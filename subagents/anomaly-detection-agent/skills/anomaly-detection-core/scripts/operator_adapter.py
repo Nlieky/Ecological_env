@@ -33,6 +33,15 @@ try:
 except ImportError:
     PYOD_AVAILABLE = False
 
+# 尝试导入可视化库
+try:
+    import matplotlib
+    matplotlib.use('Agg')  # 使用非交互式后端
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -524,6 +533,67 @@ class OperatorAdapter:
         except Exception as e:
             logger.warning(f"[ADAPTER] ABOD 检测失败: {e}，使用 zscore 替代")
             return self._zscore_anomaly(series)
+
+    def plot_anomalies(self,
+                       series: pd.Series,
+                       anomaly_mask: np.ndarray,
+                       operator_name: str,
+                       indicator_name: str,
+                       save_path: Optional[str] = None) -> str:
+        """绘制异常检测结果可视化
+
+        Args:
+            series: 原始数据序列
+            anomaly_mask: 异常掩码（True=异常）
+            operator_name: 算子名称
+            indicator_name: 指标名称
+            save_path: 保存路径（可选）
+
+        Returns:
+            图片保存路径或 base64 编码
+        """
+        if not MATPLOTLIB_AVAILABLE:
+            return "[ERROR] matplotlib 不可用，无法生成可视化"
+
+        try:
+            # 创建图形
+            fig, ax = plt.subplots(figsize=(12, 4))
+
+            # 绘制原始数据曲线
+            ax.plot(series.values, 'b-', label='数据', alpha=0.7)
+
+            # 标记异常点
+            anomaly_indices = np.where(anomaly_mask)[0]
+            if len(anomaly_indices) > 0:
+                ax.scatter(anomaly_indices, series.values[anomaly_indices],
+                          c='red', s=50, label='异常', zorder=5)
+
+            # 设置标题和标签
+            ax.set_title(f'异常检测结果 - {operator_name} | {indicator_name}')
+            ax.set_xlabel('时间步')
+            ax.set_ylabel('数值')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+
+            # 保存或返回
+            if save_path:
+                plt.savefig(save_path, dpi=100, bbox_inches='tight')
+                plt.close(fig)
+                return save_path
+            else:
+                # 返回 base64 编码
+                import io
+                import base64
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+                buf.seek(0)
+                img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+                plt.close(fig)
+                return f"data:image/png;base64,{img_base64}"
+
+        except Exception as e:
+            logger.error(f"[ADAPTER] 可视化生成失败: {e}")
+            return f"[ERROR] 可视化生成失败: {str(e)}"
 
     def get_available_operators(self) -> Dict[str, List[str]]:
         """获取可用算子分类"""
