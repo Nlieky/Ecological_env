@@ -69,6 +69,7 @@ class OperatorAdapter:
             "ecod": self._ecod_anomaly,
             "knn": self._knn_anomaly,
             "lof": self._lof_anomaly,
+            "abod": self._abod_anomaly,
         }
 
         logger.info(f"[INIT] {self.name} v{self.version} initialized")
@@ -464,6 +465,60 @@ class OperatorAdapter:
 
         except Exception as e:
             logger.warning(f"[ADAPTER] LOF 检测失败: {e}，使用 zscore 替代")
+            return self._zscore_anomaly(series)
+
+    def _abod_anomaly(self, series: pd.Series,
+                      contamination: float = 0.1) -> tuple:
+        """ABOD (Angle-Based Outlier Detection) 异常检测
+
+        Args:
+            series: 输入数据序列
+            contamination: 异常比例
+
+        Returns:
+            (scores, anomaly_mask): 异常分数和异常掩码
+        """
+        if not PYOD_AVAILABLE:
+            logger.warning("[ADAPTER] PyOD 不可用，使用 zscore 替代")
+            return self._zscore_anomaly(series)
+
+        # 数据预处理
+        X = series.values.reshape(-1, 1)
+        n_samples = len(X)
+
+        # 边界检查 - ABOD 需要至少 5 个样本
+        if n_samples < 5:
+            logger.warning("[ADAPTER] 数据量不足（ABOD 需要至少 5 个样本），返回全零分数")
+            return np.zeros(n_samples), np.zeros(n_samples, dtype=bool)
+
+        # 移除 NaN
+        valid_mask = ~np.isnan(X.flatten())
+        if valid_mask.sum() < 5:
+            logger.warning("[ADAPTER] 有效数据不足（ABOD 需要至少 5 个样本），返回全零分数")
+            return np.zeros(n_samples), np.zeros(n_samples, dtype=bool)
+
+        X_valid = X[valid_mask].reshape(-1, 1)
+
+        try:
+            # 创建并训练 ABOD 模型
+            detector = ABOD(contamination=contamination)
+            detector.fit(X_valid)
+
+            # 预测
+            scores = detector.decision_function(X_valid)
+            predictions = detector.predict(X_valid)
+
+            # 构建完整结果（包含 NaN 位置）
+            full_scores = np.zeros(n_samples)
+            full_mask = np.zeros(n_samples, dtype=bool)
+
+            full_scores[valid_mask] = scores
+            full_mask[valid_mask] = (predictions == 1)
+
+            return full_scores, full_mask
+
+        except Exception as e:
+            logger.warning(f"[ADAPTER] ABOD 检测失败: {e}，使用 zscore 替代")
             return self._zscore_anomaly(series)
 
     def get_available_operators(self) -> Dict[str, List[str]]:
