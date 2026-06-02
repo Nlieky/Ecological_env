@@ -63,14 +63,18 @@ class OperatorAdapter:
             # 机器学习类算子
             "isolation_forest": self._isolation_forest_anomaly,
             "one_class_svm": self._one_class_svm_anomaly,
-
-            # PyOD 算子
-            "hbos": self._hbos_anomaly,
-            "ecod": self._ecod_anomaly,
-            "knn": self._knn_anomaly,
-            "lof": self._lof_anomaly,
-            "abod": self._abod_anomaly,
         }
+
+        # PyOD 算子（如果可用）
+        if PYOD_AVAILABLE:
+            self.operators.update({
+                "hbos": self._hbos_anomaly,
+                "ecod": self._ecod_anomaly,
+                "knn": self._knn_anomaly,
+                "lof": self._lof_anomaly,
+                "abod": self._abod_anomaly,
+            })
+            logger.info(f"[INIT] PyOD 算子已注册: hbos, ecod, knn, lof, abod")
 
         logger.info(f"[INIT] {self.name} v{self.version} initialized")
         logger.info(f"[INIT] 已注册算子: {list(self.operators.keys())}")
