@@ -18,6 +18,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import sys
 import os
+import tempfile
 
 # 添加技能包路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -245,6 +246,55 @@ class TestOperatorAdapter(unittest.TestCase):
         available = adapter.get_available_operators()
         self.assertIn("statistical", available)
         self.assertTrue(len(available["statistical"]) > 0)
+
+    def test_plot_anomalies(self):
+        """测试可视化功能"""
+        adapter = OperatorAdapter()
+
+        # 创建测试数据
+        np.random.seed(42)
+        n = 50
+        data = 50 + 5 * np.random.randn(n)
+        data[45] = 100
+        series = pd.Series(data)
+
+        # 模拟异常掩码
+        mask = np.zeros(n, dtype=bool)
+        mask[45] = True
+
+        # 测试可视化
+        result = adapter.plot_anomalies(series, mask, "test_operator", "test_indicator")
+
+        # 验证返回值
+        self.assertTrue(isinstance(result, str))
+        self.assertTrue(result.startswith("data:image/png;base64,") or
+                       result.startswith("[ERROR]"))
+
+    def test_plot_anomalies_with_file(self):
+        """测试保存到文件的可视化"""
+        adapter = OperatorAdapter()
+
+        np.random.seed(42)
+        n = 50
+        data = 50 + 5 * np.random.randn(n)
+        data[45] = 100
+        series = pd.Series(data)
+
+        mask = np.zeros(n, dtype=bool)
+        mask[45] = True
+
+        # 测试保存到文件
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            save_path = f.name
+
+        try:
+            result = adapter.plot_anomalies(series, mask, "test", "indicator",
+                                            save_path=save_path)
+            self.assertEqual(result, save_path)
+            self.assertTrue(os.path.exists(save_path))
+        finally:
+            if os.path.exists(save_path):
+                os.unlink(save_path)
 
 
 class TestAnomalyScorer(unittest.TestCase):
