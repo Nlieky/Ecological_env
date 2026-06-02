@@ -527,12 +527,18 @@ class OperatorAdapter:
 
     def get_available_operators(self) -> Dict[str, List[str]]:
         """获取可用算子分类"""
-        return {
+        result = {
             "statistical": ["zscore", "iqr", "grubbs", "moving_average"],
-            "machine_learning": ["isolation_forest", "one_class_svm"] if ML_AVAILABLE else [],
-            "pyod": ["hbos", "knn", "lof"] if PYOD_AVAILABLE else [],
-            "deep_learning": []  # 待实现
+            "machine_learning": ["isolation_forest", "one_class_svm"] if ML_AVAILABLE else []
         }
+
+        # 添加 PyOD 算子
+        if PYOD_AVAILABLE:
+            result["pyod"] = ["hbos", "ecod", "knn", "lof", "abod"]
+        else:
+            result["pyod"] = []
+
+        return result
 
 
 # 入口函数 - 执行控制模块调用
