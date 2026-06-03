@@ -1,0 +1,15 @@
+{
+  "eval_id": 2,
+  "eval_name": "correlation_analysis_query",
+  "prompt": "分析pH和COD的相关性，判断它们之间的关系",
+  "assertions": [
+    {
+      "name": "意图识别",
+      "check": "输出包含相关性分析或correlation_analysis相关描述"
+    },
+    {
+      "name": "实体提取",
+      "check": "输出正确提取指标（pH、COD）"
+    }
+  ]
+}

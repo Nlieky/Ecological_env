@@ -1,0 +1,79 @@
+## Query Analysis for pH-COD Correlation Investigation
+
+### 1. Intent Identification
+
+The user is requesting a **correlation analysis** between two water quality parameters:
+- **pH** - A measure of acidity/alkalinity in wastewater
+- **COD** (Chemical Oxygen Demand) - A measure of organic pollutants in wastewater
+
+**Intent Types:**
+- **Analytical Intent**: Determine statistical relationship strength and direction
+- **Domain Intent**: Wastewater treatment quality assessment
+- **Investigative Intent**: Understand how pH levels might influence or correlate with organic pollution levels
+
+### 2. Entity Extraction
+
+| Entity | Category | Description |
+|--------|----------|-------------|
+| **pH** | Water Quality Parameter | Acidity/alkalinity indicator (scale 0-14) |
+| **COD** | Water Quality Parameter | Chemical Oxygen Demand (mg/L) |
+| **相关性** | Analysis Type | Correlation analysis |
+| **关系** | Output | Relationship characterization |
+| **wastewater fraud detection** | Domain Context | Environmental monitoring/compliance |
+
+**Key Assumptions:**
+- Data source: Wastewater treatment plant monitoring records
+- Time series data likely available
+- Multiple sampling points may exist
+- Fraud detection context suggests identifying anomalies or manipulated data
+
+### 3. Execution Plan
+
+**Phase 1: Data Acquisition & Preparation**
+```
+- Load wastewater monitoring dataset
+- Extract pH and COD measurement columns
+- Handle missing values and outliers
+- Validate data quality and temporal consistency
+```
+
+**Phase 2: Exploratory Analysis**
+```
+- Descriptive statistics (mean, std, min, max for both parameters)
+- Time series visualization for pH and COD trends
+- Distribution analysis (histograms, Q-Q plots)
+- Identify seasonality or patterns
+```
+
+**Phase 3: Correlation Analysis**
+```
+- Pearson correlation coefficient (linear relationship)
+- Spearman rank correlation (monotonic relationship)
+- Scatter plot with regression line
+- Correlation matrix if additional variables exist
+- Time-lagged correlation analysis (if applicable)
+```
+
+**Phase 4: Advanced Relationship Modeling**
+```
+- Polynomial regression for non-linear relationships
+- Segment analysis by pH ranges (acidic/neutral/alkaline)
+- Outlier detection for fraud flagging
+- Control chart analysis for process deviations
+```
+
+**Phase 5: Interpretation & Reporting**
+```
+- Strength of correlation (strong/weak/moderate)
+- Direction (positive/negative)
+- Statistical significance (p-value)
+- Domain interpretation (chemical/biological basis)
+- Recommendations for monitoring and fraud detection
+```
+
+**Expected Deliverables:**
+- Correlation coefficient value with confidence interval
+- Visualizations: scatter plots, time series overlays
+- Statistical significance assessment
+- Anomaly identification if correlation deviations detected
+- Domain-specific interpretation for wastewater treatment operators

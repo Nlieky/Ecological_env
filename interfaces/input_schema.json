@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ecological_env/interfaces/input_schema.json",
+  "title": "子智能体标准输入模式",
+  "description": "定义所有子智能体的标准输入数据格式",
+  "type": "object",
+  "required": ["task_id", "timestamp", "data"],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "任务唯一标识符"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "请求时间戳（ISO 8601格式）"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["user_query", "monitoring_trigger", "scheduled_task"],
+      "description": "请求来源"
+    },
+    "data": {
+      "type": "object",
+      "description": "业务数据",
+      "properties": {
+        "monitoring_point": {
+          "type": "string",
+          "description": "监测点位标识"
+        },
+        "time_range": {
+          "type": "object",
+          "properties": {
+            "start": {"type": "string", "format": "date-time"},
+            "end": {"type": "string", "format": "date-time"}
+          }
+        },
+        "indicators": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["pH", "COD", "SS", "TN", "NH3-N", "TP"]
+          },
+          "description": "监测指标列表"
+        },
+        "raw_data": {
+          "type": "array",
+          "description": "原始监测数据"
+        },
+        "features": {
+          "type": "object",
+          "description": "特征数据（用于特征分析子智能体输入）"
+        },
+        "anomalies": {
+          "type": "array",
+          "description": "异常检测结果（用于规则推理子智能体输入）"
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "可选配置参数",
+      "properties": {
+        "timeout": {
+          "type": "integer",
+          "description": "超时时间（秒）",
+          "default": 30
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "urgent"],
+          "default": "normal"
+        },
+        "reuse_policy": {
+          "type": "string",
+          "enum": ["allow", "force", "disable"],
+          "default": "allow",
+          "description": "结果复用策略"
+        },
+        "output_format": {
+          "type": "string",
+          "enum": ["json", "report", "alert"],
+          "default": "json"
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "上下文信息（用于多轮对话）",
+      "properties": {
+        "conversation_id": {"type": "string"},
+        "previous_results": {"type": "array"},
+        "user_feedback": {"type": "string"}
+      }
+    }
+  },
+  "definitions": {
+    "DataGovernanceInput": {
+      "allOf": [
+        {"$ref": "#"},
+        {
+          "properties": {
+            "target_agent": {"const": "data-governance-agent"},
+            "data": {
+              "required": ["monitoring_point", "time_range"]
+            }
+          }
+        }
+      ]
+    },
+    "FeatureAnalysisInput": {
+      "allOf": [
+        {"$ref": "#"},
+        {
+          "properties": {
+            "target_agent": {"const": "feature-analysis-agent"},
+            "data": {
+              "required": ["indicators", "raw_data"]
+            }
+          }
+        }
+      ]
+    },
+    "AnomalyDetectionInput": {
+      "allOf": [
+        {"$ref": "#"},
+        {
+          "properties": {
+            "target_agent": {"const": "anomaly-detection-agent"},
+            "data": {
+              "required": ["features"]
+            }
+          }
+        }
+      ]
+    },
+    "RuleReasoningInput": {
+      "allOf": [
+        {"$ref": "#"},
+        {
+          "properties": {
+            "target_agent": {"const": "rule-reasoning-agent"},
+            "data": {
+              "required": ["anomalies"]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

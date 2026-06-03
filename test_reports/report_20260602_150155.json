@@ -1,0 +1,310 @@
+{
+  "summary": {
+    "total_tests": 19,
+    "passed": 5,
+    "failed": 11,
+    "skipped": 3,
+    "duration": "4.2s",
+    "timestamp": "2026-06-02T15:01:55.159432"
+  },
+  "layers": [
+    {
+      "name": "ConfigTestLayer",
+      "status": "passed",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "duration": "0.1s",
+      "tests": [
+        {
+          "layer": "ConfigTestLayer",
+          "test_name": "agent_registry.yaml 加载",
+          "passed": true,
+          "error": null,
+          "duration": 0.02022576332092285,
+          "timestamp": "2026-06-02T15:01:50.994929"
+        },
+        {
+          "layer": "ConfigTestLayer",
+          "test_name": "consensus_config.yaml 加载",
+          "passed": true,
+          "error": null,
+          "duration": 0.01380467414855957,
+          "timestamp": "2026-06-02T15:01:51.008734"
+        },
+        {
+          "layer": "ConfigTestLayer",
+          "test_name": "rule_config.yaml 加载",
+          "passed": true,
+          "error": null,
+          "duration": 0.03235459327697754,
+          "timestamp": "2026-06-02T15:01:51.041088"
+        }
+      ]
+    },
+    {
+      "name": "UnitTestLayer",
+      "status": "failed",
+      "total": 10,
+      "passed": 0,
+      "failed": 10,
+      "skipped": 0,
+      "duration": "4.0s",
+      "tests": [
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "DataAcquisitionModule 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 2.9128451347351074,
+          "timestamp": "2026-06-02T15:01:53.953933"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "DataDecompositionModule 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:53.953933"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "TimeAlignmentModule 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:53.953933"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "DataCleaningModule 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:53.953933"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "StandardizationModule 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:53.953933"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "ViolationDetector 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:53.953933"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "AlertClassifier 处理",
+          "passed": false,
+          "error": "ModuleNotFoundError: No module named 'consensus_engine'",
+          "duration": 0.016551733016967773,
+          "timestamp": "2026-06-02T15:01:53.970485"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "WorkOrderGenerator 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:53.970485"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "ConsensusEngine 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:53.970485"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "ActionExecutor 验证",
+          "passed": false,
+          "error": "缺少关键属性",
+          "duration": 1.0568604469299316,
+          "timestamp": "2026-06-02T15:01:55.027345"
+        }
+      ]
+    },
+    {
+      "name": "IntegrationTestLayer",
+      "status": "passed",
+      "total": 4,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 2,
+      "duration": "0.0s",
+      "tests": [
+        {
+          "layer": "IntegrationTestLayer",
+          "test_name": "DynamicOrchestrator 验证",
+          "passed": true,
+          "error": null,
+          "duration": 0.03415703773498535,
+          "timestamp": "2026-06-02T15:01:55.071651"
+        },
+        {
+          "layer": "IntegrationTestLayer",
+          "test_name": "创建执行计划",
+          "passed": true,
+          "error": null,
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:55.071651"
+        },
+        {
+          "layer": "IntegrationTestLayer",
+          "test_name": "数据流模块导入",
+          "passed": false,
+          "error": "跳过（模块尚未实现）",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:55.071651"
+        },
+        {
+          "layer": "IntegrationTestLayer",
+          "test_name": "ExecutionControl 初始化",
+          "passed": false,
+          "error": "跳过（模块尚未实现）",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:55.071651"
+        }
+      ]
+    },
+    {
+      "name": "E2ETestLayer",
+      "status": "failed",
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "duration": "0.1s",
+      "tests": [
+        {
+          "layer": "E2ETestLayer",
+          "test_name": "pytest集成测试",
+          "passed": false,
+          "error": "测试失败，退出码: 1",
+          "duration": 0.08778119087219238,
+          "timestamp": "2026-06-02T15:01:55.159432"
+        }
+      ]
+    },
+    {
+      "name": "StreamTestLayer",
+      "status": "passed",
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "duration": "0.0s",
+      "tests": [
+        {
+          "layer": "StreamTestLayer",
+          "test_name": "Flask实时流测试",
+          "passed": false,
+          "error": "跳过（--skip-stream）",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:01:55.159432"
+        }
+      ]
+    }
+  ],
+  "failures": [
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "DataAcquisitionModule 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 2.9128451347351074,
+      "timestamp": "2026-06-02T15:01:53.953933"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "DataDecompositionModule 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 0.0,
+      "timestamp": "2026-06-02T15:01:53.953933"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "TimeAlignmentModule 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 0.0,
+      "timestamp": "2026-06-02T15:01:53.953933"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "DataCleaningModule 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 0.0,
+      "timestamp": "2026-06-02T15:01:53.953933"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "StandardizationModule 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 0.0,
+      "timestamp": "2026-06-02T15:01:53.953933"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "ViolationDetector 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 0.0,
+      "timestamp": "2026-06-02T15:01:53.953933"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "AlertClassifier 处理",
+      "passed": false,
+      "error": "ModuleNotFoundError: No module named 'consensus_engine'",
+      "duration": 0.016551733016967773,
+      "timestamp": "2026-06-02T15:01:53.970485"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "WorkOrderGenerator 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 0.0,
+      "timestamp": "2026-06-02T15:01:53.970485"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "ConsensusEngine 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 0.0,
+      "timestamp": "2026-06-02T15:01:53.970485"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "ActionExecutor 验证",
+      "passed": false,
+      "error": "缺少关键属性",
+      "duration": 1.0568604469299316,
+      "timestamp": "2026-06-02T15:01:55.027345"
+    },
+    {
+      "layer": "E2ETestLayer",
+      "test_name": "pytest集成测试",
+      "passed": false,
+      "error": "测试失败，退出码: 1",
+      "duration": 0.08778119087219238,
+      "timestamp": "2026-06-02T15:01:55.159432"
+    }
+  ],
+  "timestamp": "2026-06-02T15:01:55.159432"
+}

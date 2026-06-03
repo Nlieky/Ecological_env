@@ -1,0 +1,218 @@
+{
+  "operator_library": {
+    "version": "2.0.0",
+    "last_updated": "2026-05-07T00:00:00Z",
+    "categories": {
+      "statistical": {
+        "description": "统计类异常检测算子",
+        "operators": [
+          {
+            "id": "sigma_3",
+            "name": "3σ原则检测",
+            "type": "statistical",
+            "description": "检测超出3倍标准差的数据点",
+            "parameters": {
+              "threshold": 3.0,
+              "adaptive": false
+            },
+            "use_case": ["单点异常", "数值突变"],
+            "priority": 1
+          },
+          {
+            "id": "iqr",
+            "name": "IQR方法",
+            "type": "statistical",
+            "description": "基于四分位距的异常检测",
+            "parameters": {
+              "multiplier": 1.5
+            },
+            "use_case": ["单点异常", "离群值"],
+            "priority": 2
+          },
+          {
+            "id": "zscore",
+            "name": "Z-score检测",
+            "type": "statistical",
+            "description": "标准化后的异常检测",
+            "parameters": {
+              "threshold": 2.5
+            },
+            "use_case": ["标准化数据异常"],
+            "priority": 3
+          },
+          {
+            "id": "grubbs",
+            "name": "Grubbs检验",
+            "type": "statistical",
+            "description": "单个异常值检验",
+            "parameters": {
+              "alpha": 0.05
+            },
+            "use_case": ["单点异常确认"],
+            "priority": 4
+          }
+        ]
+      },
+      "machine_learning": {
+        "description": "机器学习类异常检测算子",
+        "operators": [
+          {
+            "id": "isolation_forest",
+            "name": "孤立森林",
+            "type": "ml",
+            "description": "无监督异常检测算法",
+            "parameters": {
+              "n_estimators": 100,
+              "contamination": 0.1,
+              "max_samples": "auto"
+            },
+            "use_case": ["多变量异常", "复杂模式"],
+            "priority": 1,
+            "model_path": "shared/models/machine-learning/isolation_forest.pkl"
+          },
+          {
+            "id": "one_class_svm",
+            "name": "One-Class SVM",
+            "type": "ml",
+            "description": "单类支持向量机",
+            "parameters": {
+              "kernel": "rbf",
+              "nu": 0.1
+            },
+            "use_case": ["边界异常", "新模式检测"],
+            "priority": 2
+          },
+          {
+            "id": "lof",
+            "name": "局部异常因子",
+            "type": "ml",
+            "description": "基于密度的异常检测",
+            "parameters": {
+              "n_neighbors": 20,
+              "contamination": 0.1
+            },
+            "use_case": ["局部异常", "密度差异"],
+            "priority": 3
+          },
+          {
+            "id": "hbos",
+            "name": "直方图离群值评分",
+            "type": "ml",
+            "description": "基于直方图的快速异常检测",
+            "parameters": {
+              "bins": 10,
+              "contamination": 0.1
+            },
+            "use_case": ["快速检测", "大规模数据"],
+            "priority": 4
+          }
+        ]
+      },
+      "deep_learning": {
+        "description": "深度学习类异常检测算子",
+        "operators": [
+          {
+            "id": "lstm_ae",
+            "name": "LSTM自编码器",
+            "type": "dl",
+            "description": "长短期记忆自编码器",
+            "parameters": {
+              "sequence_length": 24,
+              "latent_dim": 8,
+              "epochs": 100
+            },
+            "use_case": ["时序异常", "趋势异常"],
+            "priority": 1,
+            "model_path": "shared/models/deep-learning/lstm_ae.h5"
+          },
+          {
+            "id": "vae",
+            "name": "变分自编码器",
+            "type": "dl",
+            "description": "基于VAE的异常检测",
+            "parameters": {
+              "latent_dim": 8,
+              "epochs": 100
+            },
+            "use_case": ["复杂模式", "分布异常"],
+            "priority": 2
+          }
+        ]
+      },
+      "specialized": {
+        "description": "专用异常检测算子",
+        "operators": [
+          {
+            "id": "constant_detection",
+            "name": "恒定检测",
+            "type": "specialized",
+            "description": "检测数值长时间不变",
+            "parameters": {
+              "min_duration_hours": 2,
+              "variance_threshold": 0.01
+            },
+            "use_case": ["插瓶干扰", "设备故障"],
+            "priority": 1
+          },
+          {
+            "id": "change_point_detection",
+            "name": "变点检测",
+            "type": "specialized",
+            "description": "检测突变点",
+            "parameters": {
+              "method": "pelt",
+              "min_size": 5
+            },
+            "use_case": ["突变异常", "状态切换"],
+            "priority": 2
+          },
+          {
+            "id": "smoothness_detection",
+            "name": "平滑检测",
+            "type": "specialized",
+            "description": "检测过度平滑处理",
+            "parameters": {
+              "variance_threshold": 0.001,
+              "window_size": 10
+            },
+            "use_case": ["数据造假", "人工处理"],
+            "priority": 3
+          },
+          {
+            "id": "forgery_detector",
+            "name": "造假检测器",
+            "type": "specialized",
+            "description": "综合造假模式检测",
+            "parameters": {
+              "pattern_matching": true,
+              "relationship_check": true
+            },
+            "use_case": ["数据造假", "插瓶干扰"],
+            "priority": 4,
+            "model_path": "shared/models/machine-learning/pyod_detector.pkl"
+          }
+        ]
+      }
+    },
+    "operator_selection_rules": {
+      "new_data_source": ["sigma_3", "iqr", "zscore"],
+      "has_history": ["isolation_forest", "one_class_svm", "lof"],
+      "complex_pattern": ["lstm_ae", "vae", "isolation_forest"],
+      "fast_detection": ["hbos", "sigma_3", "constant_detection"],
+      "comprehensive": ["isolation_forest", "forgery_detector", "constant_detection"]
+    },
+    "confidence_calculation": {
+      "multi_operator_agreement": {
+        "full_agreement": 0.95,
+        "partial_agreement": 0.75,
+        "disagreement": 0.50
+      },
+      "historical_match": {
+        "exact_match": 0.90,
+        "similar": 0.70,
+        "no_match": 0.50
+      },
+      "stability_weight": 0.10
+    }
+  }
+}

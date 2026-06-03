@@ -1,0 +1,14 @@
+{
+  "expectations": [
+    {
+      "text": "双数据流识别",
+      "passed": true,
+      "evidence": "明确提取监测点位1='进水口(influent)'和监测点位2='出水口(effluent)'，任务类别为dual_stream_analysis"
+    },
+    {
+      "text": "违规模式识别",
+      "passed": true,
+      "evidence": "详细描述稀释排放异常检测规则，包括触发条件和判定标准"
+    }
+  ]
+}

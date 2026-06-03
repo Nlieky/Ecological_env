@@ -42,6 +42,15 @@ try:
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
+# 尝试导入深度学习库
+try:
+    import torch
+    import torch.nn as nn
+    torch.manual_seed(42)
+    DEEP_LEARNING_AVAILABLE = True
+except ImportError:
+    DEEP_LEARNING_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -84,6 +93,13 @@ class OperatorAdapter:
                 "abod": self._abod_anomaly,
             })
             logger.info(f"[INIT] PyOD 算子已注册: hbos, ecod, knn, lof, abod")
+
+        # 深度学习算子（如果可用）
+        if DEEP_LEARNING_AVAILABLE:
+            self.operators.update({
+                "vae": self._vae_anomaly,
+            })
+            logger.info(f"[INIT] 深度学习算子已注册: vae")
 
         logger.info(f"[INIT] {self.name} v{self.version} initialized")
         logger.info(f"[INIT] 已注册算子: {list(self.operators.keys())}")
@@ -534,6 +550,135 @@ class OperatorAdapter:
             logger.warning(f"[ADAPTER] ABOD 检测失败: {e}，使用 zscore 替代")
             return self._zscore_anomaly(series)
 
+    # ========== 深度学习类算子 ==========
+
+    def _vae_anomaly(self, series: pd.Series,
+                     latent_dim: int = 8,
+                     epochs: int = 50,
+                     batch_size: int = 32,
+                     contamination: float = 0.1) -> tuple:
+        """VAE (Variational Autoencoder) 异常检测
+
+        使用变分自编码器进行异常检测。通过训练VAE重构正常数据，
+        重构误差较大的样本被标记为异常。
+
+        Args:
+            series: 输入数据序列
+            latent_dim: 潜在空间维度
+            epochs: 训练轮数
+            batch_size: 批次大小
+            contamination: 异常比例阈值
+
+        Returns:
+            (scores, anomaly_mask): 异常分数和异常掩码
+        """
+        if not DEEP_LEARNING_AVAILABLE:
+            logger.warning("[ADAPTER] 深度学习库不可用，使用 zscore 替代")
+            return self._zscore_anomaly(series)
+
+        # 数据预处理
+        X = series.values.reshape(-1, 1)
+        n_samples = len(X)
+
+        # 边界检查
+        if n_samples < 20:
+            logger.warning("[ADAPTER] 数据量不足（VAE 建议至少 20 个样本），返回全零分数")
+            return np.zeros(n_samples), np.zeros(n_samples, dtype=bool)
+
+        # 移除 NaN
+        valid_mask = ~np.isnan(X.flatten())
+        if valid_mask.sum() < 20:
+            logger.warning("[ADAPTER] 有效数据不足，返回全零分数")
+            return np.zeros(n_samples), np.zeros(n_samples, dtype=bool)
+
+        X_valid = X[valid_mask]
+
+        try:
+            # 标准化数据
+            from sklearn.preprocessing import StandardScaler
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X_valid)
+
+            # 转换为torch张量
+            X_tensor = torch.FloatTensor(X_scaled).reshape(-1, 1)
+
+            # 定义VAE模型
+            class VAE(nn.Module):
+                def __init__(self, input_dim=1, latent_dim=latent_dim):
+                    super(VAE, self).__init__()
+                    # 编码器
+                    self.encoder = nn.Sequential(
+                        nn.Linear(input_dim, 32),
+                        nn.ReLU(),
+                        nn.Linear(32, latent_dim * 2)  # 均值和方差
+                    )
+                    # 解码器
+                    self.decoder = nn.Sequential(
+                        nn.Linear(latent_dim, 32),
+                        nn.ReLU(),
+                        nn.Linear(32, input_dim)
+                    )
+
+                def reparameterize(self, mu, logvar):
+                    std = torch.exp(0.5 * logvar)
+                    eps = torch.randn_like(std)
+                    return mu + eps * std
+
+                def forward(self, x):
+                    # 编码
+                    h = self.encoder(x)
+                    mu, logvar = h.chunk(2, dim=-1)
+                    z = self.reparameterize(mu, logvar)
+                    # 解码
+                    reconstructed = self.decoder(z)
+                    return reconstructed, mu, logvar
+
+            # 初始化模型
+            model = VAE(input_dim=1, latent_dim=latent_dim)
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+            # 训练VAE
+            model.train()
+            for epoch in range(epochs):
+                optimizer.zero_grad()
+
+                # 前向传播
+                reconstructed, mu, logvar = model(X_tensor)
+
+                # 计算损失：重构损失 + KL散度
+                recon_loss = nn.functional.mse_loss(reconstructed, X_tensor)
+                kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+                loss = recon_loss + 0.001 * kl_loss
+
+                # 反向传播
+                loss.backward()
+                optimizer.step()
+
+            # 计算重构误差作为异常分数
+            model.eval()
+            with torch.no_grad():
+                reconstructed, _, _ = model(X_tensor)
+                reconstruction_errors = torch.mean((X_tensor - reconstructed) ** 2, dim=1)
+
+            # 转换为numpy数组
+            errors = reconstruction_errors.numpy()
+
+            # 根据contamination确定阈值
+            threshold = np.percentile(errors, (1 - contamination) * 100)
+
+            # 构建完整结果（包含 NaN 位置）
+            full_scores = np.zeros(n_samples)
+            full_mask = np.zeros(n_samples, dtype=bool)
+
+            full_scores[valid_mask] = errors
+            full_mask[valid_mask] = errors > threshold
+
+            return full_scores, full_mask
+
+        except Exception as e:
+            logger.warning(f"[ADAPTER] VAE 检测失败: {e}，使用 zscore 替代")
+            return self._zscore_anomaly(series)
+
     def plot_anomalies(self,
                        series: pd.Series,
                        anomaly_mask: np.ndarray,
@@ -607,6 +752,12 @@ class OperatorAdapter:
             result["pyod"] = ["hbos", "ecod", "knn", "lof", "abod"]
         else:
             result["pyod"] = []
+
+        # 添加深度学习算子
+        if DEEP_LEARNING_AVAILABLE:
+            result["deep_learning"] = ["vae"]
+        else:
+            result["deep_learning"] = []
 
         return result
 

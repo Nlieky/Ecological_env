@@ -1,0 +1,73 @@
+{
+  "registry": {
+    "version": "2.0.0",
+    "last_updated": "2026-05-09T00:00:00Z",
+    "agents": [
+      {
+        "id": "data-governance-agent",
+        "name": "数据治理子智能体",
+        "version": "2.0.0",
+        "enabled": true,
+        "description": "多源数据获取、时序对齐、数据清洗、标准化处理",
+        "path": "E:/project/Ecological_env/subagents/data-governance-agent",
+        "skills": ["data-governance-core"],
+        "priority": 1,
+        "timeout": 30
+      },
+      {
+        "id": "feature-analysis-agent",
+        "name": "特征与关系分析子智能体",
+        "version": "2.0.0",
+        "enabled": true,
+        "description": "时序特征提取、指标相关性分析、趋势分析、特征融合",
+        "path": "E:/project/Ecological_env/subagents/feature-analysis-agent",
+        "skills": ["feature-analysis-core"],
+        "priority": 2,
+        "timeout": 45
+      },
+      {
+        "id": "anomaly-detection-agent",
+        "name": "异常检测子智能体",
+        "version": "2.0.0",
+        "enabled": true,
+        "description": "算子调用、异常评分、模式识别、置信度评估",
+        "path": "E:/project/Ecological_env/subagents/anomaly-detection-agent",
+        "skills": ["anomaly-detection-core"],
+        "priority": 3,
+        "timeout": 60
+      },
+      {
+        "id": "rule-reasoning-agent",
+        "name": "规则推理子智能体",
+        "version": "2.0.0",
+        "enabled": true,
+        "description": "法规规则匹配、工艺机理校验、专家经验推理、违规结论生成",
+        "path": "E:/project/Ecological_env/subagents/rule-reasoning-agent",
+        "skills": ["rule-reasoning-core"],
+        "priority": 4,
+        "timeout": 30
+      }
+    ]
+  },
+  "workflow": {
+    "default_flow": [
+      "data-governance-agent",
+      "feature-analysis-agent",
+      "anomaly-detection-agent",
+      "rule-reasoning-agent"
+    ],
+    "parallel_agents": [
+      "data-governance-agent",
+      "feature-analysis-agent"
+    ],
+    "sequential_agents": [
+      "anomaly-detection-agent",
+      "rule-reasoning-agent"
+    ]
+  },
+  "cache_config": {
+    "enabled": true,
+    "ttl_seconds": 3600,
+    "max_size": 1000
+  }
+}

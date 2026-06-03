@@ -1,0 +1,66 @@
+# 规则推理子智能体配置文件
+
+agent:
+  id: "rule-reasoning-agent"
+  name: "规则推理子智能体"
+  version: "1.0.0"
+  description: "基于法规、工艺、经验三重逻辑的违规判定子智能体"
+
+capabilities:
+  - "regulation_matcher"
+  - "process_validator"
+  - "expert_reasoner"
+  - "violation_generator"
+
+# 专利要求的参数
+patent_params:
+  similarity_threshold: 0.8    # 专家经验推理相似度阈值
+  suspicion_rules:
+    high: "patterns >= 2 AND process_violation"   # 高风险
+    medium: "patterns == 1 AND process_violation" # 中风险
+    low: "patterns > 0 AND NOT process_violation" # 低风险
+
+# 法规标准限值（GB 18918-2002 一级A标）
+standards:
+  GB18918_1A:
+    COD: 50      # mg/L
+    TN: 15       # mg/L
+    NH3_N: 5     # mg/L
+    TP: 0.5      # mg/L
+    pH_min: 6
+    pH_max: 9
+
+# 工艺规则阈值
+process_rules:
+  ph_cod:
+    ph_std_threshold: 0.1      # pH标准差异常阈值
+    cod_std_threshold: 5.0     # COD标准差异常阈值
+  nh3_tn:
+    ratio_min: 0.3             # 氨氮/总氮比值下限
+    ratio_max: 0.8             # 氨氮/总氮比值上限
+  do_degradation:
+    do_normal_min: 2.0         # 正常溶解氧下限 (mg/L)
+  mass_balance:
+    error_threshold: 0.2       # 质量平衡误差阈值
+
+# 专家案例库配置
+expert_cases:
+  case_similarity_threshold: 0.8
+  case_update_frequency: "daily"
+  case_source: "expert_cases/"
+
+# 执行配置
+execution:
+  timeout: 30                    # 最大执行时间（秒）
+  max_retries: 3                # 最大重试次数
+  parallel_processing: false    # 规则推理需要顺序执行
+
+# 输出配置
+output:
+  format: "json"
+  include_evidence: true        # 包含取证要点
+  include_regulations: true     # 包含适用法规条款
+  suspicion_colors:
+    high: "red"
+    medium: "orange"
+    low: "yellow"

@@ -1,0 +1,14 @@
+{
+  "expectations": [
+    {
+      "text": "完整实体提取",
+      "passed": true,
+      "evidence": "完整提取监测点位='当阳市金桥污水处理厂总排口'，指标=['pH','COD','氨氮']，时间范围='最近24小时'"
+    },
+    {
+      "text": "完整流程规划",
+      "passed": true,
+      "evidence": "生成4个结构化任务(task_000001-task_000004)，涉及data-governance-agent、feature-analysis-agent、anomaly-detection-agent、rule-reasoning-agent的完整执行计划"
+    }
+  ]
+}

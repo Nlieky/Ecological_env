@@ -1,0 +1,58 @@
+## Analysis of the Wastewater Fraud Detection Query
+
+### 1. Intent Identification
+
+The user is requesting an analysis of:
+- **Primary Intent**: Detect anomalous patterns in COD (Chemical Oxygen Demand) effluent data
+- **Secondary Intent**: Identify potential "bottle insertion interference" (插瓶干扰) - a type of fraud where water samples are manipulated or substituted to falsify compliance data
+- **Domain**: Environmental monitoring and wastewater treatment plant compliance
+- **Type**: Anomaly detection and fraud detection analysis
+
+### 2. Entity Extraction
+
+| Entity | Category | Description |
+|--------|----------|-------------|
+| COD | Water Quality Parameter | Chemical Oxygen Demand - key indicator of organic pollution in wastewater |
+| 出水 | Measurement Location | Effluent/Outflow water from treatment plant |
+| 异常情况 | Target Pattern | Anomalous readings or deviations from expected patterns |
+| 插瓶干扰 | Fraud Type | Bottle tampering - substituting clean water samples for actual effluent |
+| 最近 | Time Range | Recent time period (requires clarification of specific duration) |
+
+### 3. Execution Plan
+
+**Phase 1: Data Assessment**
+- Locate and inventory available COD effluent datasets
+- Identify data sources (SCADA systems, laboratory results, online monitoring stations)
+- Verify data completeness and quality for recent time period
+
+**Phase 2: Anomaly Detection**
+- Apply statistical methods to detect outliers:
+  - Z-score analysis for threshold anomalies
+  - Moving average standard deviation bands
+  - Seasonal decomposition for expected pattern extraction
+- Detect patterns consistent with bottle interference:
+  - Abnormally consistent/stable readings (natural variance suppressed)
+  - Sudden transitions to perfect compliance values
+  - Discrepancies between online monitoring vs. lab samples
+  - Correlation analysis with other parameters (NH3-N, TP, TN, flow rate)
+
+**Phase 3: Fraud Pattern Identification**
+- Search for specific indicators of bottle tampering:
+  - Extended periods of identical COD values (sensor bypass)
+  - Negative correlation between flow rate and pollutant concentration
+  - Temporal patterns suggesting manual intervention (regular working hours only)
+  - Comparison with upstream/downstream monitoring stations
+
+**Phase 4: Reporting**
+- Generate comprehensive analysis report with:
+  - Visualizations of COD trends with anomaly overlay
+  - Statistical significance of detected anomalies
+  - Confidence assessment for fraud indicators
+  - Recommendations for further investigation or validation
+
+### 4. Critical Dependencies
+
+- Access to historical COD monitoring data (required)
+- Data timestamps with at least hourly granularity
+- Auxiliary parameters for correlation analysis (flow rate, other pollutants)
+- Baseline "normal" operating range for the specific treatment plant

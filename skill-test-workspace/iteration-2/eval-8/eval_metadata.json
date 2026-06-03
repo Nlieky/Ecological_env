@@ -1,0 +1,1 @@
+{"eval_id": 8, "eval_name": "adaptive_optimization_feedback", "prompt": "监管人员反馈上次的插瓶干扰判定是误报（false_positive）。请说明系统会如何处理这个反馈？", "assertions": [{"name": "反馈收集", "check": "输出提到反馈收集或反馈类型识别"}, {"name": "参数调整机制", "check": "输出提到根据反馈调整阈值、规则或参数"}]}

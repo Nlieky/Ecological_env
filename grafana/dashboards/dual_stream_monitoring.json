@@ -1,0 +1,73 @@
+{
+  "title": "废水监测双数据流",
+  "uid": "wastewater-dual-stream",
+  "panels": [
+    {
+      "title": "进水pH值",
+      "targets": [{"expr": "wastewater_influent_ph"}],
+      "type": "gauge"
+    },
+    {
+      "title": "进水COD (mg/L)",
+      "targets": [{"expr": "wastewater_influent_cod"}],
+      "type": "gauge"
+    },
+    {
+      "title": "进水总氮 (mg/L)",
+      "targets": [{"expr": "wastewater_influent_tn"}],
+      "type": "gauge"
+    },
+    {
+      "title": "进水氨氮 (mg/L)",
+      "targets": [{"expr": "wastewater_influent_an"}],
+      "type": "gauge"
+    },
+    {
+      "title": "进水总磷 (mg/L)",
+      "targets": [{"expr": "wastewater_influent_tp"}],
+      "type": "gauge"
+    },
+    {
+      "title": "出水pH值",
+      "targets": [{"expr": "wastewater_effluent_ph"}],
+      "type": "gauge"
+    },
+    {
+      "title": "出水COD (mg/L)",
+      "targets": [{"expr": "wastewater_effluent_cod"}],
+      "type": "gauge"
+    },
+    {
+      "title": "出水总氮 (mg/L)",
+      "targets": [{"expr": "wastewater_effluent_tn"}],
+      "type": "gauge"
+    },
+    {
+      "title": "出水氨氮 (mg/L)",
+      "targets": [{"expr": "wastewater_effluent_an"}],
+      "type": "gauge"
+    },
+    {
+      "title": "出水总磷 (mg/L)",
+      "targets": [{"expr": "wastewater_effluent_tp"}],
+      "type": "gauge"
+    },
+    {
+      "title": "所有指标时序图",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "wastewater_influent_ph", "legendFormat": "进水pH"},
+        {"expr": "wastewater_influent_cod", "legendFormat": "进水COD"},
+        {"expr": "wastewater_influent_tn", "legendFormat": "进水TN"},
+        {"expr": "wastewater_influent_an", "legendFormat": "进水AN"},
+        {"expr": "wastewater_influent_tp", "legendFormat": "进水TP"},
+        {"expr": "wastewater_effluent_ph", "legendFormat": "出水pH"},
+        {"expr": "wastewater_effluent_cod", "legendFormat": "出水COD"},
+        {"expr": "wastewater_effluent_tn", "legendFormat": "出水TN"},
+        {"expr": "wastewater_effluent_an", "legendFormat": "出水AN"},
+        {"expr": "wastewater_effluent_tp", "legendFormat": "出水TP"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}}
+    }
+  ]
+}

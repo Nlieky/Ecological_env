@@ -1,0 +1,14 @@
+{
+  "expectations": [
+    {
+      "text": "双数据流识别",
+      "passed": true,
+      "evidence": "识别Influent和Effluent两个数据流"
+    },
+    {
+      "text": "违规模式识别",
+      "passed": true,
+      "evidence": "提及dilution discharge detection和稀释排放异常检测"
+    }
+  ]
+}

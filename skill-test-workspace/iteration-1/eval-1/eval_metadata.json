@@ -1,0 +1,19 @@
+{
+  "eval_id": 1,
+  "eval_name": "violation_detection_query",
+  "prompt": "分析最近出水的COD异常情况，检测是否存在插瓶干扰行为",
+  "assertions": [
+    {
+      "name": "意图识别",
+      "check": "输出包含意图类型识别，如violation_detection、analysis_query或违规检测相关描述"
+    },
+    {
+      "name": "实体提取",
+      "check": "输出正确提取监测点位（出水）和指标（COD）"
+    },
+    {
+      "name": "任务规划",
+      "check": "输出提到需要调用多个子智能体或包含执行计划"
+    }
+  ]
+}

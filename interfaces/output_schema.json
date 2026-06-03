@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ecological_env/interfaces/output_schema.json",
+  "title": "子智能体标准输出模式",
+  "description": "定义所有子智能体的标准输出数据格式",
+  "type": "object",
+  "required": ["task_id", "agent", "timestamp", "status"],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "任务唯一标识符"
+    },
+    "agent": {
+      "type": "string",
+      "enum": [
+        "data-governance-agent",
+        "feature-analysis-agent",
+        "anomaly-detection-agent",
+        "rule-reasoning-agent"
+      ],
+      "description": "子智能体标识"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "响应时间戳"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "error", "partial", "timeout"],
+      "description": "执行状态"
+    },
+    "result": {
+      "type": "object",
+      "description": "分析结果",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "结果摘要"
+        },
+        "data": {
+          "type": "object",
+          "description": "详细数据"
+        },
+        "metrics": {
+          "type": "object",
+          "description": "关键指标"
+        },
+        "anomalies": {
+          "type": "array",
+          "description": "异常列表"
+        },
+        "recommendations": {
+          "type": "array",
+          "description": "建议列表"
+        },
+        "violations": {
+          "type": "array",
+          "description": "违规判定结果"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "元数据",
+      "properties": {
+        "execution_time": {
+          "type": "number",
+          "description": "执行时间（秒）"
+        },
+        "data_points_processed": {
+          "type": "integer",
+          "description": "处理的数据点数量"
+        },
+        "cache_hit": {
+          "type": "boolean",
+          "description": "是否命中缓存"
+        },
+        "model_version": {
+          "type": "string",
+          "description": "使用的模型版本"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "结果置信度"
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "description": "错误信息（仅当status为error时存在）",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "错误代码"
+        },
+        "message": {
+          "type": "string",
+          "description": "错误消息"
+        },
+        "details": {
+          "type": "object",
+          "description": "错误详情"
+        },
+        "retry_able": {
+          "type": "boolean",
+          "description": "是否可重试"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "DataGovernanceOutput": {
+      "allOf": [
+        {"$ref": "#"},
+        {
+          "properties": {
+            "agent": {"const": "data-governance-agent"},
+            "result": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "processed_data": {
+                      "type": "array",
+                      "description": "处理后的标准化数据"
+                    },
+                    "quality_report": {
+                      "type": "object",
+                      "description": "数据质量报告"
+                    },
+                    "alignment_info": {
+                      "type": "object",
+                      "description": "时序对齐信息"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "FeatureAnalysisOutput": {
+      "allOf": [
+        {"$ref": "#"},
+        {
+          "properties": {
+            "agent": {"const": "feature-analysis-agent"},
+            "result": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "features": {
+                      "type": "object",
+                      "description": "提取的特征"
+                    },
+                    "correlations": {
+                      "type": "object",
+                      "description": "指标相关性分析结果"
+                    },
+                    "trends": {
+                      "type": "object",
+                      "description": "趋势分析结果"
+                    },
+                    "relationships": {
+                      "type": "object",
+                      "description": "关系分析结果"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "AnomalyDetectionOutput": {
+      "allOf": [
+        {"$ref": "#"},
+        {
+          "properties": {
+            "agent": {"const": "anomaly-detection-agent"},
+            "result": {
+              "properties": {
+                "anomalies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {"type": "string"},
+                      "timestamp": {"type": "string"},
+                      "score": {"type": "number"},
+                      "confidence": {"type": "number"},
+                      "pattern": {"type": "string"}
+                    }
+                  }
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "异常检测摘要"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "RuleReasoningOutput": {
+      "allOf": [
+        {"$ref": "#"},
+        {
+          "properties": {
+            "agent": {"const": "rule-reasoning-agent"},
+            "result": {
+              "properties": {
+                "violations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {"type": "string"},
+                      "severity": {"type": "string"},
+                      "regulation": {"type": "string"},
+                      "evidence": {"type": "object"},
+                      "suspect_level": {"type": "string"}
+                    }
+                  }
+                },
+                "recommendations": {
+                  "type": "array",
+                  "description": "处理建议"
+                },
+                "conclusion": {
+                  "type": "string",
+                  "description": "综合结论"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

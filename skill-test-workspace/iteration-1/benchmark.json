@@ -1,0 +1,159 @@
+{
+  "skill_name": "orchestrator",
+  "version": "2.0.0",
+  "iteration": 1,
+  "timestamp": "2026-05-19",
+  "configurations": [
+    {
+      "name": "with_skill",
+      "display_name": "使用orchestrator技能",
+      "description": "Claude使用orchestrator-core技能包进行响应"
+    },
+    {
+      "name": "without_skill",
+      "display_name": "无技能基线",
+      "description": "Claude不使用任何技能的基线响应"
+    }
+  ],
+  "evals": [
+    {
+      "eval_id": 1,
+      "eval_name": "violation_detection_query",
+      "prompt": "分析最近出水的COD异常情况，检测是否存在插瓶干扰行为",
+      "assertions": [
+        {"name": "意图识别", "description": "输出包含意图类型识别"},
+        {"name": "实体提取", "description": "输出正确提取监测点位（出水）和指标（COD）"},
+        {"name": "任务规划", "description": "输出提到需要调用多个子智能体或包含执行计划"}
+      ],
+      "runs": [
+        {
+          "config": "with_skill",
+          "run_dir": "eval-1/with_skill",
+          "pass_rate": 1.0,
+          "total_assertions": 3,
+          "passed_assertions": 3,
+          "grades": {"意图识别": true, "实体提取": true, "任务规划": true}
+        },
+        {
+          "config": "without_skill",
+          "run_dir": "eval-1/without_skill",
+          "pass_rate": 0.667,
+          "total_assertions": 3,
+          "passed_assertions": 2,
+          "grades": {"意图识别": true, "实体提取": true, "任务规划": false}
+        }
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "correlation_analysis_query",
+      "prompt": "分析pH和COD的相关性，判断它们之间的关系",
+      "assertions": [
+        {"name": "意图识别", "description": "输出包含相关性分析相关描述"},
+        {"name": "实体提取", "description": "输出正确提取指标（pH、COD）"}
+      ],
+      "runs": [
+        {
+          "config": "with_skill",
+          "run_dir": "eval-2/with_skill",
+          "pass_rate": 1.0,
+          "total_assertions": 2,
+          "passed_assertions": 2,
+          "grades": {"意图识别": true, "实体提取": true}
+        },
+        {
+          "config": "without_skill",
+          "run_dir": "eval-2/without_skill",
+          "pass_rate": 1.0,
+          "total_assertions": 2,
+          "passed_assertions": 2,
+          "grades": {"意图识别": true, "实体提取": true}
+        }
+      ]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "dual_stream_analysis_query",
+      "prompt": "对比分析进水和出水的数据，检测是否存在稀释排放异常",
+      "assertions": [
+        {"name": "双数据流识别", "description": "输出提到进水和出水两个数据流"},
+        {"name": "违规模式识别", "description": "输出提到稀释排放相关内容"}
+      ],
+      "runs": [
+        {
+          "config": "with_skill",
+          "run_dir": "eval-3/with_skill",
+          "pass_rate": 1.0,
+          "total_assertions": 2,
+          "passed_assertions": 2,
+          "grades": {"双数据流识别": true, "违规模式识别": true}
+        },
+        {
+          "config": "without_skill",
+          "run_dir": "eval-3/without_skill",
+          "pass_rate": 1.0,
+          "total_assertions": 2,
+          "passed_assertions": 2,
+          "grades": {"双数据流识别": true, "违规模式识别": true}
+        }
+      ]
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "complex_orchestration_query",
+      "prompt": "分析最近24小时当阳市金桥污水处理厂总排口的pH、COD、氨氮三项指标，执行完整的违规检测流程",
+      "assertions": [
+        {"name": "完整实体提取", "description": "输出包含监测点位、多个指标、时间范围"},
+        {"name": "完整流程规划", "description": "输出提到完整的分析流程或多个子智能体协同"}
+      ],
+      "runs": [
+        {
+          "config": "with_skill",
+          "run_dir": "eval-4/with_skill",
+          "pass_rate": 1.0,
+          "total_assertions": 2,
+          "passed_assertions": 2,
+          "grades": {"完整实体提取": true, "完整流程规划": true}
+        },
+        {
+          "config": "without_skill",
+          "run_dir": "eval-4/without_skill",
+          "pass_rate": 0.5,
+          "total_assertions": 2,
+          "passed_assertions": 1,
+          "grades": {"完整实体提取": true, "完整流程规划": false}
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "with_skill": {
+      "total_assertions": 9,
+      "passed_assertions": 9,
+      "pass_rate": 1.0,
+      "evals_pass_rate": [1.0, 1.0, 1.0, 1.0],
+      "mean_pass_rate": 1.0,
+      "stddev_pass_rate": 0.0
+    },
+    "without_skill": {
+      "total_assertions": 9,
+      "passed_assertions": 7,
+      "pass_rate": 0.778,
+      "evals_pass_rate": [0.667, 1.0, 1.0, 0.5],
+      "mean_pass_rate": 0.792,
+      "stddev_pass_rate": 0.21
+    }
+  },
+  "delta": {
+    "pass_rate_improvement": "+0.222 (+22.2%)",
+    "evals_won": 2,
+    "evals_tied": 2,
+    "evals_lost": 0
+  },
+  "analyst_observations": [
+    "with_skill配置在所有测试用例中均达到100%通过率",
+    "without_skill基线在复杂任务编排(eval-1和eval-4)中表现较弱，缺乏结构化任务分解能力",
+    "简单查询(eval-2和eval-3)两种配置都能正确处理，但with_skill提供更详细的结构化输出",
+    "orchestrator技能显著提升了任务规划能力，特别是在需要多子智能体协同的复杂场景中"
+  ]
+}

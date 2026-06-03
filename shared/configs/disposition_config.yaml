@@ -1,0 +1,31 @@
+# shared/configs/disposition_config.yaml
+# 研判预警与处置执行配置
+
+action_executor:
+  # 飞书推送配置
+  feishu:
+    webhook_url: "${FEISHU_WEBHOOK_URL:}"
+    enabled: false  # 默认关闭，需要配置 Webhook 后启用
+
+  # 监管平台推送配置
+  platform:
+    api_url: "${PLATFORM_API_URL:}"
+    api_key: "${PLATFORM_API_KEY:}"
+    enabled: false  # 默认关闭，需要配置 API 后启用
+
+  # 本地归档配置
+  archive:
+    output_dir: "/shared/outputs/work_orders/"
+    enabled: true  # 默认启用
+
+report_generator:
+  # 报告输出目录
+  output_dir: "/shared/outputs/reports/"
+
+  # 支持的报告格式
+  formats:
+    - json
+    - markdown
+
+  # 是否包含趋势图表数据
+  include_trend_charts: true

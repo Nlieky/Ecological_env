@@ -1,0 +1,102 @@
+# 废水监测系统配置文件
+# 基于专利标准四层架构 v2.0.0
+
+system:
+  name: "废水虚假排放智能监测系统"
+  version: "2.0.0"
+  environment: "production"
+  timezone: "Asia/Shanghai"
+
+# 主智能体配置
+master_agent:
+  enabled: true
+  llm_model: "claude-opus-4-7"
+  max_concurrent_tasks: 10
+  result_cache_ttl: 3600
+  adaptive_learning: true
+
+# 任务编排层配置
+task_orchestration:
+  max_parallel_tasks: 5
+  default_timeout: 30
+  retry_policy:
+    max_retries: 3
+    backoff_factor: 2
+  resource_pool:
+    cpu_limit: 80
+    memory_limit: 80
+
+# 结果复用配置
+result_reuse:
+  enabled: true
+  cache_size: 1000
+  match_strategies:
+    - data_match
+    - freshness_check
+    - semantic_match
+  freshness_threshold: 3600
+
+# 双驱动机制配置
+dual_drive:
+  active_monitoring:
+    enabled: true
+    interval: 600  # 10分钟
+    auto_alert: true
+  query_response:
+    enabled: true
+    natural_language: true
+    max_history: 100
+
+# 数据层配置
+data_layer:
+  time_series_db:
+    type: "influxdb"
+    host: "localhost"
+    port: 8086
+    database: "wastewater_monitoring"
+  knowledge_base:
+    path: "shared/knowledge"
+    regulations_path: "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/regulations"
+    process_knowledge_path: "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/process_knowledge"
+    expert_experience_path: "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/expert_experience"
+    cases_path: "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/cases"
+  operator_library:
+    path: "shared/models"
+    statistical_path: "shared/models/statistical"
+    ml_path: "shared/models/machine-learning"
+    dl_path: "shared/models/deep-learning"
+
+# 监测标准配置
+standards:
+  influent:  # 进水宽松标准
+    ph: {min: 5.0, max: 10.0}
+    cod: {max: 400}
+    ss: {max: 200}
+    tn: {max: 40}
+    nh3_n: {max: 25}
+    tp: {max: 8}
+  effluent:  # 出水严格标准（GB 18918-2002一级A标）
+    ph: {min: 6.0, max: 9.0}
+    cod: {max: 50}
+    ss: {max: 10}
+    tn: {max: 15}
+    nh3_n: {max: 5}
+    tp: {max: 0.5}
+
+# 日志配置
+logging:
+  level: "INFO"
+  path: "logs"
+  max_size: "100MB"
+  backup_count: 10
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 监控配置
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9090
+  health_check:
+    enabled: true
+    interval: 60
+    endpoint: "/health"

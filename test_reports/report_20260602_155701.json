@@ -1,0 +1,246 @@
+{
+  "summary": {
+    "total_tests": 19,
+    "passed": 13,
+    "failed": 3,
+    "skipped": 3,
+    "duration": "2.6s",
+    "timestamp": "2026-06-02T15:57:01.744385"
+  },
+  "layers": [
+    {
+      "name": "ConfigTestLayer",
+      "status": "passed",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "duration": "0.1s",
+      "tests": [
+        {
+          "layer": "ConfigTestLayer",
+          "test_name": "agent_registry.yaml 加载",
+          "passed": true,
+          "error": null,
+          "duration": 0.0148773193359375,
+          "timestamp": "2026-06-02T15:56:59.207794"
+        },
+        {
+          "layer": "ConfigTestLayer",
+          "test_name": "consensus_config.yaml 加载",
+          "passed": true,
+          "error": null,
+          "duration": 0.006521940231323242,
+          "timestamp": "2026-06-02T15:56:59.214316"
+        },
+        {
+          "layer": "ConfigTestLayer",
+          "test_name": "rule_config.yaml 加载",
+          "passed": true,
+          "error": null,
+          "duration": 0.015576362609863281,
+          "timestamp": "2026-06-02T15:56:59.229892"
+        }
+      ]
+    },
+    {
+      "name": "UnitTestLayer",
+      "status": "failed",
+      "total": 10,
+      "passed": 8,
+      "failed": 2,
+      "skipped": 0,
+      "duration": "2.4s",
+      "tests": [
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "DataAcquisitionModule 验证",
+          "passed": true,
+          "error": null,
+          "duration": 1.2939155101776123,
+          "timestamp": "2026-06-02T15:57:00.523808"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "DataDecompositionModule 处理",
+          "passed": false,
+          "error": "IndentationError: unexpected indent (data_decomposition.py, line 55)",
+          "duration": 0.0022711753845214844,
+          "timestamp": "2026-06-02T15:57:00.529176"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "TimeAlignmentModule 验证",
+          "passed": true,
+          "error": null,
+          "duration": 0.004108428955078125,
+          "timestamp": "2026-06-02T15:57:00.533284"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "DataCleaningModule 验证",
+          "passed": true,
+          "error": null,
+          "duration": 0.004117012023925781,
+          "timestamp": "2026-06-02T15:57:00.537401"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "StandardizationModule 验证",
+          "passed": true,
+          "error": null,
+          "duration": 0.0020329952239990234,
+          "timestamp": "2026-06-02T15:57:00.539435"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "ViolationDetector 验证",
+          "passed": true,
+          "error": null,
+          "duration": 0.006463766098022461,
+          "timestamp": "2026-06-02T15:57:00.545898"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "AlertClassifier 处理",
+          "passed": false,
+          "error": "ModuleNotFoundError: No module named 'consensus_engine'",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:57:00.545898"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "WorkOrderGenerator 验证",
+          "passed": true,
+          "error": null,
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:57:00.545898"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "ConsensusEngine 验证",
+          "passed": true,
+          "error": null,
+          "duration": 0.016674041748046875,
+          "timestamp": "2026-06-02T15:57:00.562572"
+        },
+        {
+          "layer": "UnitTestLayer",
+          "test_name": "ActionExecutor 验证",
+          "passed": true,
+          "error": null,
+          "duration": 1.0642402172088623,
+          "timestamp": "2026-06-02T15:57:01.626812"
+        }
+      ]
+    },
+    {
+      "name": "IntegrationTestLayer",
+      "status": "passed",
+      "total": 4,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 2,
+      "duration": "0.0s",
+      "tests": [
+        {
+          "layer": "IntegrationTestLayer",
+          "test_name": "DynamicOrchestrator 验证",
+          "passed": true,
+          "error": null,
+          "duration": 0.039258480072021484,
+          "timestamp": "2026-06-02T15:57:01.666071"
+        },
+        {
+          "layer": "IntegrationTestLayer",
+          "test_name": "创建执行计划",
+          "passed": true,
+          "error": null,
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:57:01.666071"
+        },
+        {
+          "layer": "IntegrationTestLayer",
+          "test_name": "数据流模块导入",
+          "passed": false,
+          "error": "跳过（模块尚未实现）",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:57:01.666071"
+        },
+        {
+          "layer": "IntegrationTestLayer",
+          "test_name": "ExecutionControl 初始化",
+          "passed": false,
+          "error": "跳过（模块尚未实现）",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:57:01.666071"
+        }
+      ]
+    },
+    {
+      "name": "E2ETestLayer",
+      "status": "failed",
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "duration": "0.1s",
+      "tests": [
+        {
+          "layer": "E2ETestLayer",
+          "test_name": "pytest集成测试",
+          "passed": false,
+          "error": "测试失败，退出码: 1",
+          "duration": 0.07831382751464844,
+          "timestamp": "2026-06-02T15:57:01.744385"
+        }
+      ]
+    },
+    {
+      "name": "StreamTestLayer",
+      "status": "passed",
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "duration": "0.0s",
+      "tests": [
+        {
+          "layer": "StreamTestLayer",
+          "test_name": "Flask实时流测试",
+          "passed": false,
+          "error": "跳过（--skip-stream）",
+          "duration": 0.0,
+          "timestamp": "2026-06-02T15:57:01.744385"
+        }
+      ]
+    }
+  ],
+  "failures": [
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "DataDecompositionModule 处理",
+      "passed": false,
+      "error": "IndentationError: unexpected indent (data_decomposition.py, line 55)",
+      "duration": 0.0022711753845214844,
+      "timestamp": "2026-06-02T15:57:00.529176"
+    },
+    {
+      "layer": "UnitTestLayer",
+      "test_name": "AlertClassifier 处理",
+      "passed": false,
+      "error": "ModuleNotFoundError: No module named 'consensus_engine'",
+      "duration": 0.0,
+      "timestamp": "2026-06-02T15:57:00.545898"
+    },
+    {
+      "layer": "E2ETestLayer",
+      "test_name": "pytest集成测试",
+      "passed": false,
+      "error": "测试失败，退出码: 1",
+      "duration": 0.07831382751464844,
+      "timestamp": "2026-06-02T15:57:01.744385"
+    }
+  ],
+  "timestamp": "2026-06-02T15:57:01.744385"
+}

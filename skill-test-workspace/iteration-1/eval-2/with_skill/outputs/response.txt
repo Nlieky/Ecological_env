@@ -1,0 +1,282 @@
+# 主智能体响应：pH和COD相关性分析
+
+## 1. 意图解析结果
+
+### 1.1 意图识别
+- **意图类型**: analysis_query (分析查询)
+- **核心目标**: 分析pH和COD两个监测指标之间的相关关系
+- **分析维度**: 相关性分析、关系判断
+
+### 1.2 实体提取
+- **监测指标**: ["pH", "COD"]
+- **分析类型**: correlation_analysis (相关性分析)
+- **监测点位**: 未指定（默认为出水口）
+- **时间范围**: 未指定（默认为最近24小时）
+
+### 1.3 解析后的意图对象
+```json
+{
+  "intent_type": "analysis_query",
+  "indicators": ["pH", "COD"],
+  "monitoring_point": "出水",
+  "time_range": {"value": 24, "unit": "hours"},
+  "analysis_target": "pH和COD相关性分析",
+  "output_format": "structured_report"
+}
+```
+
+## 2. 子智能体调用规划
+
+基于决策规则库，此任务属于"analysis_query"意图类型，需要以下子智能体协同：
+
+### 2.1 子智能体分配
+
+| 子智能体 | 任务 | 优先级 | 超时时间 |
+|---------|------|--------|----------|
+| data-governance-agent | 数据获取与治理 | 1 | 30秒 |
+| feature-analysis-agent | 相关性计算与分析 | 2 | 45秒 |
+| rule-reasoning-agent | 工艺机理校验与结论 | 4 | 30秒 |
+
+### 2.2 执行策略
+- **执行模式**: SEQUENTIAL (串行执行)
+- **原因**: 存在数据依赖关系，特征分析需要等待数据治理完成
+
+## 3. 结构化执行计划
+
+### 3.1 任务结构化
+
+#### 任务1: 数据获取与治理
+```yaml
+task_id: task_000001
+task_name: 获取pH和COD监测数据
+category: data_acquisition
+priority: HIGH
+description: 获取最近24小时出水口pH和COD监测数据，进行时序对齐和数据清洗
+input_params:
+  - name: monitoring_point
+    value: 出水
+    required: true
+  - name: indicators
+    value: ["pH", "COD"]
+    required: true
+  - name: time_range
+    value: {value: 24, unit: hours}
+    required: true
+  - name: operations
+    value: [time_alignment, data_cleaning, standardization]
+output_schema:
+  cleaned_data:
+    pH: {values: [], timestamps: [], statistics: {}}
+    COD: {values: [], timestamps: [], statistics: {}}
+```
+
+#### 任务2: 相关性分析
+```yaml
+task_id: task_000002
+task_name: pH与COD相关性分析
+category: feature_analysis
+priority: HIGH
+description: 计算pH和COD的皮尔逊相关系数，分析相关关系
+dependencies: [task_000001]
+input_params:
+  - name: data_source
+    value: task_000001.cleaned_data
+    required: true
+  - name: analysis_methods
+    value: [pearson_correlation, scatter_analysis, trend_analysis]
+  - name: indicators
+    value: ["pH", "COD"]
+output_schema:
+  correlation_result:
+    coefficient: float
+    significance: str
+    p_value: float
+    interpretation: str
+```
+
+#### 任务3: 工艺机理校验
+```yaml
+task_id: task_000003
+task_name: pH-COD关系工艺校验
+category: violation_reasoning
+priority: MEDIUM
+description: 根据污水处理工艺机理，校验pH和COD关系的合理性
+dependencies: [task_000002]
+input_params:
+  - name: correlation_result
+    value: task_000002.correlation_result
+    required: true
+  - name: validation_rules
+    value: [ph_cod_synergy_rule]
+output_schema:
+  validation_result:
+    is_valid: bool
+    risk_level: str
+    reasoning: str
+    recommendations: []
+```
+
+### 3.2 任务流生成
+
+```yaml
+flow_id: flow_000001
+execution_mode: SEQUENTIAL
+total_tasks: 3
+estimated_duration_seconds: 105
+
+stages:
+  - stage_id: 0
+    execution_mode: SEQUENTIAL
+    tasks: [task_000001]
+    description: 数据获取与治理
+
+  - stage_id: 1
+    execution_mode: SEQUENTIAL
+    tasks: [task_000002]
+    description: 相关性计算
+    depends_on: [task_000001]
+
+  - stage_id: 2
+    execution_mode: SEQUENTIAL
+    tasks: [task_000003]
+    description: 工艺校验与结论
+    depends_on: [task_000002]
+```
+
+### 3.3 资源匹配结果
+
+```yaml
+allocations:
+  task_000001:
+    agent: data-governance-agent
+    skill_package: data-governance-core
+    capabilities: [multi_source_data, time_alignment, data_cleaning]
+    timeout: 30
+
+  task_000002:
+    agent: feature-analysis-agent
+    skill_package: feature-analysis-core
+    capabilities: [correlation_analysis, trend_analysis]
+    timeout: 45
+
+  task_000003:
+    agent: rule-reasoning-agent
+    skill_package: rule-reasoning-core
+    capabilities: [process_validator, expert_reasoner]
+    timeout: 30
+```
+
+## 4. 决策规则应用
+
+### 4.1 pH-COD协同校验规则
+根据决策规则库中的工艺机理校验规则：
+
+```yaml
+规则名称: pH-COD协同校验
+条件: pH和COD相关性校验
+判定:
+  - 正常情况下: 相关性 >= 0.3
+  - 异常情况: 相关性 < 0.3
+违规: 相关性异常低且存在其他违规特征
+```
+
+### 4.2 异常检测阈值
+- **强相关**: |r| >= 0.7
+- **中等相关**: 0.4 <= |r| < 0.7
+- **弱相关**: 0.2 <= |r| < 0.4
+- **几乎无相关**: |r| < 0.2
+
+## 5. 执行控制方案
+
+### 5.1 执行步骤
+1. **数据获取** (data-governance-agent)
+   - 从监测系统获取最近24小时pH和COD数据
+   - 执行时序对齐（确保时间戳一致）
+   - 数据清洗（处理缺失值、异常值）
+   - 标准化处理
+
+2. **相关性计算** (feature-analysis-agent)
+   - 计算皮尔逊相关系数
+   - 绘制散点图分析
+   - 计算统计显著性（p值）
+   - 生成相关性解释
+
+3. **工艺校验** (rule-reasoning-agent)
+   - 应用pH-COD协同规则
+   - 评估风险等级
+   - 生成分析结论
+   - 提供建议
+
+### 5.2 降级策略
+- **data-governance-agent故障**: 使用缓存数据（如有）
+- **feature-analysis-agent故障**: 使用简化相关性计算
+- **rule-reasoning-agent故障**: 返回原始相关系数，不进行工艺校验
+
+## 6. 预期输出格式
+
+```json
+{
+  "analysis_summary": {
+    "indicators": ["pH", "COD"],
+    "time_range": "最近24小时",
+    "monitoring_point": "出水"
+  },
+  "correlation_result": {
+    "coefficient": 0.0,
+    "significance": "",
+    "interpretation": "",
+    "p_value": 0.0
+  },
+  "process_validation": {
+    "is_valid": true,
+    "rule_applied": "ph_cod_synergy_rule",
+    "risk_level": ""
+  },
+  "conclusion": {
+    "relationship_description": "",
+    "recommendations": []
+  },
+  "metadata": {
+    "flow_id": "flow_000001",
+    "execution_time": "",
+    "agents_involved": ["data-governance-agent", "feature-analysis-agent", "rule-reasoning-agent"]
+  }
+}
+```
+
+## 7. 结果复用判决
+
+### 7.1 初始判决
+- **数据匹配**: 待检查（需要查询缓存）
+- **新鲜度**: 待检查
+- **语义匹配**: 待检查
+- **决策**: 需要执行完整分析流程
+
+### 7.2 缓存键生成
+```
+MD5("出水|pH,COD|24|hours|analysis_query")
+```
+
+## 8. 执行优先级与时间估算
+
+| 阶段 | 子智能体 | 预计耗时 | 优先级 |
+|------|---------|----------|--------|
+| 数据获取 | data-governance-agent | 30秒 | HIGH |
+| 相关性分析 | feature-analysis-agent | 45秒 | HIGH |
+| 工艺校验 | rule-reasoning-agent | 30秒 | MEDIUM |
+| **总计** | - | **105秒** | - |
+
+## 9. 总结
+
+本任务是一个标准的分析查询（analysis_query），涉及pH和COD两个监测指标的相关性分析。根据orchestrator-core技能包的工作流模式库，采用standard_analysis工作流模式，需要3个子智能体串行协同：
+
+1. **data-governance-agent**: 负责数据获取、时序对齐和清洗
+2. **feature-analysis-agent**: 负责计算相关系数和统计分析
+3. **rule-reasoning-agent**: 负责工艺机理校验和结论生成
+
+整个流程预计耗时105秒，输出包含相关系数、显著性检验、工艺校验结果和分析结论的结构化报告。
+
+---
+生成时间: 2026-05-19
+技能版本: orchestrator-core v2.0.0
+工作流模式: standard_analysis

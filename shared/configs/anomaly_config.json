@@ -1,0 +1,395 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "废水监测异常检测参数配置（基于鲁棒估计计算）",
+    "last_updated": "2024-01-01",
+    "data_source": "pollution_water_in/out.csv"
+  },
+  "general_settings": {
+    "contamination": 0.05,
+    "confidence_level": 0.99,
+    "iqr_multiplier": 1.5,
+    "hampel_window": 24,
+    "hampel_threshold": 3
+  },
+  "inlet": {
+    "pH值": {
+      "method": "IQR",
+      "normal_mean": 7.80,
+      "normal_std": 0.21,
+      "threshold_lower": 7.16,
+      "threshold_upper": 8.45,
+      "note": "去掉133个异常点后计算",
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 7.67,
+          "q3": 7.94,
+          "lower_standard": 7.26,
+          "upper_standard": 8.34,
+          "lower_conservative": 6.85,
+          "upper_conservative": 8.75
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 0.098,
+          "threshold_pct": 0.0125
+        },
+        "modified_z_score": {
+          "median": 7.80,
+          "mad": 0.135,
+          "threshold": 3.5
+        }
+      }
+    },
+    "化学需氧量浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 82.38,
+      "normal_std": 48.67,
+      "threshold_lower": 0,
+      "threshold_upper": 228.40,
+      "note": "COD不能为负，下限设为0",
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 46.04,
+          "q3": 125.61,
+          "lower_standard": -73.31,
+          "upper_standard": 244.96,
+          "lower_conservative": -192.67,
+          "upper_conservative": 364.32
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 14.93,
+          "threshold_pct": 0.193
+        },
+        "modified_z_score": {
+          "median": 73.64,
+          "mad": 32.96,
+          "threshold": 3.5
+        }
+      }
+    },
+    "总氮浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 19.97,
+      "normal_std": 5.80,
+      "threshold_lower": 2.57,
+      "threshold_upper": 37.36,
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 16.01,
+          "q3": 23.84,
+          "lower_standard": 4.27,
+          "upper_standard": 35.58,
+          "lower_conservative": -7.47,
+          "upper_conservative": 47.33
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 1.99,
+          "threshold_pct": 0.103
+        },
+        "modified_z_score": {
+          "median": 20.10,
+          "mad": 3.92,
+          "threshold": 3.5
+        }
+      }
+    },
+    "氨氮浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 5.35,
+      "normal_std": 2.59,
+      "threshold_lower": 0,
+      "threshold_upper": 13.11,
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 3.49,
+          "q3": 7.38,
+          "lower_standard": -2.34,
+          "upper_standard": 13.21,
+          "lower_conservative": -8.16,
+          "upper_conservative": 19.04
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 0.83,
+          "threshold_pct": 0.150
+        },
+        "modified_z_score": {
+          "median": 5.09,
+          "mad": 1.84,
+          "threshold": 3.5
+        }
+      }
+    },
+    "总磷浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 2.36,
+      "normal_std": 1.35,
+      "threshold_lower": 0,
+      "threshold_upper": 6.40,
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 1.28,
+          "q3": 3.28,
+          "lower_standard": -1.72,
+          "upper_standard": 6.27,
+          "lower_conservative": -4.72,
+          "upper_conservative": 9.27
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 0.62,
+          "threshold_pct": 0.288
+        },
+        "modified_z_score": {
+          "median": 2.17,
+          "mad": 0.98,
+          "threshold": 3.5
+        }
+      }
+    }
+  },
+  "outlet": {
+    "pH值": {
+      "method": "IQR",
+      "normal_mean": 6.85,
+      "normal_std": 0.12,
+      "threshold_lower": 6.48,
+      "threshold_upper": 7.21,
+      "warning": "异常比例较高(22%)，建议检查数据质量",
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 6.81,
+          "q3": 7.02,
+          "lower_standard": 6.49,
+          "upper_standard": 7.34,
+          "lower_conservative": 6.17,
+          "upper_conservative": 7.66
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 0.027,
+          "threshold_pct": 0.0035
+        },
+        "modified_z_score": {
+          "median": 6.90,
+          "mad": 0.106,
+          "threshold": 3.5
+        }
+      }
+    },
+    "悬浮物浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 2.58,
+      "normal_std": 1.69,
+      "threshold_lower": 0,
+      "threshold_upper": 7.66,
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 1.30,
+          "q3": 3.83,
+          "lower_standard": -2.50,
+          "upper_standard": 7.63,
+          "lower_conservative": -6.30,
+          "upper_conservative": 11.43
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 0.72,
+          "threshold_pct": 0.343
+        },
+        "modified_z_score": {
+          "median": 2.59,
+          "mad": 1.26,
+          "threshold": 3.5
+        }
+      }
+    },
+    "化学需氧量浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 29.29,
+      "normal_std": 6.96,
+      "threshold_lower": 8.41,
+      "threshold_upper": 50.18,
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 24.32,
+          "q3": 33.66,
+          "lower_standard": 10.30,
+          "upper_standard": 47.68,
+          "lower_conservative": -3.72,
+          "upper_conservative": 61.70
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 1.69,
+          "threshold_pct": 0.065
+        },
+        "modified_z_score": {
+          "median": 30.31,
+          "mad": 4.30,
+          "threshold": 3.5
+        }
+      }
+    },
+    "总氮浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 9.87,
+      "normal_std": 2.38,
+      "threshold_lower": 2.72,
+      "threshold_upper": 17.02,
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 8.21,
+          "q3": 11.65,
+          "lower_standard": 3.04,
+          "upper_standard": 16.81,
+          "lower_conservative": -2.12,
+          "upper_conservative": 21.98
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 0.26,
+          "threshold_pct": 0.027
+        },
+        "modified_z_score": {
+          "median": 10.21,
+          "mad": 1.67,
+          "threshold": 3.5
+        }
+      }
+    },
+    "氨氮浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 0.23,
+      "normal_std": 0.17,
+      "threshold_lower": 0,
+      "threshold_upper": 0.75,
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 0.13,
+          "q3": 0.71,
+          "lower_standard": -0.74,
+          "upper_standard": 1.58,
+          "lower_conservative": -1.62,
+          "upper_conservative": 2.46
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 0.031,
+          "threshold_pct": 0.101
+        },
+        "modified_z_score": {
+          "median": 0.22,
+          "mad": 0.12,
+          "threshold": 3.5
+        }
+      }
+    },
+    "总磷浓度（毫克/升）": {
+      "method": "IQR",
+      "normal_mean": 0.13,
+      "normal_std": 0.02,
+      "threshold_lower": 0.06,
+      "threshold_upper": 0.19,
+      "operators": {
+        "iqr_outlier": {
+          "k": 1.5,
+          "q1": 0.11,
+          "q3": 0.15,
+          "lower_standard": 0.07,
+          "upper_standard": 0.19,
+          "lower_conservative": 0.02,
+          "upper_conservative": 0.24
+        },
+        "hampel_filter": {
+          "window_size": 24,
+          "threshold": 3
+        },
+        "gradient_detection": {
+          "threshold_diff": 0.0,
+          "threshold_pct": 0.0
+        },
+        "modified_z_score": {
+          "median": 0.13,
+          "mad": 0.015,
+          "threshold": 3.5
+        }
+      }
+    }
+  },
+  "multivariate": {
+    "inlet": {
+      "pca_t2": {
+        "n_components": 5,
+        "explained_variance_2components": 0.5822
+      }
+    },
+    "outlet": {
+      "pca_t2": {
+        "n_components": 5,
+        "explained_variance_2components": 0.58
+      }
+    }
+  },
+  "implementation_guide": {
+    "step1": "使用固定阈值法：根据国家排放标准设定硬性阈值",
+    "step2": "使用IQR法：用上述阈值检测统计异常",
+    "step3": "使用Hampel Filter：窗口大小24-48小时，检测时序突变",
+    "step4": "使用梯度检测：检测数据突变异常",
+    "step5": "使用PCA+T2：检测多指标同时异常的情况",
+    "step6": "综合判定：多个方法都判定为异常才报警"
+  },
+  "recommended_config": {
+    "inlet": {
+      "single_variable": ["iqr_outlier", "hampel_filter", "gradient_detection"],
+      "multivariate": ["pca_hotelling_t2"]
+    },
+    "outlet": {
+      "single_variable": ["iqr_outlier", "hampel_filter", "gradient_detection"],
+      "multivariate": ["pca_hotelling_t2", "spe_detection"]
+    }
+  }
+}

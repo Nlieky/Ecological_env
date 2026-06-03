@@ -1,0 +1,393 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "时序异常检测算子库配置",
+    "categories": ["statistical", "machine_learning", "deep_learning"]
+  },
+  "operators": {
+    "statistical": {
+      "description": "基于统计学的异常检测算子",
+      "count": 17,
+      "requires_training": false,
+      "operators": {
+        "fixed_threshold": {
+          "name": "固定阈值法",
+          "category": "statistical",
+          "sub_category": "统计量",
+          "description": "基于排放标准的硬性阈值检测",
+          "formula": "x < lower_bound OR x > upper_bound",
+          "params": {
+            "lower_bound": "根据排放标准设定",
+            "upper_bound": "根据排放标准设定"
+          },
+          "priority": 5,
+          "data_type": ["univariate", "multivariate"]
+        },
+        "z_score": {
+          "name": "Z-Score/3σ法",
+          "category": "statistical",
+          "sub_category": "统计量",
+          "description": "基于均值和标准差的标准化分数",
+          "formula": "|x - mean| / std > threshold",
+          "params": {
+            "threshold": "σ倍数，默认3"
+          },
+          "priority": 3,
+          "data_type": ["univariate"],
+          "note": "适合近正态分布"
+        },
+        "iqr_outlier": {
+          "name": "IQR/箱线图法",
+          "category": "statistical",
+          "sub_category": "统计量",
+          "description": "基于四分位距的离群点检测",
+          "formula": "x < Q1 - k*IQR OR x > Q3 + k*IQR",
+          "params": {
+            "k": "IQR倍数，标准1.5，保守3.0"
+          },
+          "priority": 5,
+          "data_type": ["univariate"],
+          "note": "适合偏态分布"
+        },
+        "modified_z_score": {
+          "name": "修正Z-Score",
+          "category": "statistical",
+          "sub_category": "统计量",
+          "description": "基于中位数和MAD的鲁棒Z-score",
+          "formula": "|x - median| / (1.4826 * MAD) > threshold",
+          "params": {
+            "threshold": "默认3.5"
+          },
+          "priority": 4,
+          "data_type": ["univariate"],
+          "note": "抗异常值"
+        },
+        "percentile": {
+          "name": "分位数法",
+          "category": "statistical",
+          "sub_category": "统计量",
+          "description": "基于分位数的阈值",
+          "formula": "x < p_lower OR x > p_upper",
+          "params": {
+            "lower_pct": "下分位数，如0.5%",
+            "upper_pct": "上分位数，如99.5%"
+          },
+          "priority": 3,
+          "data_type": ["univariate"],
+          "note": "任意分布适用"
+        },
+        "grubbs_test": {
+          "name": "Grubbs检验",
+          "category": "statistical",
+          "sub_category": "统计检验",
+          "description": "检测单个极端异常值",
+          "params": {
+            "alpha": "显著性水平，默认0.05"
+          },
+          "priority": 3,
+          "data_type": ["univariate"],
+          "note": "每次检测一个异常值"
+        },
+        "ese_test": {
+          "name": "ESD检验",
+          "category": "statistical",
+          "sub_category": "统计检验",
+          "description": "检测多个异常值",
+          "params": {
+            "alpha": "显著性水平，默认0.05"
+          },
+          "priority": 3,
+          "data_type": ["univariate"]
+        },
+        "hampel_filter": {
+          "name": "Hampel滤波器",
+          "category": "statistical",
+          "sub_category": "时序统计",
+          "description": "滑动窗口内基于中位数的异常检测",
+          "formula": "|x[i] - median(window)| / MAD > threshold",
+          "params": {
+            "window_size": "滑动窗口，推荐24(1天)或48(2天)",
+            "threshold": "MAD倍数，默认3"
+          },
+          "priority": 5,
+          "data_type": ["univariate"],
+          "note": "时序突变检测，抗噪性强"
+        },
+        "moving_avg": {
+          "name": "移动平均偏差",
+          "category": "statistical",
+          "sub_category": "时序统计",
+          "description": "基于移动平均的趋势异常检测",
+          "params": {
+            "window": "移动窗口，推荐24",
+            "k": "标准差倍数，默认3"
+          },
+          "priority": 3,
+          "data_type": ["univariate"],
+          "note": "趋势异常"
+        },
+        "ewm_anomaly": {
+          "name": "指数加权移动平均",
+          "category": "statistical",
+          "sub_category": "时序统计",
+          "description": "对近期数据更敏感的趋势检测",
+          "params": {
+            "span": "跨度，推荐24",
+            "k": "标准差倍数，默认3"
+          },
+          "priority": 3,
+          "data_type": ["univariate"],
+          "note": "短期趋势"
+        },
+        "gradient_detection": {
+          "name": "梯度检测",
+          "category": "statistical",
+          "sub_category": "时序统计",
+          "description": "基于一阶差分的突变检测",
+          "params": {
+            "gradient_threshold": "梯度阈值",
+            "method": "'diff'或'pct_change'"
+          },
+          "priority": 5,
+          "data_type": ["univariate"],
+          "note": "突变异常检测"
+        },
+        "derivative_detection": {
+          "name": "二阶导数检测",
+          "category": "statistical",
+          "sub_category": "时序统计",
+          "description": "检测拐点和波动异常",
+          "params": {
+            "window": "平滑窗口",
+            "k": "标准差倍数"
+          },
+          "priority": 3,
+          "data_type": ["univariate"],
+          "note": "拐点检测"
+        },
+        "burst_detection": {
+          "name": "突发检测",
+          "category": "statistical",
+          "sub_category": "时序统计",
+          "description": "检测数据突发变化",
+          "params": {
+            "window": "检测窗口",
+            "threshold_pct": "突发阈值比例"
+          },
+          "priority": 3,
+          "data_type": ["univariate"]
+        },
+        "mahalanobis_distance": {
+          "name": "马氏距离",
+          "category": "statistical",
+          "sub_category": "多变量统计",
+          "description": "考虑协方差结构的多变量距离",
+          "formula": "sqrt((x-μ)' * Σ^(-1) * (x-μ))",
+          "params": {
+            "threshold_quantile": "距离分位数，默认0.99"
+          },
+          "priority": 4,
+          "data_type": ["multivariate"],
+          "note": "多变量关联异常"
+        },
+        "pca_hotelling_t2": {
+          "name": "PCA + Hotelling T²",
+          "category": "statistical",
+          "sub_category": "多变量统计",
+          "description": "主成分得分统计量",
+          "formula": "T² = Σ(score_i² / λ_i)",
+          "params": {
+            "n_components": "主成分数量",
+            "threshold_quantile": "T²分位数，默认0.99"
+          },
+          "priority": 5,
+          "data_type": ["multivariate"],
+          "note": "工业多指标监控"
+        },
+        "spe_detection": {
+          "name": "PCA + SPE",
+          "category": "statistical",
+          "sub_category": "多变量统计",
+          "description": "模型残差平方和",
+          "formula": "SPE = Σ(x - x_reconstructed)²",
+          "params": {
+            "n_components": "主成分数量",
+            "threshold_quantile": "SPE分位数，默认0.99"
+          },
+          "priority": 4,
+          "data_type": ["multivariate"],
+          "note": "检测模型未能解释的异常"
+        }
+      }
+    },
+    "machine_learning": {
+      "description": "基于机器学习的异常检测算子",
+      "count": 7,
+      "requires_training": true,
+      "operators": {
+        "knn_distance": {
+          "name": "KNN距离",
+          "category": "machine_learning",
+          "sub_category": "距离学习",
+          "description": "基于K近邻平均距离的异常检测",
+          "params": {
+            "k": "近邻数，默认5",
+            "threshold_pct": "距离分位数，如95%"
+          },
+          "priority": 3,
+          "data_type": ["univariate"],
+          "note": "离群点检测"
+        },
+        "lof_detection": {
+          "name": "局部离群因子(LOF)",
+          "category": "machine_learning",
+          "sub_category": "密度学习",
+          "description": "基于局部密度的离群点检测",
+          "params": {
+            "n_neighbors": "近邻数，默认20",
+            "contamination": "异常比例，默认0.05"
+          },
+          "priority": 4,
+          "data_type": ["multivariate"],
+          "note": "复杂分布异常"
+        },
+        "kde_anomaly": {
+          "name": "核密度估计",
+          "category": "machine_learning",
+          "sub_category": "密度学习",
+          "description": "低概率区域即异常",
+          "params": {
+            "threshold_quantile": "密度分位数，如1%"
+          },
+          "priority": 3,
+          "data_type": ["univariate"],
+          "note": "任意分布"
+        },
+        "isolation_forest": {
+          "name": "孤立森林",
+          "category": "machine_learning",
+          "sub_category": "集成学习",
+          "description": "基于隔离的异常检测",
+          "params": {
+            "contamination": "异常比例，默认0.05",
+            "n_estimators": "树数量，默认100"
+          },
+          "priority": 4,
+          "data_type": ["multivariate"],
+          "note": "高维无监督检测"
+        },
+        "one_class_svm": {
+          "name": "单类SVM",
+          "category": "machine_learning",
+          "sub_category": "支持向量",
+          "description": "学习正常数据边界",
+          "params": {
+            "nu": "异常比例上界，默认0.05",
+            "kernel": "核函数，默认rbf"
+          },
+          "priority": 3,
+          "data_type": ["multivariate"],
+          "note": "需要正常样本训练"
+        },
+        "voting_ensemble": {
+          "name": "投票集成",
+          "category": "machine_learning",
+          "sub_category": "集成",
+          "description": "多个算子投票决定",
+          "params": {
+            "methods": "参与的算子列表",
+            "min_votes": "最少投票数"
+          },
+          "priority": 4,
+          "data_type": ["univariate"],
+          "note": "降低误报"
+        },
+        "weighted_score": {
+          "name": "加权评分",
+          "category": "machine_learning",
+          "sub_category": "集成",
+          "description": "综合异常分数",
+          "params": {
+            "methods": "参与的算子列表",
+            "weights": "各算子权重"
+          },
+          "priority": 4,
+          "data_type": ["univariate"],
+          "note": "异常程度量化"
+        }
+      }
+    },
+    "deep_learning": {
+      "description": "基于深度学习的异常检测算子",
+      "count": 0,
+      "requires_training": true,
+      "status": "reserved",
+      "operators": {
+        "lstm_ae": {
+          "name": "LSTM自编码器",
+          "category": "deep_learning",
+          "sub_category": "自编码器",
+          "description": "基于LSTM的序列自编码器",
+          "status": "待实现",
+          "priority": 5
+        },
+        "cnn_ae": {
+          "name": "CNN自编码器",
+          "category": "deep_learning",
+          "sub_category": "自编码器",
+          "description": "基于CNN的自编码器",
+          "status": "待实现",
+          "priority": 4
+        },
+        "vae": {
+          "name": "变分自编码器",
+          "category": "deep_learning",
+          "sub_category": "自编码器",
+          "description": "基于VAE的异常检测",
+          "status": "待实现",
+          "priority": 4
+        },
+        "lstm_pred": {
+          "name": "LSTM预测模型",
+          "category": "deep_learning",
+          "sub_category": "预测",
+          "description": "基于LSTM的时序预测异常检测",
+          "status": "待实现",
+          "priority": 5
+        },
+        "gru_pred": {
+          "name": "GRU预测模型",
+          "category": "deep_learning",
+          "sub_category": "预测",
+          "description": "基于GRU的时序预测异常检测",
+          "status": "待实现",
+          "priority": 4
+        },
+        "transformer": {
+          "name": "Transformer模型",
+          "category": "deep_learning",
+          "sub_category": "预测",
+          "description": "基于Transformer的异常检测",
+          "status": "待实现",
+          "priority": 5
+        },
+        "gan": {
+          "name": "生成对抗网络",
+          "category": "deep_learning",
+          "sub_category": "生成",
+          "description": "基于GAN的异常检测",
+          "status": "待实现",
+          "priority": 3
+        },
+        "diffusion": {
+          "name": "扩散模型",
+          "category": "deep_learning",
+          "sub_category": "生成",
+          "description": "基于扩散模型的异常检测",
+          "status": "待实现",
+          "priority": 3
+        }
+      }
+    }
+  }
+}

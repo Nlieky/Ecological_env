@@ -1,0 +1,214 @@
+{
+  "skills": [
+    {
+      "skill_id": "data-governance-core",
+      "skill_name": "数据治理核心技能包",
+      "version": "2.0.0",
+      "subagent_id": "data-governance-agent",
+      "description": "多源数据获取、时序对齐规整、数据清洗质控、标准化归一化",
+      "capabilities": [
+        {
+          "capability_id": "multi_source_data",
+          "name": "多源数据获取",
+          "description": "从CSV、API等数据源获取监测数据",
+          "module": "multi_source_data.py",
+          "class": "MultiSourceDataAcquisition",
+          "methods": ["fetch_data", "validate_source", "merge_sources"]
+        },
+        {
+          "capability_id": "time_alignment",
+          "name": "时序对齐规整",
+          "description": "将不同时间序列的数据对齐到统一时间轴",
+          "module": "time_alignment.py",
+          "class": "TimeAlignment",
+          "methods": ["align", "resample", "fill_gaps"]
+        },
+        {
+          "capability_id": "data_cleaning",
+          "name": "数据清洗质控",
+          "description": "检测和处理异常值、缺失值、重复值",
+          "module": "data_cleaning.py",
+          "class": "DataCleaning",
+          "methods": ["detect_outliers", "handle_missing", "remove_duplicates"]
+        },
+        {
+          "capability_id": "standardization",
+          "name": "标准化归一化",
+          "description": "数据标准化和归一化处理",
+          "module": "standardization.py",
+          "class": "Standardization",
+          "methods": ["normalize", "standardize", "scale"]
+        }
+      ],
+      "dependencies": [
+        "pandas",
+        "numpy"
+      ],
+      "config_path": "subagents/data-governance-agent/config.yaml"
+    },
+    {
+      "skill_id": "feature-analysis-core",
+      "skill_name": "特征分析核心技能包",
+      "version": "2.0.0",
+      "subagent_id": "feature-analysis-agent",
+      "description": "时序特征提取、指标相关性分析、趋势与滞后分析、特征融合优化",
+      "capabilities": [
+        {
+          "capability_id": "time_series_features",
+          "name": "时序特征提取",
+          "description": "从时间序列数据中提取统计特征和频域特征",
+          "module": "time_series_features.py",
+          "class": "TimeSeriesFeatures",
+          "methods": ["extract_statistical", "extract_frequency", "extract_wavelet"]
+        },
+        {
+          "capability_id": "correlation_analysis",
+          "name": "指标相关性分析",
+          "description": "计算多指标之间的相关性和协整关系",
+          "module": "correlation_analysis.py",
+          "class": "CorrelationAnalysis",
+          "methods": ["pearson_correlation", "spearman_correlation", "cross_correlation"]
+        },
+        {
+          "capability_id": "trend_analysis",
+          "name": "趋势与滞后分析",
+          "description": "检测数据趋势和分析变量间滞后关系",
+          "module": "trend_analysis.py",
+          "class": "TrendAnalysis",
+          "methods": ["detect_trend", "decompose", "granger_causality"]
+        },
+        {
+          "capability_id": "feature_fusion",
+          "name": "特征融合优化",
+          "description": "融合多源特征并优化特征选择",
+          "module": "feature_fusion.py",
+          "class": "FeatureFusion",
+          "methods": ["fuse_features", "select_features", "reduce_dimension"]
+        }
+      ],
+      "dependencies": [
+        "pandas",
+        "numpy",
+        "scipy",
+        "statsmodels"
+      ],
+      "config_path": "subagents/feature-analysis-agent/config.yaml"
+    },
+    {
+      "skill_id": "anomaly-detection-core",
+      "skill_name": "异常检测核心技能包",
+      "version": "2.1.0",
+      "subagent_id": "anomaly-detection-agent",
+      "description": "算子调用适配、异常评分计算、异常模式识别、违规模式检测",
+      "capabilities": [
+        {
+          "capability_id": "operator_adapter",
+          "name": "算子调用适配",
+          "description": "集成多种异常检测算法并自动选择",
+          "module": "operator_adapter.py",
+          "class": "OperatorAdapter",
+          "methods": ["select_operator", "execute_operator", "ensemble_results"]
+        },
+        {
+          "capability_id": "anomaly_scorer",
+          "name": "异常评分计算",
+          "description": "综合多算子结果计算异常分数",
+          "module": "anomaly_scorer.py",
+          "class": "AnomalyScorer",
+          "methods": ["calculate_score", "normalize_scores", "rank_anomalies"]
+        },
+        {
+          "capability_id": "pattern_recognizer",
+          "name": "异常模式识别",
+          "description": "识别5类异常特征：平稳、突变、趋势、周期、高频波动",
+          "module": "pattern_recognizer.py",
+          "class": "PatternRecognizer",
+          "methods": ["recognize_patterns", "is_constant", "is_spike", "is_trend", "is_periodic", "is_high_freq_volatility"]
+        },
+        {
+          "capability_id": "violation_detector",
+          "name": "违规模式检测",
+          "description": "检测4类违规模式：插瓶干扰、人工拟合、稀释排放、恶意逃避",
+          "module": "violation_detector.py",
+          "class": "ViolationDetector",
+          "methods": ["detect_violations", "detect_bottle_interference", "detect_artificial_fitting", "detect_dilution_discharge", "detect_malicious_evasion"]
+        },
+        {
+          "capability_id": "confidence_evaluator",
+          "name": "可信度评估",
+          "description": "评估异常检测结果的置信度",
+          "module": "confidence_evaluator.py",
+          "class": "ConfidenceEvaluator",
+          "methods": ["evaluate_consistency", "calculate_confidence", "validate_result"]
+        }
+      ],
+      "dependencies": [
+        "pandas",
+        "numpy",
+        "scipy",
+        "scikit-learn",
+        "pyod"
+      ],
+      "config_path": "subagents/anomaly-detection-agent/config.yaml"
+    },
+    {
+      "skill_id": "rule-reasoning-core",
+      "skill_name": "规则推理核心技能包",
+      "version": "2.1.0",
+      "subagent_id": "rule-reasoning-agent",
+      "description": "法规规则匹配、工艺机理校验、专家经验推理、违规结论生成",
+      "capabilities": [
+        {
+          "capability_id": "regulation_matcher",
+          "name": "法规规则匹配",
+          "description": "匹配监测数据与法规标准，判定是否超标",
+          "module": "regulation_matcher.py",
+          "class": "RegulationMatcher",
+          "methods": ["match_exceedance", "match_violation", "get_regulation_summary"]
+        },
+        {
+          "capability_id": "process_validator",
+          "name": "工艺机理校验",
+          "description": "验证数据是否符合污水处理工艺机理",
+          "module": "process_validator.py",
+          "class": "ProcessValidator",
+          "methods": ["validate", "validate_biochemical_rules", "validate_mass_balance_rules", "validate_correlation_rules", "validate_nitrogen_conversion_rules"]
+        },
+        {
+          "capability_id": "expert_reasoner",
+          "name": "专家经验推理",
+          "description": "基于专家经验规则进行推理判断",
+          "module": "expert_reasoner.py",
+          "class": "ExpertReasoner",
+          "methods": ["reason", "extract_features", "match_patterns", "determine_suspicion_level"]
+        },
+        {
+          "capability_id": "violation_generator",
+          "name": "违规结论生成",
+          "description": "生成结构化的违规检测结论和报告",
+          "module": "violation_generator.py",
+          "class": "ViolationGenerator",
+          "methods": ["generate", "determine_conclusion_type", "generate_evidence_points", "format_report"]
+        }
+      ],
+      "dependencies": [
+        "pandas",
+        "numpy",
+        "yaml"
+      ],
+      "config_path": "subagents/rule-reasoning-agent/config.yaml"
+    }
+  ],
+  "version": "2.1.0",
+  "last_updated": "2026-05-15T10:30:00Z",
+  "metadata": {
+    "total_skills": 4,
+    "total_capabilities": 17,
+    "subagents_with_skills": [
+      "data-governance-agent",
+      "feature-analysis-agent",
+      "anomaly-detection-agent",
+      "rule-reasoning-agent"
+    ]
+  }
+}

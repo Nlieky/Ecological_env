@@ -1,0 +1,17 @@
+{
+  "agent_id": "rule-reasoning-agent",
+  "version": "1.0.0",
+  "status": "idle",
+  "last_execution": null,
+  "statistics": {
+    "total_executions": 0,
+    "successful_executions": 0,
+    "failed_executions": 0,
+    "high_risk_detected": 0,
+    "medium_risk_detected": 0,
+    "low_risk_detected": 0
+  },
+  "current_task": null,
+  "loaded_cases": [],
+  "last_update": "2026-05-21T10:00:00Z"
+}
