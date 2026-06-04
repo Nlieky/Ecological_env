@@ -494,9 +494,10 @@ class LLMAgentCoordinator:
         5. LLM 分析执行结果
         """
 
-        # 1. 构建系统提示词（主智能体身份）
-        system_prompt = self._build_master_agent_system_prompt()
-        print(f"[LLM] 系统提示词已构建，包含主智能体身份")
+        # 1. 获取子智能体专属系统提示词
+        agent_id = identity.agent_id
+        system_prompt = self._get_subagent_system_prompt(agent_id)
+        print(f"[LLM] 使用 {agent_id} 专属系统提示词")
 
         # 2. 获取子智能体身份摘要
         identity_summary = self._build_identity_summary(identity)
@@ -505,6 +506,10 @@ class LLMAgentCoordinator:
         # 3. 获取可用脚本信息
         scripts_info = self._get_available_scripts(identity)
         print(f"[LLM] 可用脚本: {list(scripts_info.keys())}")
+
+        # 增强日志
+        print(f"[LLM] 子智能体: {agent_id}")
+        print(f"[LLM] 使用配置: model={self._get_subagent_model(agent_id)}, system_prompt长度={len(system_prompt)}")
 
         # 4. 构建决策 prompt
 
@@ -555,12 +560,16 @@ class LLMAgentCoordinator:
 """
 
         try:
-            # 4. LLM 决策
+            # 4.5 获取子智能体专用模型
+            model_type = self._get_subagent_model(agent_id)
+            print(f"[LLM] {agent_id} 使用模型: {model_type}")
+
+            # 5. LLM 决策
             print(f"[LLM] 请求 {identity.agent_name} 决策...")
             decision_response = self.llm_client.chat(
                 message=decision_prompt,
                 system_prompt=system_prompt,
-                model_type="primary",
+                model_type=model_type,
                 temperature=0.0
             )
 
