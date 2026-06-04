@@ -34,7 +34,7 @@ def _get_classes():
     from .pattern_recognizer import PatternRecognizer
     from .violation_detector import ViolationDetector
     from .confidence_evaluator import ConfidenceEvaluator
-    from .time_series_features import TimeSeriesFeatures
+    from .time_series_features import TimeSeriesFeatureExtractor
     from .correlation_analysis import CorrelationAnalyzer
     from .trend_analysis import TrendAnalyzer
     return {
@@ -43,7 +43,8 @@ def _get_classes():
         'PatternRecognizer': PatternRecognizer,
         'ViolationDetector': ViolationDetector,
         'ConfidenceEvaluator': ConfidenceEvaluator,
-        'TimeSeriesFeatures': TimeSeriesFeatures,
+        'TimeSeriesFeatureExtractor': TimeSeriesFeatureExtractor,
+        'TimeSeriesFeatures': TimeSeriesFeatureExtractor,  # 别名兼容
         'CorrelationAnalyzer': CorrelationAnalyzer,
         'TrendAnalyzer': TrendAnalyzer
     }
@@ -315,7 +316,17 @@ def main(data: dict = None, indicators: list = None, config: dict = None,
     # 转换为DataFrame格式
     df = None
     if data and "values" in data:
-        df = pd.DataFrame(data["values"])
+        values_dict = data["values"]
+        # 验证所有数组长度一致
+        lengths = [len(v) for v in values_dict.values()]
+        if len(set(lengths)) > 1:
+            print(f"[ERROR] 数组长度不一致: {dict(zip(values_dict.keys(), lengths))}")
+            # 截断到最小长度
+            min_len = min(lengths)
+            print(f"[ERROR] 截断到最小长度: {min_len}")
+            values_dict = {k: v[:min_len] for k, v in values_dict.items()}
+        df = pd.DataFrame(values_dict)
+        print(f"[DATA] 创建DataFrame: {df.shape}, 列: {list(df.columns)}")
 
     if df is None or df.empty:
         return {

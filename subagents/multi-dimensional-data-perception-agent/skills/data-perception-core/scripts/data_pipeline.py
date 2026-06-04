@@ -14,12 +14,20 @@ class MultiDimensionalDataPipeline:
 
     def __init__(self):
         """初始化流水线，加载所有预处理模块"""
-        # 导入所有模块
-        from data_acquisition import DataAcquisitionModule
-        from standardization import StandardizationModule
-        from time_alignment import TimeAlignmentModule
-        from data_cleaning import DataCleaningModule
-        from data_decomposition import DataDecompositionModule
+        # 导入所有模块（使用绝对导入，因为模块被加载为scripts）
+        try:
+            from .data_acquisition import DataAcquisitionModule
+            from .standardization import StandardizationModule
+            from .time_alignment import TimeAlignmentModule
+            from .data_cleaning import DataCleaningModule
+            from .data_decomposition import DataDecompositionModule
+        except ImportError:
+            # 如果相对导入失败，尝试直接导入
+            from data_acquisition import DataAcquisitionModule
+            from standardization import StandardizationModule
+            from time_alignment import TimeAlignmentModule
+            from data_cleaning import DataCleaningModule
+            from data_decomposition import DataDecompositionModule
 
         # 初始化模块
         self.acquisition = DataAcquisitionModule()
@@ -149,3 +157,118 @@ class MultiDimensionalDataPipeline:
             "total": len(results),
             "results": results
         }
+
+
+# ==================== 标准入口函数 ====================
+
+def main(data=None, task=None, **kwargs) -> Dict[str, Any]:
+    """标准入口函数：主智能体调用
+
+    Args:
+        data: 输入数据（包含values的字典）
+        task: 任务描述
+        **kwargs: 其他参数
+
+    Returns:
+        处理结果
+    """
+    # 提取参数
+    indicators = kwargs.get("indicators", [])
+    config = kwargs.get("config", {})
+
+    # 从task中提取参数
+    if task:
+        data = data or task.get("data")
+        indicators = indicators or task.get("indicators", [])
+        config = config or task.get("config", {})
+
+    print(f"[PIPELINE-MAIN] 接收到数据: data={type(data)}, indicators={indicators}")
+
+    # 如果没有数据，返回错误
+    if not data:
+        return {
+            "status": "error",
+            "error": "No data provided",
+            "processed_data": None,
+            "summary": "数据感知处理失败：未提供输入数据"
+        }
+
+    # 处理两种数据格式：
+    # 1. data["values"] 格式（时序数据字典）
+    # 2. data["influent"]/data["effluent"] 格式（双流数据）
+    result = {
+        "status": "success",
+        "processed_data": {},
+        "summary": "",
+        "metrics": {}
+    }
+
+    try:
+        import pandas as pd
+
+        if "values" in data:
+            # 时序数据格式
+            values = data["values"]
+            df = pd.DataFrame(values)
+
+            print(f"[PIPELINE-MAIN] 处理时序数据: {df.shape}, 列: {list(df.columns)}")
+
+            # 数据清洗：处理缺失值
+            df_cleaned = df.fillna(method="ffill").fillna(0)
+
+            # 数据分解（如果有多列）
+            if len(df_cleaned.columns) > 1:
+                # 计算列之间的相关性
+                correlation = df_cleaned.corr()
+                result["metrics"]["correlation"] = correlation.to_dict()
+
+            result["processed_data"] = {
+                "original_shape": df.shape,
+                "cleaned_shape": df_cleaned.shape,
+                "columns": list(df_cleaned.columns),
+                "statistics": df_cleaned.describe().to_dict() if not df_cleaned.empty else {}
+            }
+            result["summary"] = f"完成数据感知处理：处理{df.shape[0]}条数据，{df.shape[1]}个指标"
+            result["metrics"] = {
+                "row_count": df.shape[0],
+                "column_count": df.shape[1],
+                "null_count": int(df.isnull().sum().sum()),
+                "cleaned_null_count": int(df_cleaned.isnull().sum().sum())
+            }
+
+        elif "influent" in data or "effluent" in data:
+            # 双流数据格式
+            pipeline = MultiDimensionalDataPipeline()
+            stream_data = {
+                "influent": data.get("influent", {}),
+                "effluent": data.get("effluent", {})
+            }
+            pipeline_result = pipeline.process_stream_data(stream_data)
+            result.update(pipeline_result)
+
+        else:
+            result["status"] = "error"
+            result["error"] = "Unknown data format"
+
+    except Exception as e:
+        print(f"[PIPELINE-MAIN] 处理失败: {e}")
+        result["status"] = "error"
+        result["error"] = str(e)
+        result["summary"] = f"数据感知处理失败：{str(e)}"
+
+    return result
+
+
+def process(data=None, task=None, **kwargs) -> Dict[str, Any]:
+    """process 函数别名"""
+    return main(data=data, task=task, **kwargs)
+
+
+def execute(data=None, task=None, **kwargs) -> Dict[str, Any]:
+    """execute 函数别名"""
+    return main(data=data, task=task, **kwargs)
+
+
+def run(data=None, task=None, **kwargs) -> Dict[str, Any]:
+    """run 函数别名"""
+    return main(data=data, task=task, **kwargs)

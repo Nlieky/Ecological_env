@@ -29,9 +29,10 @@ try:
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
-    logging.warning("Anthropic SDK not installed. Install with: pip install anthropic")
+    import warnings
+    warnings.warn("Anthropic SDK not installed. Install with: pip install anthropic")
 
-logging.basicConfig(level=logging.INFO)
+# 不配置logging，由主应用统一配置
 logger = logging.getLogger(__name__)
 
 
@@ -96,7 +97,7 @@ class LLMClient:
             max_retries=config.max_retries
         )
 
-        logger.info(f"[LLM_CLIENT] Initialized with model: {config.primary_model}")
+        print(f"[LLM_CLIENT] Initialized with model: {config.primary_model}")
 
     def chat(
         self,
@@ -151,19 +152,19 @@ class LLMClient:
 
             # 检查响应内容
             if not response.content or len(response.content) == 0:
-                logger.warning(f"[LLM_CLIENT] Empty response from model: {model}")
+                print(f"[LLM_CLIENT] Empty response from model: {model}")
                 return ""
 
             result = response.content[0].text
             if not result:
-                logger.warning(f"[LLM_CLIENT] Empty text content from model: {model}")
+                print(f"[LLM_CLIENT] Empty text content from model: {model}")
                 return ""
 
-            logger.info(f"[LLM_CLIENT] Request completed, model: {model}, tokens: {response.usage.output_tokens}")
+            print(f"[LLM_CLIENT] Request completed, model: {model}, tokens: {response.usage.output_tokens}")
             return result
 
         except Exception as e:
-            logger.error(f"[LLM_CLIENT] Request failed: {e}")
+            print(f"[LLM_CLIENT] Request failed: {e}")
             return ""
 
     def chat_stream(
@@ -208,7 +209,7 @@ class LLMClient:
                     yield text
 
         except Exception as e:
-            logger.error(f"[LLM_CLIENT] Stream failed: {e}")
+            print(f"[LLM_CLIENT] Stream failed: {e}")
             raise
 
 
@@ -248,15 +249,15 @@ def load_llm_config(
 
     # 加载环境变量
     load_dotenv(env_path)
-    logger.info(f"[CONFIG] Loaded .env from: {env_path}")
+    print(f"[CONFIG] Loaded .env from: {env_path}")
 
     # 加载YAML配置
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             yaml_config = yaml.safe_load(f)
-        logger.info(f"[CONFIG] Loaded YAML from: {config_path}")
+        print(f"[CONFIG] Loaded YAML from: {config_path}")
     except FileNotFoundError:
-        logger.warning(f"[CONFIG] YAML config not found: {config_path}, using defaults")
+        print(f"[CONFIG] YAML config not found: {config_path}, using defaults")
         yaml_config = {}
 
     # 提取模型配置
@@ -291,7 +292,7 @@ def load_llm_config(
         system_prompt=system_prompt
     )
 
-    logger.info(f"[CONFIG] LLM config loaded: primary_model={_llm_config.primary_model}")
+    print(f"[CONFIG] LLM config loaded: primary_model={_llm_config.primary_model}")
 
     return _llm_config
 
@@ -353,7 +354,7 @@ def get_subagent_llm_client(
         subagent_config = subagent_configs.get(subagent_id, {})
 
         if not subagent_config.get("enabled", False):
-            logger.info(f"[SUBAGENT] {subagent_id} does not require LLM")
+            print(f"[SUBAGENT] {subagent_id} does not require LLM")
             return None
 
         # 子智能体使用特定配置
@@ -364,7 +365,7 @@ def get_subagent_llm_client(
         return client
 
     except FileNotFoundError:
-        logger.warning(f"[SUBAGENT] Config not found for {subagent_id}")
+        print(f"[SUBAGENT] Config not found for {subagent_id}")
         return None
 
 
