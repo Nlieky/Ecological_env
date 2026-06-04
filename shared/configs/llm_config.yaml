@@ -172,7 +172,7 @@ monitoring:
 # ==================== 子智能体特定配置 ====================
 subagent_configs:
   # 多维数据感知子智能体
-  data_perception_agent:
+  multi-dimensional-data-perception-agent:
     enabled: true
     model: "fast"  # 使用快速模型，数据处理较快
     system_prompt: |
@@ -203,7 +203,7 @@ subagent_configs:
       - 对齐容差：±5分钟
 
   # 异常检测子智能体
-  anomaly_detection_agent:
+  anomaly-detection-agent:
     enabled: true
     model: "analysis"  # 使用分析模型，异常检测需要复杂计算
     system_prompt: |
@@ -233,7 +233,7 @@ subagent_configs:
       - 0-0.2: 极低置信度，仅供参考
 
   # 规则推理子智能体
-  rule_reasoning_agent:
+  rule-reasoning-agent:
     enabled: true
     model: "primary"  # 使用主模型，推理需要更高准确性
     system_prompt: |
@@ -263,7 +263,7 @@ subagent_configs:
       插瓶干扰、稀释排放、人工拟合、恶意逃避等模式的识别规则
 
   # 研判预警与处置执行子智能体
-  disposition_execution_agent:
+  disposition-execution-agent:
     enabled: true
     model: "primary"  # 使用主模型，需要准确判定和生成工单
     system_prompt: |
