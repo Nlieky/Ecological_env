@@ -26,6 +26,7 @@ import asyncio
 import json
 import os
 import re
+import yaml
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass, field
@@ -52,7 +53,7 @@ else:
     # 最后的备用方案：使用resolve()确保是绝对路径
     project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
 
-logging.basicConfig(level=logging.INFO)
+# 不再配置logging，由主应用统一配置
 logger = logging.getLogger(__name__)
 
 
@@ -185,28 +186,28 @@ class SubAgentIdentityLoader:
             "skill_module": "data-perception-core",
             "scripts": ["data_acquisition.py", "time_alignment.py", "data_cleaning.py", "standardization.py", "data_decomposition.py", "__init__.py"],
             "recommended_script": "__init__.py",
-            "path": "subagents/multi-dimensional-data-perception-agent"
+            "path": "multi-dimensional-data-perception-agent"
         },
         "anomaly-detection-agent": {
             "name": "异常检测子智能体",
             "skill_module": "anomaly-detection-core",
             "scripts": ["__init__.py", "operator_adapter.py", "anomaly_scorer.py", "pattern_recognizer.py", "confidence_evaluator.py", "violation_detector.py"],
             "recommended_script": "__init__.py",
-            "path": "subagents/anomaly-detection-agent"
+            "path": "anomaly-detection-agent"
         },
         "rule-reasoning-agent": {
             "name": "规则推理子智能体",
             "skill_module": "rule-reasoning-core",
             "scripts": ["expert_reasoner.py", "regulation_matcher.py", "process_validator.py", "violation_generator.py"],
             "recommended_script": "expert_reasoner.py",
-            "path": "subagents/rule-reasoning-agent"
+            "path": "rule-reasoning-agent"
         },
         "disposition-execution-agent": {
             "name": "研判预警与处置执行子智能体",
             "skill_module": "disposition-execution-core",
             "scripts": ["alert_classifier.py", "work_order_generator.py", "action_executor.py", "report_generator.py", "consensus_engine.py", "__init__.py"],
             "recommended_script": "alert_classifier.py",
-            "path": "subagents/disposition-execution-agent"
+            "path": "disposition-execution-agent"
         }
     }
 
@@ -234,7 +235,7 @@ class SubAgentIdentityLoader:
             return self._identity_cache[agent_id]
 
         if agent_id not in self.SUB_AGENTS:
-            logger.warning(f"[IDENTITY] 未知子智能体: {agent_id}")
+            print(f"[IDENTITY] 未知子智能体: {agent_id}")
             return None
 
         config = self.SUB_AGENTS[agent_id]
@@ -257,9 +258,9 @@ class SubAgentIdentityLoader:
                 try:
                     with open(path, 'r', encoding='utf-8') as f:
                         identity_content[name] = f.read()
-                    logger.info(f"[IDENTITY] 已加载 {agent_id}/{name}")
+                    print(f"[IDENTITY] 已加载 {agent_id}/{name}")
                 except Exception as e:
-                    logger.warning(f"[IDENTITY] 无法加载 {path}: {e}")
+                    print(f"[IDENTITY] 无法加载 {path}: {e}")
                     identity_content[name] = ""
 
         # 脚本路径
@@ -310,7 +311,9 @@ class LLMAgentCoordinator:
         self.llm_client = llm_client
         # 5层 parent 到达项目根目录 (E:\project\Ecological_env)
         self.project_root = project_root or Path(__file__).resolve().parent.parent.parent.parent.parent
-        logger.info("[COORD] 大模型子智能体协调器初始化完成")
+        # 加载LLM配置
+        self.llm_config = self._load_llm_config()
+        print("[COORD] 大模型子智能体协调器初始化完成")
 
     def coordinate_agent_execution(self, agent_id: str, task: Dict[str, Any],
                                    previous_results: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -335,15 +338,118 @@ class LLMAgentCoordinator:
                 "error": f"无法加载子智能体身份: {agent_id}"
             }
 
-        logger.info(f"[COORD] 协调 {identity.agent_name} 执行任务: {task.get('task_id')}")
+        print(f"[COORD] 协调 {identity.agent_name} 执行任务: {task.get('task_id')}")
 
         # 2. 选择协调模式
         if self.llm_client is not None:
-            logger.info(f"[COORD] 使用 LLM 协调模式")
+            print(f"[COORD] 使用 LLM 协调模式")
             return self._llm_coordinate_agent(identity, task, previous_results)
         else:
-            logger.info(f"[COORD] 使用本地规则模式")
+            print(f"[COORD] 使用本地规则模式")
             return self._local_coordinate_agent(identity, task, previous_results)
+
+    def _load_llm_config(self) -> dict:
+        """
+        从 llm_config.yaml 加载完整的LLM配置
+
+        Returns:
+            dict: LLM配置字典，包含subagent_configs等配置
+        """
+        config_path = self.project_root / "shared" / "configs" / "llm_config.yaml"
+
+        if not config_path.exists():
+            logger.warning(f"[CONFIG] LLM配置文件不存在: {config_path}")
+            return {"subagent_configs": {}}
+
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f) or {}
+            print(f"[CONFIG] 已加载LLM配置")
+            return config
+        except Exception as e:
+            logger.error(f"[CONFIG] 加载LLM配置失败: {e}")
+            return {"subagent_configs": {}}
+
+    def _get_subagent_config(self, agent_id: str) -> dict:
+        """
+        获取指定子智能体的LLM配置
+
+        Args:
+            agent_id: 子智能体ID
+
+        Returns:
+            dict: 子智能体的LLM配置，包含system_prompt、model等
+        """
+        if not hasattr(self, 'llm_config') or not self.llm_config:
+            self.llm_config = self._load_llm_config()
+
+        subagent_configs = self.llm_config.get('subagent_configs', {})
+        config = subagent_configs.get(agent_id, {})
+
+        # 检查是否启用
+        if not config.get('enabled', True):
+            logger.warning(f"[CONFIG] 子智能体 {agent_id} 的LLM功能未启用，使用默认配置")
+            return {}
+
+        # 验证必要字段
+        if 'system_prompt' not in config:
+            logger.warning(f"[CONFIG] 子智能体 {agent_id} 缺少system_prompt配置")
+
+        if 'model' not in config:
+            logger.info(f"[CONFIG] 子智能体 {agent_id} 未指定模型，使用primary")
+            config['model'] = 'primary'
+
+        return config
+
+    def _get_subagent_system_prompt(self, agent_id: str) -> str:
+        """
+        获取子智能体的system_prompt
+
+        Args:
+            agent_id: 子智能体ID
+
+        Returns:
+            str: 子智能体的系统提示词，如果配置缺失则返回主智能体提示词
+        """
+        config = self._get_subagent_config(agent_id)
+
+        if not config:
+            # 回退到主智能体提示词
+            return self._build_master_agent_system_prompt()
+
+        system_prompt = config.get('system_prompt', '')
+
+        if not system_prompt:
+            logger.warning(f"[CONFIG] 子智能体 {agent_id} 未配置system_prompt，使用主智能体提示词")
+            return self._build_master_agent_system_prompt()
+
+        return system_prompt
+
+    def _get_subagent_model(self, agent_id: str) -> str:
+        """
+        获取子智能体的专用模型配置
+
+        Args:
+            agent_id: 子智能体ID
+
+        Returns:
+            str: 模型类型（fast/primary/analysis），默认为primary
+        """
+        config = self._get_subagent_config(agent_id)
+
+        if not config:
+            # 默认使用主模型
+            return 'primary'
+
+        model_key = config.get('model', 'primary')
+
+        # 验证模型配置有效
+        valid_models = ['fast', 'primary', 'analysis']
+        if model_key not in valid_models:
+            logger.warning(f"[CONFIG] 无效的模型配置: {model_key}，使用primary")
+            return 'primary'
+
+        return model_key
 
     def _build_master_agent_system_prompt(self) -> str:
         """构建主智能体系统提示词"""
@@ -368,9 +474,9 @@ class LLMAgentCoordinator:
                         if len(content) > 1000:
                             content = content[:1000] + "\n...(已截断)"
                         parts.append(f"## {name}\n{content}\n")
-                        logger.info(f"[PROMPT] 已加载 {name} 到系统提示词")
+                        print(f"[PROMPT] 已加载 {name} 到系统提示词")
                 except Exception as e:
-                    logger.warning(f"[PROMPT] 无法加载 {name}: {e}")
+                    print(f"[PROMPT] 无法加载 {name}: {e}")
 
         return "\n".join(parts)
 
@@ -390,15 +496,15 @@ class LLMAgentCoordinator:
 
         # 1. 构建系统提示词（主智能体身份）
         system_prompt = self._build_master_agent_system_prompt()
-        logger.info(f"[LLM] 系统提示词已构建，包含主智能体身份")
+        print(f"[LLM] 系统提示词已构建，包含主智能体身份")
 
         # 2. 获取子智能体身份摘要
         identity_summary = self._build_identity_summary(identity)
-        logger.info(f"[LLM] 子智能体身份摘要已构建，长度: {len(identity_summary)} 字符")
+        print(f"[LLM] 子智能体身份摘要已构建，长度: {len(identity_summary)} 字符")
 
         # 3. 获取可用脚本信息
         scripts_info = self._get_available_scripts(identity)
-        logger.info(f"[LLM] 可用脚本: {list(scripts_info.keys())}")
+        print(f"[LLM] 可用脚本: {list(scripts_info.keys())}")
 
         # 4. 构建决策 prompt
 
@@ -450,7 +556,7 @@ class LLMAgentCoordinator:
 
         try:
             # 4. LLM 决策
-            logger.info(f"[LLM] 请求 {identity.agent_name} 决策...")
+            print(f"[LLM] 请求 {identity.agent_name} 决策...")
             decision_response = self.llm_client.chat(
                 message=decision_prompt,
                 system_prompt=system_prompt,
@@ -458,7 +564,7 @@ class LLMAgentCoordinator:
                 temperature=0.0
             )
 
-            logger.info(f"[LLM] 决策响应: {decision_response[:300]}...")
+            print(f"[LLM] 决策响应: {decision_response[:300]}...")
 
             # 5. 解析 LLM 决策
             decision = self._parse_llm_decision(decision_response)
@@ -478,7 +584,7 @@ class LLMAgentCoordinator:
             import traceback
             traceback.print_exc()
             # 回退到本地模式
-            logger.info(f"[FALLBACK] 回退到本地规则模式")
+            print(f"[FALLBACK] 回退到本地规则模式")
             return self._local_coordinate_agent(identity, task, previous_results)
 
     def _local_coordinate_agent(self, identity: SubAgentIdentity,
@@ -499,7 +605,7 @@ class LLMAgentCoordinator:
             "reasoning": f"使用默认脚本 {recommended_script}"
         }
 
-        logger.info(f"[LOCAL] 本地规则模式，使用默认脚本: {recommended_script}")
+        print(f"[LOCAL] 本地规则模式，使用默认脚本: {recommended_script}")
 
         # 执行脚本
         return self._execute_script_by_decision(decision, identity, task)
@@ -599,11 +705,11 @@ class LLMAgentCoordinator:
                 # 尝试直接解析
                 decision = json.loads(response)
 
-            logger.info(f"[LLM] 决策解析成功: {decision.get('script', 'N/A')}")
+            print(f"[LLM] 决策解析成功: {decision.get('script', 'N/A')}")
             return decision
 
         except json.JSONDecodeError as e:
-            logger.warning(f"[LLM] JSON 解析失败: {e}，使用文本分析")
+            print(f"[LLM] JSON 解析失败: {e}，使用文本分析")
             # 文本分析回退
             return {
                 "script": None,
@@ -652,7 +758,7 @@ class LLMAgentCoordinator:
         params = decision.get("params", {})
 
         if not script_name:
-            logger.warning("[LLM] 未指定脚本，使用默认处理")
+            print("[LLM] 未指定脚本，使用默认处理")
             return {
                 "status": "success",
                 "agent_id": identity.agent_id,
@@ -667,7 +773,7 @@ class LLMAgentCoordinator:
         # 1. 检查是否有前一个agent的处理后数据
         if "processed_data" in task:
             data_to_inject = task["processed_data"]
-            logger.info(f"[DATA-FLOW] 使用前一个agent的处理后数据")
+            print(f"[DATA-FLOW] 使用前一个agent的处理后数据")
 
         # 2. 否则，检查metadata中的原始时序数据
         elif task.get("metadata"):
@@ -690,12 +796,14 @@ class LLMAgentCoordinator:
                         values = []
                         for record in influent_ts:
                             val = record.get(key)
-                            # 尝试转换为数值，失败则跳过
-                            try:
-                                if val is not None:
-                                    values.append(float(val))
-                            except (ValueError, TypeError):
+                            # 尝试转换为数值，失败或为None时使用0.0
+                            if val is None:
                                 values.append(0.0)
+                            else:
+                                try:
+                                    values.append(float(val))
+                                except (ValueError, TypeError):
+                                    values.append(0.0)
                         data_values[f"influent_{key}"] = values
 
                 # 处理出水数据
@@ -709,25 +817,28 @@ class LLMAgentCoordinator:
                         values = []
                         for record in effluent_ts:
                             val = record.get(key)
-                            try:
-                                if val is not None:
-                                    values.append(float(val))
-                            except (ValueError, TypeError):
+                            # 尝试转换为数值，失败或为None时使用0.0
+                            if val is None:
                                 values.append(0.0)
+                            else:
+                                try:
+                                    values.append(float(val))
+                                except (ValueError, TypeError):
+                                    values.append(0.0)
                         data_values[f"effluent_{key}"] = values
 
                 if data_values:
                     data_to_inject = {"values": data_values}
-                    logger.info(f"[AUTO-INJECT] 自动注入时序数据: {len(data_values)}个指标, 每个指标{len(influent_ts)}条")
+                    print(f"[AUTO-INJECT] 自动注入时序数据: {len(data_values)}个指标, 每个指标{len(influent_ts)}条")
 
         # 3. 如果有数据要注入，添加到params中
         if data_to_inject and "data" not in params:
             params["data"] = data_to_inject
-            logger.info(f"[AUTO-INJECT] 已将data注入到params，params现在包含: {list(params.keys())}")
+            print(f"[AUTO-INJECT] 已将data注入到params，params现在包含: {list(params.keys())}")
         elif "data" in params:
-            logger.info(f"[AUTO-INJECT] params中已有data参数")
+            print(f"[AUTO-INJECT] params中已有data参数")
         else:
-            logger.info(f"[AUTO-INJECT] 没有数据要注入，data_to_inject={data_to_inject is not None}")
+            print(f"[AUTO-INJECT] 没有数据要注入，data_to_inject={data_to_inject is not None}")
 
         # ========== 查找脚本路径 ==========
         script_path = None
@@ -737,11 +848,10 @@ class LLMAgentCoordinator:
                 break
 
         if not script_path:
-            logger.warning(f"[LLM] 脚本未找到: {script_name}，回退到本地模式")
-            # 回退到本地模式
-            return self._local_coordinate_agent(identity, task, {})
+            print(f"[ERROR] 脚本未找到: {script_name}，无法执行")
+            return {"status": "error", "message": f"脚本未找到: {script_name}"}
 
-        logger.info(f"[LLM] 执行脚本: {script_path.name}")
+        print(f"[LLM] 执行脚本: {script_path.name}")
         return self._dynamic_execute_script(script_path, params, task, identity)
 
     def _dynamic_execute_script(self, script_path: Path,
@@ -789,7 +899,7 @@ class LLMAgentCoordinator:
                 removed_keys.append(key)
 
         if removed_keys:
-            logger.info(f"[LLM] 清除缓存模块: {removed_keys[:5]}...")  # 只显示前5个
+            print(f"[LLM] 清除缓存模块: {removed_keys[:5]}...")  # 只显示前5个
         script_name = script_path.stem
 
         try:
@@ -825,7 +935,7 @@ class LLMAgentCoordinator:
                     if root_str not in sys.path:
                         sys.path.insert(0, root_str)
 
-                    logger.info(f"[LLM] 加载 __init__.py 作为包模块: {module_name}")
+                    print(f"[LLM] 加载 __init__.py 作为包模块: {module_name}")
 
                     # 使用包名加载
                     spec = importlib.util.spec_from_file_location(module_name, script_path)
@@ -848,7 +958,7 @@ class LLMAgentCoordinator:
                         call_params["data"] = task["data"]
 
                     # 调试日志
-                    logger.info(f"[LLM] __init__.py 准备传递参数: {list(call_params.keys())}")
+                    print(f"[LLM] __init__.py 准备传递参数: {list(call_params.keys())}")
 
                     # 尝试调用入口函数
                     for func_name in ['main', 'run', 'process', 'execute']:
@@ -857,7 +967,7 @@ class LLMAgentCoordinator:
                             if callable(func):
                                 import inspect
                                 sig = inspect.signature(func)
-                                logger.info(f"[LLM] __init__.py.{func_name} 签名参数: {list(sig.parameters.keys())}")
+                                print(f"[LLM] __init__.py.{func_name} 签名参数: {list(sig.parameters.keys())}")
 
                                 filtered_params = {}
                                 for name, param in sig.parameters.items():
@@ -866,7 +976,7 @@ class LLMAgentCoordinator:
                                     elif param.kind == inspect.Parameter.VAR_KEYWORD:
                                         filtered_params.update(call_params)
 
-                                logger.info(f"[LLM] 调用 __init__.py.{func_name}(), 参数: {list(filtered_params.keys())}")
+                                print(f"[LLM] 调用 __init__.py.{func_name}(), 参数: {list(filtered_params.keys())}")
                                 result = func(**filtered_params)
                                 return self._format_success_result(identity.agent_id, "__init__.py", result)
 
@@ -908,11 +1018,11 @@ class LLMAgentCoordinator:
                 if str(scripts_dir) not in sys.path:
                     sys.path.insert(0, str(scripts_dir))
 
-                logger.info(f"[LLM] 检测到包结构: {package_name}, 根目录: {root_str}")
+                print(f"[LLM] 检测到包结构: {package_name}, 根目录: {root_str}")
 
                 # === 预加载同级模块（避免相对导入时的循环依赖）===
                 # 对于 pipeline.py，先加载 data_acquisition, time_alignment 等
-                sibling_modules = ['data_acquisition', 'time_alignment', 'data_cleaning', 'standardization']
+                sibling_modules = ['data_acquisition', 'time_alignment', 'data_cleaning', 'standardization', 'data_decomposition', 'data_pipeline']
                 for sibling in sibling_modules:
                     sibling_path = script_dir / f"{sibling}.py"
                     if sibling_path.exists() and f"{package_name}.{sibling}" not in sys.modules:
@@ -925,9 +1035,9 @@ class LLMAgentCoordinator:
                                 sibling_module.__package__ = package_name
                                 sibling_spec.loader.exec_module(sibling_module)
                                 sys.modules[f"{package_name}.{sibling}"] = sibling_module
-                                logger.info(f"[LLM] 预加载依赖: {sibling}")
+                                print(f"[LLM] 预加载依赖: {sibling}")
                         except Exception as e:
-                            logger.warning(f"[LLM] 预加载 {sibling} 失败: {e}")
+                            print(f"[LLM] 预加载 {sibling} 失败: {e}")
 
                 # 使用完整模块名加载
                 module_name = f"{package_name}.{script_name}"
@@ -969,13 +1079,13 @@ class LLMAgentCoordinator:
                 call_params["data"] = task["data"]
 
             # 调试日志：显示所有准备传递的参数
-            logger.info(f"[LLM] 准备传递参数: {list(call_params.keys())}")
+            print(f"[LLM] 准备传递参数: {list(call_params.keys())}")
             if "data" in call_params:
                 data_param = call_params["data"]
                 if isinstance(data_param, dict):
-                    logger.info(f"[LLM] data参数包含字段: {list(data_param.keys())[:5]}...")
+                    print(f"[LLM] data参数包含字段: {list(data_param.keys())[:5]}...")
                 else:
-                    logger.info(f"[LLM] data参数类型: {type(data_param)}")
+                    print(f"[LLM] data参数类型: {type(data_param)}")
 
             # 定义安全调用函数（参数过滤）
             def safe_call(func, **kwargs):
@@ -983,7 +1093,7 @@ class LLMAgentCoordinator:
                 import inspect
                 try:
                     sig = inspect.signature(func)
-                    logger.info(f"[LLM] 函数 {func.__name__} 的签名参数: {list(sig.parameters.keys())}")
+                    print(f"[LLM] 函数 {func.__name__} 的签名参数: {list(sig.parameters.keys())}")
                     # 过滤出函数接受的参数
                     filtered_params = {}
                     for name, param in sig.parameters.items():
@@ -994,9 +1104,9 @@ class LLMAgentCoordinator:
                             filtered_params.update(kwargs)
                         elif param.default == inspect.Parameter.empty and name not in kwargs:
                             # 必需参数缺失
-                            logger.warning(f"[LLM] 缺少必需参数: {name}")
+                            print(f"[LLM] 缺少必需参数: {name}")
 
-                    logger.info(f"[LLM] 调用函数: {func.__name__}(), 参数: {list(filtered_params.keys())}")
+                    print(f"[LLM] 调用函数: {func.__name__}(), 参数: {list(filtered_params.keys())}")
                     return func(**filtered_params)
                 except TypeError as e:
                     logger.error(f"[LLM] 函数调用失败: {e}")
@@ -1040,7 +1150,7 @@ class LLMAgentCoordinator:
                     break
 
             if main_class:
-                logger.info(f"[LLM] 实例化类: {main_class.__name__}")
+                print(f"[LLM] 实例化类: {main_class.__name__}")
                 # 尝试无参数实例化
                 try:
                     instance = main_class()
@@ -1057,7 +1167,7 @@ class LLMAgentCoordinator:
                             return self._format_success_result(identity.agent_id, script_name, result)
 
             # === 4. 所有尝试失败 ===
-            logger.warning(f"[LLM] 脚本 {script_name} 没有可调用的入口函数或类")
+            print(f"[LLM] 脚本 {script_name} 没有可调用的入口函数或类")
             return {
                 "status": "error",
                 "agent_id": identity.agent_id,
@@ -1097,13 +1207,13 @@ class LLMAgentCoordinator:
         """让 LLM 分析脚本执行结果"""
         # 如果脚本执行失败，直接返回错误结果，不要让LLM处理
         if script_result.get("status") == "error":
-            logger.warning(f"[LLM] 脚本执行失败，跳过LLM分析，直接返回错误结果")
+            print(f"[LLM] 脚本执行失败，跳过LLM分析，直接返回错误结果")
             return script_result
 
         # 先检查脚本结果是否包含处理后的数据
         # 如果有，直接返回脚本结果，不要让LLM覆盖它
         if self._extract_processed_data(script_result):
-            logger.info(f"[LLM] {identity.agent_id}脚本已输出处理后的数据，跳过LLM分析")
+            print(f"[LLM] {identity.agent_id}脚本已输出处理后的数据，跳过LLM分析")
             return script_result
 
         # 辅助函数：过滤不可JSON序列化的对象
@@ -1160,7 +1270,7 @@ class LLMAgentCoordinator:
 """
 
         try:
-            logger.info(f"[LLM] 分析{identity.agent_name}的执行结果")
+            print(f"[LLM] 分析{identity.agent_name}的执行结果")
             response = self.llm_client.chat(
                 message=analysis_prompt,
                 system_prompt=system_prompt,
@@ -1182,12 +1292,12 @@ class LLMAgentCoordinator:
                 if "result" not in final_result and "result" in script_result:
                     final_result["result"] = script_result["result"]
 
-                logger.info(f"[LLM] 结果分析完成")
+                print(f"[LLM] 结果分析完成")
                 return final_result
 
             except json.JSONDecodeError:
                 # JSON 解析失败，返回原始脚本结果
-                logger.warning(f"[LLM] JSON解析失败，返回原始脚本结果")
+                print(f"[LLM] JSON解析失败，返回原始脚本结果")
                 return script_result
 
         except Exception as e:
@@ -1226,14 +1336,14 @@ class LLMAgentCoordinator:
         agent_id = identity.agent_id
         category = context.get("category", "")
 
-        logger.info(f"[COORD] 执行 {agent_id} 任务，类别: {category}")
+        print(f"[COORD] 执行 {agent_id} 任务，类别: {category}")
 
         try:
             # 根据子智能体类型调用相应脚本
             if agent_id == "multi-dimensional-data-perception-agent":
                 return self._execute_data_perception(identity, context)
             elif agent_id == "data-governance-agent":  # 兼容旧名称
-                logger.warning("[COORD] data-governance-agent已废弃，请使用multi-dimensional-data-perception-agent")
+                print("[COORD] data-governance-agent已废弃，请使用multi-dimensional-data-perception-agent")
                 return self._execute_data_perception(identity, context)
             elif agent_id == "anomaly-detection-agent":
                 return self._execute_anomaly_detection(identity, context)
@@ -1284,7 +1394,7 @@ class LLMAgentCoordinator:
                     "decomposition_info": result.get("decomposition", {})
                 }
         except ImportError:
-            logger.warning("[DATA_PERCEPTION] data_decomposition不可用")
+            print("[DATA_PERCEPTION] data_decomposition不可用")
 
         # 备用方案：使用 data_cleaning
         try:
@@ -1303,7 +1413,7 @@ class LLMAgentCoordinator:
                     "quality_report": {"method": "data_cleaning"}
                 }
         except Exception as e:
-            logger.warning(f"[DATA_PERCEPTION] data_cleaning不可用: {e}")
+            print(f"[DATA_PERCEPTION] data_cleaning不可用: {e}")
 
         # 简化处理：直接返回数据
         input_params = context.get("input_params", {})
@@ -1484,7 +1594,7 @@ class LLMAgentCoordinator:
             执行计划字典，包含 selected_agents, execution_plan, reasoning
         """
         if self.llm_client is None:
-            logger.warning("[L1-LLM] LLM客户端不可用，使用默认执行计划")
+            print("[L1-LLM] LLM客户端不可用，使用默认执行计划")
             return self._get_default_execution_plan()
 
         system_prompt = self._build_master_agent_system_prompt()
@@ -1532,23 +1642,23 @@ class LLMAgentCoordinator:
 """
 
         try:
-            logger.info("[L1-LLM] 请求主智能体决策子智能体执行计划...")
+            print("[L1-LLM] 请求主智能体决策子智能体执行计划...")
             response = self.llm_client.chat(
                 message=decision_prompt,
                 system_prompt=system_prompt,
                 model_type="primary",
                 temperature=0.0
             )
-            logger.info(f"[L1-LLM] 执行计划响应: {response[:500]}...")
+            print(f"[L1-LLM] 执行计划响应: {response[:500]}...")
 
             plan = self._parse_llm_decision(response)
 
             # 验证并修正执行计划
             if "execution_plan" not in plan or not plan["execution_plan"]:
-                logger.warning("[L1-LLM] LLM返回的执行计划无效，使用默认计划")
+                print("[L1-LLM] LLM返回的执行计划无效，使用默认计划")
                 return self._get_default_execution_plan()
 
-            logger.info(f"[L1-LLM] 执行计划包含 {len(plan['execution_plan'])} 个子智能体")
+            print(f"[L1-LLM] 执行计划包含 {len(plan['execution_plan'])} 个子智能体")
             return plan
 
         except Exception as e:
@@ -1595,7 +1705,7 @@ class LLMAgentCoordinator:
         # 检查agent是否输出了处理后的数据
         processed_data = self._extract_processed_data(raw_output)
         if processed_data:
-            logger.info(f"[L1-LLM] {agent_id}输出了处理后的数据，直接传递给{next_agent_id}，跳过LLM处理")
+            print(f"[L1-LLM] {agent_id}输出了处理后的数据，直接传递给{next_agent_id}，跳过LLM处理")
             return {
                 "processed_data": processed_data,
                 "status": "success",
@@ -1604,7 +1714,7 @@ class LLMAgentCoordinator:
 
         # ========== 如果没有处理后的数据，使用LLM处理 ==========
         if self.llm_client is None:
-            logger.warning("[L1-LLM] LLM客户端不可用，直接传递原始输出")
+            print("[L1-LLM] LLM客户端不可用，直接传递原始输出")
             return raw_output
 
         system_prompt = self._build_master_agent_system_prompt()
@@ -1645,17 +1755,17 @@ class LLMAgentCoordinator:
 """
 
         try:
-            logger.info(f"[L1-LLM] 主智能体处理 {agent_id} 输出，准备传递给 {next_agent_id}...")
+            print(f"[L1-LLM] 主智能体处理 {agent_id} 输出，准备传递给 {next_agent_id}...")
             response = self.llm_client.chat(
                 message=process_prompt,
                 system_prompt=system_prompt,
                 model_type="primary",
                 temperature=0.0
             )
-            logger.info(f"[L1-LLM] 输出处理响应: {response[:300]}...")
+            print(f"[L1-LLM] 输出处理响应: {response[:300]}...")
 
             processed = self._parse_llm_decision(response)
-            logger.info(f"[L1-LLM] 输出处理完成，提取了 {len(processed)} 个字段")
+            print(f"[L1-LLM] 输出处理完成，提取了 {len(processed)} 个字段")
             return processed
 
         except Exception as e:
@@ -1694,45 +1804,45 @@ class LLMAgentCoordinator:
         # ============ 第一层LLM：主智能体决策执行计划 ============
         # 强制使用完整执行计划（所有4个子智能体）
         if analysis_scope == "full":
-            logger.info("[COORD] 强制使用完整执行计划（所有4个子智能体）")
+            print("[COORD] 强制使用完整执行计划（所有4个子智能体）")
             plan_result = self._get_default_execution_plan()
             agent_sequence = plan_result.get("execution_plan", [])
         elif self.llm_client is not None:
-            logger.info("=" * 60)
-            logger.info("[L1-LLM] 第一层LLM：主智能体决策子智能体执行计划")
-            logger.info("=" * 60)
+            print("=" * 60)
+            print("[L1-LLM] 第一层LLM：主智能体决策子智能体执行计划")
+            print("=" * 60)
             plan_result = self._llm_plan_subagent_execution(task)
             agent_sequence = plan_result.get("execution_plan", [])
 
             if not agent_sequence:
-                logger.warning("[COORD] LLM返回的执行计划为空，使用默认计划")
+                print("[COORD] LLM返回的执行计划为空，使用默认计划")
                 agent_sequence = self._get_default_execution_plan()["execution_plan"]
         else:
-            logger.info("[COORD] LLM不可用，使用默认执行计划")
+            print("[COORD] LLM不可用，使用默认执行计划")
             agent_sequence = self._get_default_execution_plan()["execution_plan"]
 
-        logger.info(f"[COORD] 执行计划包含 {len(agent_sequence)} 个子智能体:")
+        print(f"[COORD] 执行计划包含 {len(agent_sequence)} 个子智能体:")
         for i, step in enumerate(agent_sequence):
             agent_id = step.get("agent", "unknown")
             purpose = step.get("purpose", "未知")
-            logger.info(f"  {i+1}. {agent_id}: {purpose}")
+            print(f"  {i+1}. {agent_id}: {purpose}")
 
         # ============ 按计划执行子智能体 ============
         for i, step in enumerate(agent_sequence):
             agent_id = step.get("agent")
             next_agent_id = agent_sequence[i + 1].get("agent") if i + 1 < len(agent_sequence) else None
 
-            logger.info("")
-            logger.info("=" * 60)
-            logger.info(f"[COORD] 执行子智能体 {i + 1}/{len(agent_sequence)}: {agent_id}")
-            logger.info("=" * 60)
+            print("")
+            print("=" * 60)
+            print(f"[COORD] 执行子智能体 {i + 1}/{len(agent_sequence)}: {agent_id}")
+            print("=" * 60)
 
             # ============ 第二层LLM：子智能体内决策 ============
-            logger.info(f"[L2-LLM] 第二层LLM：{agent_id} 决策脚本调用...")
+            print(f"[L2-LLM] 第二层LLM：{agent_id} 决策脚本调用...")
 
             # 如果有前一个agent的处理后数据，传递给当前agent
             if "processed_data" in processed_context:
-                logger.info(f"[DATA-FLOW] 当前agent将使用前一个agent的处理后数据")
+                print(f"[DATA-FLOW] 当前agent将使用前一个agent的处理后数据")
 
             result = self.coordinate_agent_execution(
                 agent_id,
@@ -1749,20 +1859,20 @@ class LLMAgentCoordinator:
             processed_context[f"{agent_id}_raw_output"] = result
 
             if processed_data:
-                logger.info(f"[DATA-FLOW] {agent_id} 输出了处理后的数据，准备传递给下一个agent")
+                print(f"[DATA-FLOW] {agent_id} 输出了处理后的数据，准备传递给下一个agent")
                 # 更新processed_context中的processed_data，供下一个agent使用
                 processed_context["processed_data"] = processed_data
 
                 # 如果有处理后的数据，跳过LLM处理（避免数据被修改）
                 if next_agent_id:
-                    logger.info(f"[L1-LLM] 跳过LLM处理，直接传递处理后的数据给{next_agent_id}")
+                    print(f"[L1-LLM] 跳过LLM处理，直接传递处理后的数据给{next_agent_id}")
             else:
-                logger.info(f"[DATA-FLOW] {agent_id} 没有输出处理后的数据（或输出格式不标准）")
+                print(f"[DATA-FLOW] {agent_id} 没有输出处理后的数据（或输出格式不标准）")
 
                 # ============ 第一层LLM：主智能体处理输出（仅当没有处理后的数据时） ============
                 if next_agent_id and self.llm_client is not None and result.get("status") == "success":
-                    logger.info("")
-                    logger.info(f"[L1-LLM] 第一层LLM：主智能体处理 {agent_id} 输出")
+                    print("")
+                    print(f"[L1-LLM] 第一层LLM：主智能体处理 {agent_id} 输出")
 
                     processed_output = self._llm_process_agent_output(
                         agent_id, result, next_agent_id
@@ -1775,17 +1885,17 @@ class LLMAgentCoordinator:
                     processed_context[f"{agent_id}_processed"] = processed_output
                     processed_context["last_processed"] = processed_output
 
-                    logger.info(f"[L1-LLM] 处理完成")
+                    print(f"[L1-LLM] 处理完成")
 
             # 如果执行失败，中断流程
             if result.get("status") == "error":
                 logger.error(f"[COORD] 子智能体 {agent_id} 执行失败，中断流程")
                 break
 
-        logger.info("")
-        logger.info("=" * 60)
-        logger.info(f"[COORD] 所有子智能体执行完成: {len(results)} 个")
-        logger.info("=" * 60)
+        print("")
+        print("=" * 60)
+        print(f"[COORD] 所有子智能体执行完成: {len(results)} 个")
+        print("=" * 60)
 
         return results
 
@@ -1811,9 +1921,9 @@ class ExecutionControlModule:
         # 动态编排器（任务规划与智能体协调）
         self.orchestrator = DynamicOrchestrator()
 
-        logger.info(f"[INIT] {self.name} v{self.version} initialized")
-        logger.info(f"[INIT] 大模型协调器已启用")
-        logger.info(f"[INIT] 动态编排器已集成")
+        print(f"[INIT] {self.name} v{self.version} initialized")
+        print(f"[INIT] 大模型协调器已启用")
+        print(f"[INIT] 动态编排器已集成")
 
     def register_agent_client(self, agent_id: str, client: Any):
         """
@@ -1824,7 +1934,7 @@ class ExecutionControlModule:
             client: 客户端对象（可以是HTTP客户端、gRPC客户端等）
         """
         self.agent_clients[agent_id] = client
-        logger.info(f"[REGISTER] Agent client registered: {agent_id}")
+        print(f"[REGISTER] Agent client registered: {agent_id}")
 
     async def execute_task(self, task: Dict[str, Any],
                           allocation: Dict[str, Any],
@@ -1852,7 +1962,7 @@ class ExecutionControlModule:
         )
 
         try:
-            logger.info(f"[EXECUTE] Starting task {task_id} on agent {agent_id}")
+            print(f"[EXECUTE] Starting task {task_id} on agent {agent_id}")
 
             # 更新状态
             result.status = ExecutionStatus.RUNNING
@@ -1878,7 +1988,7 @@ class ExecutionControlModule:
             end = datetime.fromisoformat(result.end_time)
             result.duration_seconds = (end - start).total_seconds()
 
-            logger.info(f"[EXECUTE] Task {task_id} completed in {result.duration_seconds:.2f}s")
+            print(f"[EXECUTE] Task {task_id} completed in {result.duration_seconds:.2f}s")
 
         except asyncio.TimeoutError:
             result.status = ExecutionStatus.TIMEOUT
@@ -1918,7 +2028,7 @@ class ExecutionControlModule:
         """
         agent_id = allocation["agent_id"]
 
-        logger.info(f"[DISPATCH] 分发任务到 {agent_id}")
+        print(f"[DISPATCH] 分发任务到 {agent_id}")
 
         # 使用大模型协调器执行任务
         # 注意：这里是同步调用，实际在异步上下文中运行
@@ -1952,7 +2062,7 @@ class ExecutionControlModule:
         task_ids = stage["tasks"]
         execution_mode = stage.get("execution_mode", "parallel")
 
-        logger.info(f"[STAGE] Executing stage {stage_id} with {len(task_ids)} tasks ({execution_mode})")
+        print(f"[STAGE] Executing stage {stage_id} with {len(task_ids)} tasks ({execution_mode})")
 
         if execution_mode == "parallel":
             # 并行执行
@@ -1989,7 +2099,7 @@ class ExecutionControlModule:
 
                     # 如果任务失败且不允许继续，则停止
                     if result.status == ExecutionStatus.FAILED:
-                        logger.warning(f"[STAGE] Task {task_id} failed, stopping stage")
+                        print(f"[STAGE] Task {task_id} failed, stopping stage")
                         break
 
         return execution_results
@@ -2010,7 +2120,7 @@ class ExecutionControlModule:
         tasks = flow["tasks"]
         stages = flow["stages"]
 
-        logger.info(f"[FLOW] Starting flow execution: {flow_id}")
+        print(f"[FLOW] Starting flow execution: {flow_id}")
 
         report = ExecutionReport(
             flow_id=flow_id,
@@ -2054,7 +2164,7 @@ class ExecutionControlModule:
             # 保存历史记录
             self.execution_history.append(report)
 
-            logger.info(f"[FLOW] Flow completed: {report.completed_tasks}/{report.total_tasks} tasks successful")
+            print(f"[FLOW] Flow completed: {report.completed_tasks}/{report.total_tasks} tasks successful")
 
         return report
 
@@ -2068,7 +2178,7 @@ class ExecutionControlModule:
         Returns:
             执行结果字典
         """
-        logger.info(f"[PLAN] 执行计划: task_type={plan.task_type}, mode={plan.execution_mode.value}, agents={len(plan.agents)}")
+        print(f"[PLAN] 执行计划: task_type={plan.task_type}, mode={plan.execution_mode.value}, agents={len(plan.agents)}")
 
         if dry_run:
             return {
@@ -2083,7 +2193,7 @@ class ExecutionControlModule:
         for idx, agent_task in enumerate(plan.agents):
             agent_id = agent_task.id
 
-            logger.info(f"[PLAN] 执行智能体 {idx + 1}/{len(plan.agents)}: {agent_id}")
+            print(f"[PLAN] 执行智能体 {idx + 1}/{len(plan.agents)}: {agent_id}")
 
             # 调用子智能体的逻辑
             result = self._execute_agent(agent_id, agent_task)
@@ -2095,7 +2205,7 @@ class ExecutionControlModule:
                 # 更新下一个智能体的输入数据
                 if result.get("status") == "success" and "processed_data" in result:
                     next_agent.input_data.update(result["processed_data"])
-                    logger.info(f"[PLAN] 传递处理后的数据给 {next_agent.id}")
+                    print(f"[PLAN] 传递处理后的数据给 {next_agent.id}")
 
         return {
             "status": "completed",
@@ -2155,7 +2265,7 @@ class ExecutionControlModule:
         if task_id in self.active_executions:
             # 实际实现中需要向子智能体发送取消请求
             del self.active_executions[task_id]
-            logger.info(f"[CANCEL] Task {task_id} cancelled")
+            print(f"[CANCEL] Task {task_id} cancelled")
             return True
         return False
 
