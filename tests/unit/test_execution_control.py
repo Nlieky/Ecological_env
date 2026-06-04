@@ -147,3 +147,59 @@ class TestSubagentLLMIntegration:
 
         # 验证模型类型在有效范围内
         assert model_type in ['fast', 'primary', 'analysis']
+
+
+class TestFallbackMechanism:
+    """测试回退机制"""
+
+    @pytest.fixture
+    def coordinator(self):
+        """创建协调器实例"""
+        return LLMAgentCoordinator()
+
+    def test_fallback_to_master_prompt_when_config_empty(self, coordinator):
+        """验证配置为空时回退到主智能体提示词"""
+        # 清空配置
+        coordinator.llm_config = {}
+
+        # 获取不存在子智能体的提示词
+        prompt = coordinator._get_subagent_system_prompt('non-existent-agent')
+
+        # 验证返回的是主智能体提示词（包含"主智能体"或"master"）
+        assert len(prompt) > 0
+        # 主智能体提示词包含"你是废水虚假排放智能监测系统的主智能体"
+        assert '主智能体' in prompt or 'master' in prompt.lower()
+
+    def test_fallback_to_primary_model_when_config_missing(self, coordinator):
+        """验证配置缺失时回退到primary模型"""
+        # 清空配置
+        coordinator.llm_config = {}
+
+        # 获取不存在子智能体的模型
+        model = coordinator._get_subagent_model('non-existent-agent')
+
+        # 验证默认使用primary
+        assert model == 'primary'
+
+    def test_invalid_model_defaults_to_primary(self, coordinator, mocker):
+        """验证无效模型配置回退到primary"""
+        # Mock配置返回无效模型
+        mocker.patch.object(coordinator, '_get_subagent_config', return_value={'model': 'invalid_model'})
+
+        model = coordinator._get_subagent_model('test-agent')
+
+        assert model == 'primary'
+
+    def test_disabled_agent_returns_empty_config(self, coordinator):
+        """验证disabled的子智能体返回空配置"""
+        # Mock配置返回enabled=False
+        coordinator.llm_config = {
+            'subagent_configs': {
+                'test-agent': {'enabled': False, 'system_prompt': 'test', 'model': 'fast'}
+            }
+        }
+
+        config = coordinator._get_subagent_config('test-agent')
+
+        # 验证返回空配置
+        assert config == {}
