@@ -1398,7 +1398,10 @@ class LLMAgentCoordinator:
                 return {
                     "status": "success",
                     "agent_id": identity.agent_id,
-                    "result": result,
+                    "result": {
+                        "cleaned_data": result.get("cleaned_data", {}),
+                        "decomposition": result.get("decomposition", {})
+                    },
                     "processed_data": result.get("cleaned_data", {}),
                     "decomposition_info": result.get("decomposition", {})
                 }
@@ -1407,30 +1410,47 @@ class LLMAgentCoordinator:
 
         # 备用方案：使用 data_cleaning
         try:
-            from data_cleaning import clean_data
+            from data_cleaning import DataCleaningModule
 
             input_params = context.get("input_params", {})
-            effluent_data = input_params.get("effluent_data", {})
+            data = context.get("data", {})
 
-            if effluent_data:
-                cleaned = clean_data(effluent_data)
+            if data:
+                cleaner = DataCleaningModule()
+
+                # 清洗进水数据
+                influent_cleaned = cleaner.clean_water_quality_data(data.get("influent", []))
+                # 清洗出水数据
+                effluent_cleaned = cleaner.clean_water_quality_data(data.get("effluent", []))
+
+                cleaned = {
+                    "influent": influent_cleaned.get("cleaned_data", []),
+                    "effluent": effluent_cleaned.get("cleaned_data", []),
+                    "quality_report": {
+                        "influent": influent_cleaned.get("quality_report", {}),
+                        "effluent": effluent_cleaned.get("quality_report", {})
+                    }
+                }
 
                 return {
                     "status": "success",
                     "agent_id": identity.agent_id,
-                    "processed_data": cleaned,
-                    "quality_report": {"method": "data_cleaning"}
+                    "result": {
+                        "cleaned_data": cleaned,
+                        "quality_report": cleaned.get("quality_report", {})
+                    },
+                    "processed_data": cleaned
                 }
         except Exception as e:
-            print(f"[DATA_PERCEPTION] data_cleaning不可用: {e}")
+            print(f"[DATA_PERCEPTION] data_cleaning error: {e}")
 
         # 简化处理：直接返回数据
         input_params = context.get("input_params", {})
         return {
             "status": "success",
             "agent_id": identity.agent_id,
-            "processed_data": input_params.get("effluent_data", {}),
-            "quality_report": {"method": "simple_pass_through"}
+            "result": {},
+            "processed_data": {}
         }
 
     def _execute_anomaly_detection(self, identity: SubAgentIdentity,

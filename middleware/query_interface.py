@@ -30,14 +30,27 @@ from shared.configs.llm_client import get_llm_client
 from historical_data_fetcher import HistoricalDataFetcher
 
 # 使用简单的print代替logging，避免递归错误
+import sys
 def log_info(msg):
-    print(f"[INFO] {msg}")
+    try:
+        print(f"[INFO] {msg}", flush=True)
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        print(f"[INFO] {msg.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')}", flush=True)
+    sys.stdout.flush()
 
 def log_error(msg):
-    print(f"[ERROR] {msg}")
+    try:
+        print(f"[ERROR] {msg}", flush=True)
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        print(f"[ERROR] {msg.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')}", flush=True)
+    sys.stdout.flush()
 
 def log_warning(msg):
-    print(f"[WARNING] {msg}")
+    try:
+        print(f"[WARNING] {msg}", flush=True)
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        print(f"[WARNING] {msg.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')}", flush=True)
+    sys.stdout.flush()
 
 
 # 自定义JSON编码器
@@ -150,7 +163,11 @@ def initialize_components():
 
     # 1. 初始化LLM客户端
     try:
-        llm_client = get_llm_client()
+        # 传递正确的路径参数
+        llm_client = get_llm_client(
+            env_path=str(PROJECT_ROOT / "middleware" / ".env"),
+            config_path=str(PROJECT_ROOT / "shared" / "configs" / "llm_config.yaml")
+        )
         log_info("[INIT] LLM客户端初始化成功")
     except Exception as e:
         log_error(f"[INIT] LLM客户端初始化失败: {e}")
@@ -233,6 +250,13 @@ def handle_query():
         log_info("[STEP 3] LLM调度子智能体分析...")
 
         # 3.1 调用多维数据感知子智能体
+        log_info("=" * 60)
+        log_info("[STEP 3.1] 调用多维数据感知子智能体")
+        log_info(f"[STEP 3.1] 任务ID: query_{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        log_info(f"[STEP 3.1] 查询内容: {query[:100]}...")
+        log_info(f"[STEP 3.1] 数据量: influent={len(historical_data.get('influent', []))}, effluent={len(historical_data.get('effluent', []))}")
+        log_info("=" * 60)
+
         perception_result = llm_coordinator.coordinate_agent_execution(
             agent_id="multi-dimensional-data-perception-agent",
             task={
@@ -252,9 +276,50 @@ def handle_query():
             }
         )
 
+        log_info("=" * 60)
+        log_info(f"[STEP 3.1] 多维数据感知子智能体完成")
+        log_info(f"[STEP 3.1] 状态: {perception_result.get('status', 'unknown')}")
+        if perception_result.get('status') == 'success':
+            log_info(f"[STEP 3.1] 结果摘要: {str(perception_result.get('summary', ''))[:200]}...")
+        log_info("=" * 60)
+
         # 3.2 调用异常检测子智能体（如果需要）
         anomaly_result = None
         if 'anomaly' in intent.get('analysis_types', []) or 'correlation' in intent.get('analysis_types', []):
+            log_info("=" * 60)
+            log_info("[STEP 3.2] 调用异常检测子智能体")
+            log_info(f"[STEP 3.2] 分析类型: {intent.get('analysis_types', [])}")
+            log_info("=" * 60)
+
+            # NEW: Extract preprocessed data from perception result
+            processed_data = historical_data  # 默认使用原始数据
+            if perception_result and isinstance(perception_result, dict):
+                # 尝试从感知结果中获取cleaned_data
+                if "result" in perception_result:
+                    result_data = perception_result["result"]
+                    if isinstance(result_data, dict):
+                        # 路径1: result.cleaned_data
+                        if "cleaned_data" in result_data:
+                            cleaned = result_data["cleaned_data"]
+                            if isinstance(cleaned, dict) and "influent" in cleaned and "effluent" in cleaned:
+                                processed_data = {
+                                    "influent": cleaned["influent"],
+                                    "effluent": cleaned["effluent"]
+                                }
+                                log_info(f"[STEP 3.2] 使用感知子智能体预处理后的数据: influent={len(processed_data['influent'])}, effluent={len(processed_data['effluent'])}")
+                        # 路径2: result.aligned_data
+                        elif "aligned_data" in result_data:
+                            aligned = result_data["aligned_data"]
+                            if isinstance(aligned, dict):
+                                processed_data = aligned
+                                log_info(f"[STEP 3.2] 使用感知子智能体对齐后的数据")
+                # 路径3: processed_data直接路径
+                elif "processed_data" in perception_result:
+                    processed = perception_result["processed_data"]
+                    if isinstance(processed, dict):
+                        processed_data = processed
+                        log_info(f"[STEP 3.2] 使用感知子智能体处理后的数据")
+
             anomaly_result = llm_coordinator.coordinate_agent_execution(
                 agent_id="anomaly-detection-agent",
                 task={
@@ -262,19 +327,54 @@ def handle_query():
                     "description": "异常检测和相关性分析",
                     "query": query,
                     "intent": intent,
-                    "data": historical_data,
+                    "data": processed_data,  # 使用预处理后的数据
                     "metadata": {
-                        "data_count": len(historical_data.get('influent', [])),
+                        "data_count": len(processed_data.get('influent', [])),
                         "indicators": intent.get('indicators', []),
                         "analysis_types": intent.get('analysis_types', []),
-                        # 将历史数据转换为时序格式以便注入
-                        "influent_timeseries": historical_data.get('influent', []),
-                        "effluent_timeseries": historical_data.get('effluent', [])
+                        "data_source": "preprocessed" if processed_data is not historical_data else "raw",
+                        "influent_timeseries": processed_data.get('influent', []),
+                        "effluent_timeseries": processed_data.get('effluent', [])
                     },
                     "previous_results": {"perception": perception_result}
                 },
                 previous_results={"perception": perception_result}
             )
+
+            log_info("=" * 60)
+            log_info(f"[STEP 3.2] 异常检测子智能体完成")
+            log_info(f"[STEP 3.2] 状态: {anomaly_result.get('status', 'unknown')}")
+            log_info(f"[STEP 3.2] 结果keys: {list(anomaly_result.keys()) if isinstance(anomaly_result, dict) else 'N/A'}")
+
+            # 调试：深入查看result字段
+            if anomaly_result and isinstance(anomaly_result, dict):
+                result_field = anomaly_result.get('result', {})
+                if result_field:
+                    log_info(f"[STEP 3.2] result字段类型: {type(result_field)}")
+                    if isinstance(result_field, dict):
+                        log_info(f"[STEP 3.2] result.keys: {list(result_field.keys())}")
+                        if 'anomalies' in result_field:
+                            anomalies = result_field.get('anomalies', [])
+                            log_info(f"[STEP 3.2] result.anomalies: {len(anomalies)} 个")
+                            if anomalies and len(anomalies) > 0:
+                                log_info(f"[STEP 3.2] 第一个异常示例: {str(anomalies[0])[:200]}...")
+                        if 'output' in result_field:
+                            output = result_field.get('output', {})
+                            log_info(f"[STEP 3.2] result.output类型: {type(output)}, keys: {list(output.keys()) if isinstance(output, dict) else 'N/A'}")
+                            if isinstance(output, dict) and 'anomalies' in output:
+                                anomalies = output.get('anomalies', [])
+                                log_info(f"[STEP 3.2] result.output.anomalies: {len(anomalies)} 个")
+
+            if anomaly_result.get('anomalies'):
+                anomalies = anomaly_result.get('anomalies', [])
+                log_info(f"[STEP 3.2] 检测到 {len(anomalies)} 个异常点")
+                for idx, anom in enumerate(anomalies[:3]):  # 只显示前3个异常
+                    log_info(f"[STEP 3.2]   异常{idx+1}: {anom.get('indicator', 'N/A')} - {anom.get('pattern', 'N/A')} (严重度: {anom.get('severity', 'N/A')})")
+                if len(anomalies) > 3:
+                    log_info(f"[STEP 3.2]   ... 还有 {len(anomalies) - 3} 个异常点")
+            log_info("=" * 60)
+        else:
+            log_info("[STEP 3.2] 跳过异常检测（未请求相关分析类型）")
 
         # ========== 步骤4: LLM整合结果生成报告 ==========
         log_info("[STEP 4] LLM整合结果生成报告...")
@@ -282,7 +382,7 @@ def handle_query():
 
         # ========== 返回结果 ==========
         try:
-            # 简化结果，避免numpy类型
+            # 构建完整的结果响应
             result = {
                 'status': 'success',
                 'query': str(query),
@@ -293,7 +393,112 @@ def handle_query():
                 'summary': str(summary) if summary else ''
             }
 
-            # 只包含perception和anomaly的状态，不包含详细结果
+            # ========== 添加时序数据（用于前端图表绘制）==========
+            # 使用预处理后的数据以确保与异常检测使用的数据一致
+            result['timeseries_data'] = {
+                'influent': processed_data.get('influent', historical_data.get('influent', [])),
+                'effluent': processed_data.get('effluent', historical_data.get('effluent', []))
+            }
+
+            # ========== 添加异常详情（用于前端标注异常点）==========
+            result['anomaly_details'] = []
+            if anomaly_result:
+                # 从异常检测结果中提取异常点详情
+                # 数据结构可能是: anomaly_result['result']['anomalies'] 或 anomaly_result['result']['output']['anomalies']
+                anomalies = []
+
+                # 尝试多种路径
+                if 'result' in anomaly_result and isinstance(anomaly_result['result'], dict):
+                    result_field = anomaly_result['result']
+                    # 路径1: result.anomalies
+                    if 'anomalies' in result_field:
+                        anomalies = result_field['anomalies']
+                        log_info(f"[QUERY] 从 result.anomalies 提取异常数据")
+                    # 路径2: result.output.anomalies
+                    elif 'output' in result_field and isinstance(result_field['output'], dict) and 'anomalies' in result_field['output']:
+                        anomalies = result_field['output']['anomalies']
+                        log_info(f"[QUERY] 从 result.output.anomalies 提取异常数据")
+                    else:
+                        log_info(f"[QUERY] result字段中未找到anomalies数据，result keys: {list(result_field.keys())}")
+
+                # 路径3: 直接的 anomalies (备用)
+                if not anomalies and 'anomalies' in anomaly_result:
+                    anomalies = anomaly_result['anomalies']
+                    log_info(f"[QUERY] 从 anomaly_result.anomalies 提取异常数据")
+
+                if anomalies:
+                    # 获取时序数据列表，用于索引转换
+                    influent_data = historical_data.get('influent', [])
+                    effluent_data = historical_data.get('effluent', [])
+
+                    # 打印时序数据样本（用于调试）
+                    if influent_data and len(influent_data) > 0:
+                        log_info(f"[QUERY] influent数据样本: timestamp={influent_data[0].get('timestamp', 'N/A')}")
+
+                    # 转换异常点格式为前端友好的格式
+                    for anomaly in anomalies:
+                        # 处理times字段：可能是整数索引、数组或时间字符串
+                        times_value = anomaly.get('times', '')
+                        indicator_name = anomaly.get('indicator', '')
+
+                        log_info(f"[QUERY] 处理异常点: indicator={indicator_name}, times原始值={times_value} (type={type(times_value).__name__})")
+
+                        # 检查是否是整数类型（包括 numpy 的整数类型）
+                        import numpy as np
+                        is_integer = isinstance(times_value, (int, np.integer))
+
+                        # 如果是整数索引，转换为实际时间戳
+                        if is_integer:
+                            # 根据indicator选择数据源
+                            data_list = []
+                            if 'influent' in indicator_name:
+                                data_list = influent_data
+                            elif 'effluent' in indicator_name:
+                                data_list = effluent_data
+                            else:
+                                # 默认使用influent
+                                data_list = influent_data
+
+                            # 索引转换为时间戳
+                            if 0 <= times_value < len(data_list):
+                                record = data_list[times_value]
+                                if isinstance(record, dict) and 'timestamp' in record:
+                                    old_value = times_value
+                                    times_value = record['timestamp']
+                                    log_info(f"[QUERY] 索引转换: {old_value} -> {times_value}")
+                                else:
+                                    log_info(f"[QUERY] 索引{times_value}处的数据没有timestamp字段")
+                                    times_value = str(times_value)
+                            else:
+                                log_info(f"[QUERY] 索引{times_value}超出范围(0-{len(data_list)-1})")
+                                times_value = str(times_value)
+                        elif isinstance(times_value, list):
+                            # 如果是数组，取第一个元素
+                            times_value = times_value[0] if times_value else ''
+
+                        result['anomaly_details'].append({
+                            'indicator': indicator_name,
+                            'times': str(times_value) if times_value else '',
+                            'score': float(anomaly.get('score', 0)),
+                            'pattern': anomaly.get('pattern', 'unknown'),
+                            'severity': anomaly.get('severity', 'medium')
+                        })
+                    log_info(f"[QUERY] 提取异常点详情: {len(result['anomaly_details'])} 个")
+
+            # ========== 添加分析结果 ==========
+            result['analysis_results'] = {}
+            if anomaly_result:
+                # 相关性分析结果
+                if 'correlation' in anomaly_result:
+                    result['analysis_results']['correlation'] = anomaly_result['correlation']
+                # 趋势分析结果
+                if 'trends' in anomaly_result:
+                    result['analysis_results']['trends'] = anomaly_result['trends']
+                # 模式统计
+                if 'patterns' in anomaly_result:
+                    result['analysis_results']['patterns'] = anomaly_result['patterns']
+
+            # ========== 状态字段 ==========
             if perception_result:
                 result['perception_status'] = 'success'
             else:
@@ -306,7 +511,8 @@ def handle_query():
 
             log_info("[QUERY] 查询完成，准备序列化")
             log_info(f"[QUERY] Result keys: {list(result.keys())}")
-            log_info(f"[QUERY] Result types: {[(k, type(v).__name__) for k, v in result.items()]}")
+            log_info(f"[QUERY] 时序数据: influent={len(result['timeseries_data']['influent'])}, effluent={len(result['timeseries_data']['effluent'])}")
+            log_info(f"[QUERY] 异常点: {len(result['anomaly_details'])} 个")
 
             json_str = json.dumps(result, ensure_ascii=False, cls=NumpyJSONEncoder)
             log_info("[QUERY] JSON序列化成功")
