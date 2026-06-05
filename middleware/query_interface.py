@@ -427,61 +427,88 @@ def handle_query():
                     log_info(f"[QUERY] 从 anomaly_result.anomalies 提取异常数据")
 
                 if anomalies:
-                    # 获取时序数据列表，用于索引转换
-                    influent_data = historical_data.get('influent', [])
-                    effluent_data = historical_data.get('effluent', [])
-
-                    # 打印时序数据样本（用于调试）
-                    if influent_data and len(influent_data) > 0:
-                        log_info(f"[QUERY] influent数据样本: timestamp={influent_data[0].get('timestamp', 'N/A')}")
-
-                    # 转换异常点格式为前端友好的格式
-                    for anomaly in anomalies:
-                        # 处理times字段：可能是整数索引、数组或时间字符串
-                        times_value = anomaly.get('times', '')
-                        indicator_name = anomaly.get('indicator', '')
-
-                        log_info(f"[QUERY] 处理异常点: indicator={indicator_name}, times原始值={times_value} (type={type(times_value).__name__})")
-
-                        # 检查是否是整数类型（包括 numpy 的整数类型）
-                        import numpy as np
-                        is_integer = isinstance(times_value, (int, np.integer))
-
-                        # 如果是整数索引，转换为实际时间戳
-                        if is_integer:
-                            # 根据indicator选择数据源
-                            data_list = []
-                            if 'influent' in indicator_name:
-                                data_list = influent_data
-                            elif 'effluent' in indicator_name:
-                                data_list = effluent_data
-                            else:
-                                # 默认使用influent
-                                data_list = influent_data
-
-                            # 索引转换为时间戳
-                            if 0 <= times_value < len(data_list):
-                                record = data_list[times_value]
-                                if isinstance(record, dict) and 'timestamp' in record:
-                                    old_value = times_value
-                                    times_value = record['timestamp']
-                                    log_info(f"[QUERY] 索引转换: {old_value} -> {times_value}")
+                    # 构建时间戳到索引的映射（为每个数据源构建一次）
+                    def build_timestamp_mapping(ts_data):
+                        """构建时间戳到索引的映射，检测重复时间戳"""
+                        timestamp_to_index = {}
+                        duplicates = []
+                        for idx, record in enumerate(ts_data):
+                            if isinstance(record, dict) and "timestamp" in record:
+                                timestamp = record["timestamp"]
+                                if timestamp in timestamp_to_index:
+                                    duplicates.append((timestamp, timestamp_to_index[timestamp], idx))
                                 else:
-                                    log_info(f"[QUERY] 索引{times_value}处的数据没有timestamp字段")
-                                    times_value = str(times_value)
-                            else:
-                                log_info(f"[QUERY] 索引{times_value}超出范围(0-{len(data_list)-1})")
-                                times_value = str(times_value)
-                        elif isinstance(times_value, list):
-                            # 如果是数组，取第一个元素
-                            times_value = times_value[0] if times_value else ''
+                                    timestamp_to_index[timestamp] = idx
 
+                        if duplicates:
+                            log_info(f"[QUERY] 警告: 发现{len(duplicates)}个重复时间戳，使用最后出现的索引")
+                            for dup_ts, old_idx, new_idx in duplicates[:3]:  # 只记录前3个
+                                log_info(f"[QUERY]   时间戳'{dup_ts}'在索引{old_idx}和{new_idx}重复")
+
+                        return timestamp_to_index
+
+                    # 为influent和effluent分别构建映射
+                    influent_data = processed_data.get("influent", historical_data.get("influent", []))
+                    effluent_data = processed_data.get("effluent", historical_data.get("effluent", []))
+
+                    influent_mapping = build_timestamp_mapping(influent_data)
+                    effluent_mapping = build_timestamp_mapping(effluent_data)
+
+                    # 批量处理所有异常点（一次性处理而非逐个处理）
+                    def select_mapping_and_data(anomaly):
+                        """根据indicator选择对应的映射和数据"""
+                        indicator = anomaly.get("indicator", "")
+                        if "influent" in indicator.lower():
+                            return influent_mapping, influent_data
+                        else:
+                            return effluent_mapping, effluent_data
+
+                    # 处理所有异常点
+                    matched_anomalies = []
+                    for anomaly in anomalies:
+                        if not isinstance(anomaly, dict):
+                            continue
+
+                        times_value = anomaly.get("times", "")
+                        if not times_value:
+                            log_info(f"[QUERY] 跳过空times的异常点: indicator={anomaly.get('indicator', 'unknown')}")
+                            continue
+
+                        ts_mapping, ts_data = select_mapping_and_data(anomaly)
+
+                        # 检查是否为整数索引
+                        try:
+                            times_int = int(times_value)
+                            if 0 <= times_int < len(ts_data):
+                                record = ts_data[times_int]
+                                if isinstance(record, dict) and "timestamp" in record:
+                                    anomaly_copy = dict(anomaly)
+                                    anomaly_copy["times"] = record["timestamp"]
+                                    anomaly_copy["data_index"] = times_int
+                                    matched_anomalies.append(anomaly_copy)
+                                    continue
+                        except (ValueError, TypeError):
+                            pass
+
+                        # 如果times是时间戳字符串，查找对应的索引
+                        if times_value in ts_mapping:
+                            anomaly_copy = dict(anomaly)
+                            anomaly_copy["data_index"] = ts_mapping[times_value]
+                            matched_anomalies.append(anomaly_copy)
+                        else:
+                            # 时间戳不匹配，保留原异常点
+                            log_info(f"[QUERY] 时间戳未匹配: times={times_value}, indicator={anomaly.get('indicator', 'unknown')}")
+                            matched_anomalies.append(anomaly)
+
+                    # 转换为前端格式
+                    for anomaly in matched_anomalies:
                         result['anomaly_details'].append({
-                            'indicator': indicator_name,
-                            'times': str(times_value) if times_value else '',
-                            'score': float(anomaly.get('score', 0)),
-                            'pattern': anomaly.get('pattern', 'unknown'),
-                            'severity': anomaly.get('severity', 'medium')
+                            'indicator': anomaly.get('indicator', ''),
+                            'times': anomaly.get('times', ''),
+                            'score': anomaly.get('score', 0),
+                            'pattern': anomaly.get('pattern', ''),
+                            'severity': anomaly.get('severity', 'medium'),
+                            'data_index': anomaly.get('data_index', -1)
                         })
                     log_info(f"[QUERY] 提取异常点详情: {len(result['anomaly_details'])} 个")
 
