@@ -93,7 +93,9 @@ def standardize_anomaly_output(anomaly_output: Dict[str, Any]) -> Dict[str, Any]
         "patterns": anomaly_output.get("patterns", {}),
         "violations": anomaly_output.get("violations", []),
         "confidence": anomaly_output.get("confidence", {}),
-        "suspicion_level": anomaly_output.get("suspicion_level", "medium")
+        "suspicion_level": anomaly_output.get("suspicion_level", "medium"),
+        "features": anomaly_output.get("features"),
+        "features_error": anomaly_output.get("features_error")
     }
 
 def _format_indicator(anomaly: Dict[str, Any]) -> str:
@@ -189,7 +191,7 @@ def __getattr__(name: str):
 
 
 def detect_anomalies(data: "pd.DataFrame", indicators: list,
-                     config: dict = None) -> dict:
+                     config: dict = None, include_features: bool = False) -> dict:
     """
     异常检测便捷函数
 
@@ -197,9 +199,10 @@ def detect_anomalies(data: "pd.DataFrame", indicators: list,
         data: 输入特征数据
         indicators: 指标列表
         config: 配置参数
+        include_features: 是否包含时间序列特征提取（默认: False）
 
     Returns:
-        包含异常、模式、违规和置信度的字典
+        包含异常、模式、违规、置信度和可选特征的字典
     """
     import logging
     import pandas as pd
@@ -272,6 +275,62 @@ def detect_anomalies(data: "pd.DataFrame", indicators: list,
         results["confidence"] = confidence_results
 
         logger.info("[ANOMALY] 异常检测完成")
+
+        # 6. 特征提取（可选）
+        if include_features:
+            logger.info("[ANOMALY] 提取时间序列特征...")
+            try:
+                classes = _get_classes()
+                TimeSeriesFeatures = classes.get('TimeSeriesFeatures')
+                CorrelationAnalyzer = classes.get('CorrelationAnalyzer')
+                TrendAnalyzer = classes.get('TrendAnalyzer')
+
+                features = {}
+
+                # 时序特征提取
+                if TimeSeriesFeatures:
+                    ts_extractor = TimeSeriesFeatures()
+                    for indicator in indicators:
+                        if indicator in data.columns:
+                            series_data = data[indicator].dropna()
+                            if len(series_data) > 0:
+                                try:
+                                    ts_features = ts_extractor.extract_features(series_data)
+                                    features[indicator] = ts_features
+                                except Exception as e:
+                                    logger.warning(f"[ANOMALY] 特征提取失败 {indicator}: {e}")
+
+                # 相关性分析
+                if CorrelationAnalyzer:
+                    corr_analyzer = CorrelationAnalyzer()
+                    corr_data = data[indicators].select_dtypes(include=[np.number])
+                    if not corr_data.empty:
+                        try:
+                            correlations = corr_analyzer.analyze(corr_data, method="pearson")
+                            features["_correlations"] = correlations
+                        except Exception as e:
+                            logger.warning(f"[ANOMALY] 相关性分析失败: {e}")
+
+                # 趋势分析
+                if TrendAnalyzer:
+                    trend_analyzer = TrendAnalyzer()
+                    for indicator in indicators:
+                        if indicator in data.columns:
+                            series_data = data[indicator].dropna()
+                            if len(series_data) > 1:
+                                try:
+                                    trend = trend_analyzer.analyze_trend(series_data)
+                                    if "_trends" not in features:
+                                        features["_trends"] = {}
+                                    features["_trends"][indicator] = trend
+                                except Exception as e:
+                                    logger.warning(f"[ANOMALY] 趋势分析失败 {indicator}: {e}")
+
+                results["features"] = features
+                logger.info(f"[ANOMALY] 特征提取完成: {len(features)} 个指标")
+            except Exception as e:
+                logger.error(f"[ANOMALY] 特征提取失败: {e}")
+                results["features_error"] = str(e)
 
     except Exception as e:
         logger.error(f"[ANOMALY] 异常检测失败: {e}")
