@@ -27,6 +27,135 @@ __all__ = [
 __version__ = "2.2.0"
 
 
+from typing import Dict, List, Any
+
+def standardize_anomaly_output(anomaly_output: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    标准化异常检测输出格式
+
+    Args:
+        anomaly_output: 原始异常检测输出
+
+    Returns:
+        标准化后的输出，包含标准格式的anomalies列表
+    """
+    if not anomaly_output or not isinstance(anomaly_output, dict):
+        return {"anomalies": [], "status": "error", "message": "Invalid input"}
+
+    # 获取anomalies列表（支持多种路径）
+    anomalies = []
+    if "anomalies" in anomaly_output:
+        anomalies = anomaly_output["anomalies"]
+    elif "result" in anomaly_output and isinstance(anomaly_output["result"], dict):
+        result = anomaly_output["result"]
+        if "anomalies" in result:
+            anomalies = result["anomalies"]
+        elif "output" in result and isinstance(result["output"], dict) and "anomalies" in result["output"]:
+            anomalies = result["output"]["anomalies"]
+
+    if not anomalies:
+        return {
+            "anomalies": [],
+            "status": "success",
+            "message": "No anomalies found",
+            "patterns": anomaly_output.get("patterns", {}),
+            "violations": anomaly_output.get("violations", [])
+        }
+
+    # 标准化每个异常点
+    standardized_anomalies = []
+    for anomaly in anomalies:
+        if not isinstance(anomaly, dict):
+            continue
+
+        # 安全地转换分数值
+        score_raw = anomaly.get("score", anomaly.get("anomaly_score", 0.5))
+        try:
+            score = float(score_raw)
+        except (ValueError, TypeError):
+            score = 0.5
+
+        # 构建标准格式
+        std_anomaly = {
+            "indicator": _format_indicator(anomaly),
+            "times": _format_timestamp(anomaly),
+            "score": score,
+            "pattern": anomaly.get("pattern", anomaly.get("type", "unknown")),
+            "severity": _determine_severity(anomaly)
+        }
+
+        standardized_anomalies.append(std_anomaly)
+
+    # 返回标准化输出
+    return {
+        "anomalies": standardized_anomalies,
+        "status": "success",
+        "patterns": anomaly_output.get("patterns", {}),
+        "violations": anomaly_output.get("violations", []),
+        "confidence": anomaly_output.get("confidence", {}),
+        "suspicion_level": anomaly_output.get("suspicion_level", "medium")
+    }
+
+def _format_indicator(anomaly: Dict[str, Any]) -> str:
+    """格式化指标名称为标准格式: {source}_{indicator}"""
+    indicator = anomaly.get("indicator", anomaly.get("feature", "unknown"))
+    source = anomaly.get("source", "effluent")  # 默认为出水
+
+    # 移除可能的单位后缀
+    indicator = indicator.replace("（毫克/升）", "").replace("(mg/L)", "")
+
+    # 标准化中文字段名
+    field_mapping = {
+        "pH值": "pH",
+        "化学需氧量浓度": "COD",
+        "总氮浓度": "TN",
+        "氨氮浓度": "NH3_N",
+        "总磷浓度": "TP"
+    }
+
+    if indicator in field_mapping:
+        indicator = field_mapping[indicator]
+
+    return f"{source}_{indicator}"
+
+def _format_timestamp(anomaly: Dict[str, Any]) -> str:
+    """格式化时间戳"""
+    # 支持多种时间字段
+    time_fields = ["timestamp", "time", "times", "datetime", "监测时间"]
+
+    for field in time_fields:
+        if field in anomaly and anomaly[field]:
+            time_val = anomaly[field]
+            # 如果是整数（索引），返回原值
+            if isinstance(time_val, int):
+                return str(time_val)
+            # 如果是字符串，确保格式
+            return str(time_val)
+
+    # 如果没有时间字段，返回空字符串
+    return ""
+
+def _determine_severity(anomaly: Dict[str, Any]) -> str:
+    """确定严重程度"""
+    # 如果已经有severity字段，直接使用
+    if "severity" in anomaly:
+        return anomaly["severity"]
+
+    # 基于score确定（安全转换）
+    score_raw = anomaly.get("score", anomaly.get("anomaly_score", 0.5))
+    try:
+        score = float(score_raw)
+    except (ValueError, TypeError):
+        score = 0.5
+
+    if score >= 0.8:
+        return "high"
+    elif score >= 0.5:
+        return "medium"
+    else:
+        return "low"
+
+
 def _get_classes():
     """动态导入类（避免顶层相对导入问题）"""
     from .operator_adapter import OperatorAdapter
@@ -148,7 +277,8 @@ def detect_anomalies(data: "pd.DataFrame", indicators: list,
         logger.error(f"[ANOMALY] 异常检测失败: {e}")
         results["error"] = str(e)
 
-    return results
+    # 标准化输出格式
+    return standardize_anomaly_output(results)
 
 
 def extract_features(data: "pd.DataFrame", indicators: list,
