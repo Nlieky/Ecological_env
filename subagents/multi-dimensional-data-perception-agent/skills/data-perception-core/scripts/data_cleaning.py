@@ -99,7 +99,7 @@ class DataCleaningModule:
                 continue
 
             cleaned_record = {}
-            record_has_anomaly = False
+            anomaly_fields = []  # Track anomalous fields
 
             for key, value in record.items():
                 # 检查缺失值
@@ -115,18 +115,23 @@ class DataCleaningModule:
                         num_value = float(value)
                         if num_value < min_val or num_value > max_val:
                             anomaly_count += 1
-                            record_has_anomaly = True
-                            cleaned_record[key] = None
+                            anomaly_fields.append(key)  # Mark field as anomalous
+                            cleaned_record[key] = num_value  # Preserve value
                         else:
                             cleaned_record[key] = num_value
                     except (ValueError, TypeError):
                         anomaly_count += 1
+                        anomaly_fields.append(key)
                         cleaned_record[key] = None
                 else:
                     cleaned_record[key] = value
 
-            if not record_has_anomaly:
-                cleaned_data.append(cleaned_record)
+            # Add anomaly fields marker to record
+            if anomaly_fields:
+                cleaned_record['_anomaly_fields'] = anomaly_fields
+
+            # Always append the record
+            cleaned_data.append(cleaned_record)
 
         # 计算质量指标 - 使用实际字段数量而非固定范围数量
         total_values = sum(len(record) for record in data if isinstance(record, dict))
@@ -143,8 +148,17 @@ class DataCleaningModule:
             "missing_count": missing_count,
             "anomaly_count": anomaly_count,
             "cleaned_count": len(cleaned_data),
-            "total_records": len(data)
+            "total_records": len(data),
+            "anomaly_fields_summary": {}  # Field anomaly statistics
         }
+
+        # Count anomalies per field
+        field_anomaly_counts = {}
+        for record in cleaned_data:
+            if '_anomaly_fields' in record:
+                for field in record['_anomaly_fields']:
+                    field_anomaly_counts[field] = field_anomaly_counts.get(field, 0) + 1
+        quality_report["anomaly_fields_summary"] = field_anomaly_counts
 
         logger.info(f"Data cleaning complete: {len(cleaned_data)} records cleaned, "
                     f"{missing_count} missing values, {anomaly_count} anomalies detected")
