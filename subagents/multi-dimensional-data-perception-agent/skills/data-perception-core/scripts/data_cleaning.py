@@ -168,6 +168,28 @@ class DataCleaningModule:
             "quality_report": quality_report
         }
 
+    def interpolate_missing_values(
+        self,
+        data: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """插值缺失值"""
+        try:
+            from .data_interpolation import DataInterpolationModule
+
+            interpolator = DataInterpolationModule(max_gap_size=3)
+            return interpolator.interpolate_timeseries(data)
+        except ImportError:
+            logger.warning("data_interpolation module not available")
+            return {
+                "interpolated_data": data,
+                "report": {
+                    "interpolated_count": 0,
+                    "total_gaps": 0,
+                    "interpolated_fields": [],
+                    "error": "data_interpolation module not available"
+                }
+            }
+
 
 # Module-level export for unit test validation
 valid_ranges = DataCleaningModule.valid_ranges
