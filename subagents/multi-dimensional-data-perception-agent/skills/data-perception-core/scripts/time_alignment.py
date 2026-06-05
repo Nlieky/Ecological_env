@@ -134,12 +134,16 @@ class TimeAlignmentModule:
             ]
 
             if not matching_eff.empty:
-                eff_row = matching_eff.iloc[0]
+                # Calculate time difference for each match and find the best
+                matching_eff['time_diff'] = (matching_eff[FIELD_MONITORING_TIME] - target_time).abs()
+                best_match_idx = matching_eff['time_diff'].idxmin()
+                eff_row = matching_eff.loc[best_match_idx]
                 aligned_pairs.append({
                     "influent_time": inf_time.strftime(DATETIME_FORMAT),
                     "effluent_time": eff_row[FIELD_MONITORING_TIME].strftime(DATETIME_FORMAT),
                     "influent": inf_row.to_dict(),
-                    "effluent": eff_row.to_dict()
+                    "effluent": eff_row.to_dict(),
+                    "time_diff_seconds": matching_eff.loc[best_match_idx, 'time_diff'].total_seconds()  # Optional: track time difference
                 })
 
         return {
@@ -171,7 +175,10 @@ class TimeAlignmentModule:
                 continue
             target_time = inf_time + timedelta(hours=lag_hours)
 
-            # 查找匹配的出水记录
+            # 查找匹配的出水记录 - 选择时间差最小的
+            best_match = None
+            best_time_diff = float('inf')
+
             for eff_record in effluent:
                 if FIELD_MONITORING_TIME not in eff_record:
                     logger.warning(f"Effluent record missing '{FIELD_MONITORING_TIME}' field")
@@ -182,16 +189,21 @@ class TimeAlignmentModule:
                 except (ValueError, AttributeError) as e:
                     logger.warning(f"Invalid timestamp format in effluent record: {eff_record.get(FIELD_MONITORING_TIME)}, error: {e}")
                     continue
+
                 time_diff = abs((eff_time - target_time).total_seconds())
 
-                if time_diff < TIME_TOLERANCE_SECONDS:
-                    aligned_pairs.append({
+                if time_diff < TIME_TOLERANCE_SECONDS and time_diff < best_time_diff:
+                    best_time_diff = time_diff
+                    best_match = {
                         "influent_time": inf_time.strftime(DATETIME_FORMAT),
                         "effluent_time": eff_time.strftime(DATETIME_FORMAT),
                         "influent": inf_record,
-                        "effluent": eff_record
-                    })
-                    break
+                        "effluent": eff_record,
+                        "time_diff_seconds": time_diff
+                    }
+
+            if best_match:
+                aligned_pairs.append(best_match)
 
         return {
             "status": "success",
