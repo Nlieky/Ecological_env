@@ -53,8 +53,7 @@
     --danger-color: #ef4444;
     --bg-color: #f8fafc;
     --card-bg: #ffffff;
-    --text-primary: #0f172a;
-    --text-secondary: #64748b;
+    /* text-primary, text-secondary 已在新变量中定义，避免重复 */
     --border-color: #e2e8f0;
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
