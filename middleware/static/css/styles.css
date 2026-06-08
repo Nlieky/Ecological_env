@@ -6,6 +6,46 @@
 }
 
 :root {
+    /* ========== 新配色方案 - CSS变量 ========== */
+
+    /* 主色 - 蓝色系 */
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --primary-light: #60a5fa;
+    --primary-bg: #eff6ff;
+
+    /* 中性色 */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f1f5f9;
+    --bg-tertiary: #e2e8f0;
+    --border: #cbd5e1;
+
+    /* 文本色 */
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --text-tertiary: #94a3b8;
+
+    /* 导航栏 */
+    --nav-bg: #1e293b;
+    --nav-hover: #334155;
+    --nav-active: #2563eb;
+
+    /* 状态色 */
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+
+    /* 字体 */
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-xs: 12px;
+    --font-sm: 14px;
+    --font-base: 16px;
+    --font-lg: 18px;
+    --font-xl: 24px;
+    --font-2xl: 32px;
+
+    /* ========== 旧变量 - 保留兼容性 ========== */
     --primary-color: #2563eb;
     --secondary-color: #64748b;
     --success-color: #22c55e;
@@ -13,7 +53,7 @@
     --danger-color: #ef4444;
     --bg-color: #f8fafc;
     --card-bg: #ffffff;
-    --text-primary: #1e293b;
+    --text-primary: #0f172a;
     --text-secondary: #64748b;
     --border-color: #e2e8f0;
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -279,18 +319,36 @@ body {
 
 .result-charts {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 20px;
+    grid-template-columns: 1fr;
+    gap: 24px;
 }
 
 .chart-wrapper {
-    background: var(--bg-color);
-    border-radius: 8px;
-    padding: 16px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    min-height: 450px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
 }
 
 .chart-wrapper canvas {
-    max-height: 300px;
+    max-height: 500px;
+    width: 100% !important;
+    height: auto !important;
+}
+
+/* 全宽时序图表 */
+.chart-wrapper[style*="max-width: 100%"] {
+    min-height: 500px;
+}
+
+.chart-wrapper[style*="min-height: 400px"] {
+    min-height: 450px;
+}
+
+.chart-wrapper[style*="min-height: 400px"] canvas {
+    max-height: 500px;
 }
 
 /* ========== 实时监控 ========== */
@@ -406,6 +464,76 @@ body {
     color: var(--text-primary);
 }
 
+/* ========== Grafana集成 ========== */
+.grafana-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.grafana-header h2 {
+    font-size: 20px;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.grafana-container {
+    position: relative;
+    width: 100%;
+    height: 800px;
+    background: #1a1a1a;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+
+#grafana-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+.grafana-fallback {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-color);
+    border-radius: 8px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 20px;
+    text-align: center;
+}
+
+.grafana-fallback.show {
+    display: flex;
+}
+
+.grafana-fallback p {
+    color: var(--text-secondary);
+    font-size: 16px;
+}
+
+.btn-grafana {
+    background: #f97316;
+    color: white;
+}
+
+.btn-grafana:hover {
+    background: #ea580c;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
 /* ========== 响应式 ========== */
 @media (max-width: 768px) {
     .container {
@@ -435,6 +563,15 @@ body {
     .tab-btn {
         flex: 1;
         min-width: 80px;
+    }
+
+    .grafana-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .grafana-container {
+        height: 600px;
     }
 }
 
