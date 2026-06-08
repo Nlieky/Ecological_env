@@ -5,7 +5,7 @@ const MONITORING_API = `${API_BASE}/api/web/monitoring`;
 
 // ========== 状态管理 ==========
 const state = {
-    currentTab: 'query',
+    currentPanel: 'query',
     queryInProgress: false,
     lastQueryResult: null
 };
@@ -19,7 +19,7 @@ const elements = {
     queryResult: null,
     resultSummary: null,
     resultCharts: null,
-    tabButtons: null,
+    navItems: null,
     panels: null
 };
 
@@ -33,15 +33,27 @@ function init() {
     elements.queryResult = document.getElementById('query-result');
     elements.resultSummary = document.getElementById('result-summary');
     elements.resultCharts = document.getElementById('result-charts');
-    elements.tabButtons = document.querySelectorAll('.tab-btn');
-    elements.panels = document.querySelectorAll('.panel');
+    elements.navItems = document.querySelectorAll('.nav-item');
+    elements.panels = document.querySelectorAll('.content-panel');
 
     // 绑定事件
     elements.queryBtn.addEventListener('click', handleQuery);
     elements.clearBtn.addEventListener('click', handleClear);
-    elements.tabButtons.forEach(btn => {
-        btn.addEventListener('click', handleTabSwitch);
+    elements.navItems.forEach(item => {
+        item.addEventListener('click', handleTabSwitch);
     });
+
+    // 侧边栏展开/收起
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('expanded');
+            // 更新按钮文字
+            const span = sidebarToggle.querySelector('span');
+            span.textContent = sidebar.classList.contains('expanded') ? '»' : '«';
+        });
+    }
 
     // 检查服务状态
     checkServicesStatus();
@@ -82,37 +94,61 @@ function showServiceWarning(message) {
         border-radius: 8px;
         border-left: 4px solid #f59e0b;
     `;
-    document.querySelector('.container').insertBefore(
-        warning,
-        document.querySelector('.header').nextSibling
-    );
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+        mainContent.insertBefore(warning, mainContent.firstChild);
+    }
 }
 
-// ========== 标签切换 ==========
+// ========== 导航切换 ==========
 function handleTabSwitch(e) {
-    const tabId = e.target.dataset.tab;
-    if (!tabId) return;
+    e.preventDefault();
+    const navItem = e.target.closest('.nav-item');
+    if (!navItem) return;
+
+    const panelId = navItem.dataset.panel;
+    if (!panelId) return;
 
     // 更新状态
-    state.currentTab = tabId;
+    state.currentPanel = panelId;
 
-    // 更新UI
-    elements.tabButtons.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tabId);
+    // 更新导航状态
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
     });
-    elements.panels.forEach(panel => {
-        panel.classList.toggle('active', panel.id === `${tabId}-panel`);
+    navItem.classList.add('active');
+
+    // 更新面板显示
+    document.querySelectorAll('.content-panel').forEach(panel => {
+        panel.classList.remove('active');
     });
+
+    const targetPanel = document.getElementById(`${panelId}-panel`);
+    if (targetPanel) {
+        targetPanel.classList.add('active');
+    }
+
+    // 更新页面标题
+    const titles = {
+        'query': '智能查询',
+        'monitoring': '实时监控',
+        'analysis': '分析报告',
+        'settings': '系统设置'
+    };
+    const pageTitle = document.querySelector('.page-title');
+    if (pageTitle) {
+        pageTitle.textContent = titles[panelId] || '监测系统';
+    }
 
     // 如果切换到监控面板，启动监控
-    if (tabId === 'monitoring') {
+    if (panelId === 'monitoring') {
         if (typeof startMonitoring === 'function') {
             startMonitoring();
         }
     }
 
     // 如果切换到分析面板，刷新报告
-    if (tabId === 'analysis') {
+    if (panelId === 'analysis') {
         loadAnalysisReports();
     }
 }
@@ -188,10 +224,8 @@ function updateQueryUI(status, data) {
             // 显示摘要
             elements.resultSummary.innerHTML = formatSummary(data);
 
-            // 创建图表（如果有数据）
-            if (data.analysis) {
-                createCharts(data.analysis);
-            }
+            // 创建图表（传递完整数据对象）
+            createCharts(data);
             break;
 
         case 'error':
@@ -242,14 +276,100 @@ function formatSummary(data) {
         `;
     }
 
+    // 添加透明度信息
+    if (data.process_info) {
+        const pInfo = data.process_info;
+        html += `
+            <div class="data-info" style="background: #f0f9ff; border-left: 4px solid #0ea5e9;">
+                <h4>🔍 处理过程信息</h4>
+                <p><strong>查询时间范围:</strong> ${pInfo.query_time_range || 'N/A'}</p>
+                <p><strong>实际数据量:</strong> 进水 ${pInfo.actual_data_count?.influent || 0} 条, 出水 ${pInfo.actual_data_count?.effluent || 0} 条</p>
+                <p><strong>检测到异常点:</strong> ${pInfo.anomaly_count || 0} 个</p>
+                <p><strong>使用算子:</strong> ${Array.isArray(pInfo.operators_used) ? pInfo.operators_used.join(', ') : 'N/A'}</p>
+            </div>
+        `;
+    }
+
     return html;
 }
 
 // ========== 创建图表 ==========
-function createCharts(analysisData) {
+function createCharts(data) {
     elements.resultCharts.innerHTML = '';
 
-    // 如果没有分析数据，显示提示
+    // 优先使用时序数据创建图表
+    if (data.timeseries_data && (data.timeseries_data.influent?.length > 0 || data.timeseries_data.effluent?.length > 0)) {
+        // 创建进水图表容器
+        if (data.timeseries_data.influent?.length > 0) {
+            const influentDiv = document.createElement('div');
+            influentDiv.className = 'chart-wrapper';
+            influentDiv.style.maxWidth = '100%';
+            influentDiv.style.minHeight = '400px';
+            influentDiv.style.marginBottom = '20px';
+            const influentCanvasId = 'timeseries-chart-influent';
+            influentDiv.innerHTML = `<canvas id="${influentCanvasId}"></canvas>`;
+            elements.resultCharts.appendChild(influentDiv);
+
+            setTimeout(() => {
+                if (typeof createSingleSourceChart === 'function') {
+                    // 筛选进水数据的异常点
+                    const influentAnomalies = (data.anomaly_details || []).filter(anomaly =>
+                        anomaly.indicator && anomaly.indicator.startsWith('influent_')
+                    );
+                    createSingleSourceChart(
+                        influentCanvasId,
+                        data.timeseries_data.influent,
+                        influentAnomalies, // 进水图表显示进水异常点
+                        {
+                            title: '进水数据时序图（含异常点标注）',
+                            source: 'influent'
+                        }
+                    );
+                }
+            }, 100);
+        }
+
+        // 创建出水图表容器
+        if (data.timeseries_data.effluent?.length > 0) {
+            const effluentDiv = document.createElement('div');
+            effluentDiv.className = 'chart-wrapper';
+            effluentDiv.style.maxWidth = '100%';
+            effluentDiv.style.minHeight = '400px';
+            effluentDiv.style.marginBottom = '20px';
+            const effluentCanvasId = 'timeseries-chart-effluent';
+            effluentDiv.innerHTML = `<canvas id="${effluentCanvasId}"></canvas>`;
+            elements.resultCharts.appendChild(effluentDiv);
+
+            setTimeout(() => {
+                if (typeof createSingleSourceChart === 'function') {
+                    // 筛选出水数据的异常点
+                    const effluentAnomalies = (data.anomaly_details || []).filter(anomaly =>
+                        anomaly.indicator && anomaly.indicator.startsWith('effluent_')
+                    );
+                    createSingleSourceChart(
+                        effluentCanvasId,
+                        data.timeseries_data.effluent,
+                        effluentAnomalies, // 出水图表显示出水异常点
+                        {
+                            title: '出水数据时序图（含异常点标注）',
+                            source: 'effluent'
+                        }
+                    );
+                }
+            }, 100);
+        }
+
+        // 显示异常统计信息
+        if (data.anomaly_details && data.anomaly_details.length > 0) {
+            const anomalyStats = createAnomalyStats(data.anomaly_details);
+            elements.resultCharts.appendChild(anomalyStats);
+        }
+
+        return;
+    }
+
+    // 如果没有时序数据，回退到旧的分析数据格式
+    const analysisData = data.analysis;
     const hasData = analysisData && (
         analysisData.correlation ||
         analysisData.anomaly ||
@@ -304,6 +424,47 @@ function createCharts(analysisData) {
             }, 100);
         });
     }
+}
+
+// ========== 创建异常统计信息 ==========
+function createAnomalyStats(anomalyDetails) {
+    const statsDiv = document.createElement('div');
+    statsDiv.className = 'chart-wrapper';
+    statsDiv.style.background = 'var(--bg-color)';
+
+    // 统计各种异常数量
+    const severityCounts = {};
+    const indicatorCounts = {};
+    const patternCounts = {};
+
+    anomalyDetails.forEach(anomaly => {
+        severityCounts[anomaly.severity] = (severityCounts[anomaly.severity] || 0) + 1;
+        indicatorCounts[anomaly.indicator] = (indicatorCounts[anomaly.indicator] || 0) + 1;
+        patternCounts[anomaly.pattern] = (patternCounts[anomaly.pattern] || 0) + 1;
+    });
+
+    const severityLabels = { 'high': '高', 'critical': '严重', 'medium': '中', 'low': '低', 'unknown': '未知' };
+    const patternLabels = { 'constant': '常数异常', 'spike': '尖峰异常', 'drop': '骤降异常', 'trend': '趋势异常', 'unknown': '未知模式' };
+
+    statsDiv.innerHTML = `
+        <h4 style="margin-bottom: 12px; font-size: 14px;">📊 异常统计 (共 ${anomalyDetails.length} 个)</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; font-size: 13px;">
+            <div style="background: white; padding: 8px; border-radius: 4px;">
+                <strong>严重程度分布:</strong><br>
+                ${Object.entries(severityCounts).map(([key, val]) => `${severityLabels[key] || key}: ${val}`).join('<br>')}
+            </div>
+            <div style="background: white; padding: 8px; border-radius: 4px;">
+                <strong>指标分布:</strong><br>
+                ${Object.entries(indicatorCounts).map(([key, val]) => `${key}: ${val}`).join('<br>')}
+            </div>
+            <div style="background: white; padding: 8px; border-radius: 4px;">
+                <strong>异常模式:</strong><br>
+                ${Object.entries(patternCounts).map(([key, val]) => `${patternLabels[key] || key}: ${val}`).join('<br>')}
+            </div>
+        </div>
+    `;
+
+    return statsDiv;
 }
 
 // ========== 加载分析报告 ==========
