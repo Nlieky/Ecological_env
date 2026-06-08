@@ -66,68 +66,6 @@ body {
     line-height: 1.6;
 }
 
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-/* ========== 头部导航 ========== */
-.header {
-    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-    color: white;
-    padding: 24px 32px;
-    border-radius: 12px;
-    margin-bottom: 24px;
-    box-shadow: var(--shadow-md);
-}
-
-.logo h1 {
-    font-size: 28px;
-    margin-bottom: 4px;
-}
-
-.subtitle {
-    font-size: 14px;
-    opacity: 0.9;
-}
-
-.tabs {
-    display: flex;
-    gap: 8px;
-    margin-top: 20px;
-}
-
-.tab-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.3s ease;
-}
-
-.tab-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.tab-btn.active {
-    background: white;
-    color: var(--primary-color);
-    border-color: white;
-}
-
-/* ========== 面板 ========== */
-.panel {
-    display: none;
-}
-
-.panel.active {
-    display: block;
-}
-
 /* ========== 查询界面 ========== */
 .query-section {
     background: var(--card-bg);
@@ -535,33 +473,12 @@ body {
 
 /* ========== 响应式 ========== */
 @media (max-width: 768px) {
-    .container {
-        padding: 12px;
-    }
-
-    .header {
-        padding: 16px 20px;
-    }
-
-    .logo h1 {
-        font-size: 20px;
-    }
-
-    .tabs {
-        flex-wrap: wrap;
-    }
-
     .metrics-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
     .result-charts {
         grid-template-columns: 1fr;
-    }
-
-    .tab-btn {
-        flex: 1;
-        min-width: 80px;
     }
 
     .grafana-header {
@@ -842,36 +759,6 @@ body {
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     padding: 16px;
-}
-
-/* 指标卡片网格 */
-.metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.metric-card {
-    text-align: center;
-}
-
-.metric-title {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-bottom: 8px;
-}
-
-.metric-value {
-    font-size: 32px;
-    font-weight: 700;
-    color: var(--primary);
-    margin-bottom: 4px;
-}
-
-.metric-trend {
-    font-size: 14px;
-    color: var(--text-secondary);
 }
 
 /* 告警面板 */
