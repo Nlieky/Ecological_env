@@ -939,6 +939,46 @@ body {
     padding: 16px;
 }
 
+/* ========== 告警项样式 ========== */
+.alert-item {
+    border-left: 4px solid;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    background: var(--bg-secondary);
+}
+
+.alert-item.border-danger {
+    border-left-color: var(--danger);
+}
+
+.alert-item.border-warning {
+    border-left-color: var(--warning);
+}
+
+.alert-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.alert-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+.alert-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
 /* 新布局响应式 */
 @media (max-width: 1200px) {
     .metrics-grid {

@@ -58,6 +58,9 @@ function init() {
     // 检查服务状态
     checkServicesStatus();
 
+    // 初始化告警面板
+    alertPanel.init();
+
     console.log('[APP] 应用初始化完成');
 }
 
@@ -496,6 +499,21 @@ async function loadAnalysisReports() {
             </div>
         `).join('');
 
+        // 更新告铃徽章
+        const totalAlerts = (response.data.results || []).filter(r =>
+            r.anomalies_count > 0 || r.violations_count > 0
+        ).length;
+
+        const badge = document.getElementById('alert-badge');
+        if (badge) {
+            if (totalAlerts > 0) {
+                badge.textContent = totalAlerts;
+                badge.style.display = 'block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
     } catch (error) {
         console.error('[APP] 加载报告失败:', error);
         listElement.innerHTML = '<div class="error">加载失败，请检查监控服务是否启动</div>';
@@ -522,6 +540,101 @@ function formatReportText(text) {
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>');
 }
+
+// ========== 告警面板管理 ==========
+const alertPanel = {
+    overlay: null,
+    panel: null,
+    content: null,
+    closeBtn: null,
+
+    init() {
+        // 获取DOM元素
+        this.overlay = document.getElementById('alert-overlay');
+        this.panel = document.getElementById('alert-panel');
+        this.content = document.getElementById('alert-list');
+        this.closeBtn = document.getElementById('alert-close');
+
+        if (!this.overlay || !this.panel || !this.content || !this.closeBtn) {
+            console.warn('[ALERT] 告警面板元素未找到');
+            return;
+        }
+
+        // 点击关闭按钮
+        this.closeBtn.addEventListener('click', () => this.hide());
+
+        // 点击遮罩关闭
+        this.overlay.addEventListener('click', () => this.hide());
+
+        // 点击告铃按钮显示面板
+        const alertBtn = document.getElementById('alert-btn');
+        if (alertBtn) {
+            alertBtn.addEventListener('click', () => this.show());
+        }
+    },
+
+    show() {
+        if (this.overlay && this.panel) {
+            this.overlay.classList.add('show');
+            this.panel.classList.add('show');
+            this.loadAlerts();
+        }
+    },
+
+    hide() {
+        if (this.overlay && this.panel) {
+            this.overlay.classList.remove('show');
+            this.panel.classList.remove('show');
+        }
+    },
+
+    async loadAlerts() {
+        if (!this.content) return;
+
+        try {
+            const response = await axios.get(`${MONITORING_API}/analysis`);
+            const reports = response.data.results || [];
+
+            // 筛选有异常的报告
+            const alerts = reports.filter(r => r.anomalies_count > 0 || r.violations_count > 0);
+
+            if (alerts.length === 0) {
+                this.content.innerHTML = '<div class="empty-state">暂无告警</div>';
+                return;
+            }
+
+            this.content.innerHTML = alerts.map(alert => {
+                const time = new Date(alert.timestamp).toLocaleString('zh-CN', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                const severity = alert.violations_count > 0 ? 'danger' : 'warning';
+                const colorClass = severity === 'danger' ? 'border-danger' : 'border-warning';
+
+                return `
+                    <div class="alert-item ${colorClass}">
+                        <div class="alert-time">${time}</div>
+                        <div class="alert-content">
+                            <div class="alert-title">${alert.query || '异常检测'}</div>
+                            <div class="alert-desc">
+                                检测到 ${alert.anomalies_count} 处异常
+                                ${alert.violations_count > 0 ? `，${alert.violations_count} 处违规` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+        } catch (error) {
+            console.error('[ALERT] 加载告警失败:', error);
+            if (this.content) {
+                this.content.innerHTML = '<div class="empty-state">加载失败</div>';
+            }
+        }
+    }
+};
 
 // ========== 启动应用 ==========
 document.addEventListener('DOMContentLoaded', init);
