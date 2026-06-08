@@ -114,6 +114,16 @@ body {
     gap: 8px;
 }
 
+/* ========== 按钮动画 ========== */
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
 .btn-primary {
     background: var(--primary-color);
     color: white;
@@ -749,6 +759,22 @@ body {
     display: block;
 }
 
+/* ========== 页面切换动画 ========== */
+.content-panel {
+    animation: fade-in 300ms ease-out;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* 卡片通用样式 */
 .metric-card,
 .chart-container,
@@ -759,6 +785,17 @@ body {
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     padding: 16px;
+}
+
+/* ========== 悬浮效果 ========== */
+.metric-card:hover,
+.chart-container:hover,
+.query-section:hover,
+.monitoring-section:hover,
+.analysis-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: all 200ms ease-out;
 }
 
 /* 告警面板 */
@@ -833,6 +870,11 @@ body {
     margin-bottom: 12px;
     border-radius: 4px;
     background: var(--bg-secondary);
+}
+
+.alert-item:hover {
+    background: var(--bg-tertiary);
+    transition: background 200ms ease-out;
 }
 
 .alert-item.border-danger {
