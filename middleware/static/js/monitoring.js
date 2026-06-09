@@ -273,21 +273,8 @@ function stopMonitoring() {
     monitoring.stop();
 }
 
-// 监听标签切换事件
-document.addEventListener('DOMContentLoaded', () => {
-    const tabButtons = document.querySelectorAll('.tab-btn');
-
-    tabButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tabId = e.target.dataset.tab;
-
-            if (tabId === 'monitoring') {
-                startMonitoring();
-            } else {
-                stopMonitoring();
-            }
-        });
-    });
+// 注意：监控系统的启动/停止现在由 app.js 中的导航切换逻辑控制
+// 不再需要在这里监听标签切换事件
 
     // 页面隐藏时停止监控
     document.addEventListener('visibilitychange', () => {
