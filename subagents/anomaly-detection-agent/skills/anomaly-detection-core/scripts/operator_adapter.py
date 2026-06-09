@@ -509,7 +509,9 @@ class OperatorAdapter:
         if len(anomaly_mask) > 0:
             anomaly_mask[0] = False
 
-        return z_scores, anomaly_mask.astype(bool).astype(float).values
+        # z_scores 和 anomaly_mask 都已经是 numpy 数组
+        # 使用 np.asarray 确保返回 numpy 数组类型
+        return np.asarray(z_scores), np.asarray(anomaly_mask)
 
     def _hampel_anomaly(self, series: pd.Series,
                         threshold: float = 3.0) -> tuple:
