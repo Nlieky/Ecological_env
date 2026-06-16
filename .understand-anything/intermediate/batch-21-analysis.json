@@ -1,0 +1,170 @@
+{
+  "nodes": [
+    {
+      "id": "document:subagents/rule-reasoning-agent/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "subagents/rule-reasoning-agent/AGENTS.md",
+      "summary": "规则推理子智能体的核心职责文档，定义了基于法规、工艺知识和专家经验进行违规判定的核心任务，包含数据处理流程、红线原则和输出格式规范。",
+      "tags": ["documentation", "agent-definition", "rule-reasoning", "violation-detection"],
+      "complexity": "moderate",
+      "languageNotes": "中英文混合文档，定义了环保监测违规判定的规则推理流程和四种违规类型（插瓶干扰、稀释排放、人工拟合、恶意逃避）。"
+    },
+    {
+      "id": "document:subagents/rule-reasoning-agent/IDENTITY.md",
+      "type": "document",
+      "name": "IDENTITY.md",
+      "filePath": "subagents/rule-reasoning-agent/IDENTITY.md",
+      "summary": "规则推理子智能体的身份定义文档，确立其作为知识推理器的核心价值，明确不做数据检测、特征提取和数据治理的边界。",
+      "tags": ["documentation", "agent-identity", "knowledge-reasoning"],
+      "complexity": "simple",
+      "languageNotes": "简洁的身份定义，采用Emoji符号和要点式结构，强调知识驱动判定和双层判定体系。"
+    },
+    {
+      "id": "document:subagents/rule-reasoning-agent/MEMORY.md",
+      "type": "document",
+      "name": "MEMORY.md",
+      "filePath": "subagents/rule-reasoning-agent/MEMORY.md",
+      "summary": "规则推理子智能体的专业知识记忆库，包含法规库要点（水污染防治法、排放标准）、工艺知识要点、专家经验规则和嫌疑等级判定标准。",
+      "tags": ["documentation", "knowledge-base", "expert-rules", "regulations"],
+      "complexity": "moderate",
+      "languageNotes": "纯中文专业文档，结构化存储环保监测领域的法规条款、工艺原理、专家经验和取证要点，为违规判定提供知识支撑。"
+    },
+    {
+      "id": "document:subagents/rule-reasoning-agent/SOUL.md",
+      "type": "document",
+      "name": "SOUL.md",
+      "filePath": "subagents/rule-reasoning-agent/SOUL.md",
+      "summary": "规则推理子智能体的灵魂文档，阐述其核心信念和工作哲学，强调知识驱动判定、数据与语义分离、证据优先和嫌疑级别判定。",
+      "tags": ["documentation", "agent-philosophy", "knowledge-driven"],
+      "complexity": "moderate",
+      "languageNotes": "哲学性文档，中英文混合，深入探讨智能体的工作理念和价值定位，强调'知识就是力量'和'证据重于观点'。"
+    },
+    {
+      "id": "document:subagents/rule-reasoning-agent/TOOLS.md",
+      "type": "document",
+      "name": "TOOLS.md",
+      "filePath": "subagents/rule-reasoning-agent/TOOLS.md",
+      "summary": "规则推理子智能体的工具路径和参数参考文档，包含知识库路径、法规引用、工艺机理规则和嫌疑等级判定标准。",
+      "tags": ["documentation", "tool-reference", "process-rules"],
+      "complexity": "moderate",
+      "languageNotes": "技术参考文档，采用表格形式组织知识库路径、工艺规则阈值和调查要点，提供pH-COD协同、氨氮-总氮转化等工艺规则。"
+    },
+    {
+      "id": "document:subagents/rule-reasoning-agent/USER.md",
+      "type": "document",
+      "name": "USER.md",
+      "filePath": "subagents/rule-reasoning-agent/USER.md",
+      "summary": "规则推理子智能体的用户画像文档，定义用户为监管人员，说明调用方式、关注重点和期望输出类型。",
+      "tags": ["documentation", "user-profile", "stakeholder"],
+      "complexity": "simple",
+      "languageNotes": "简洁的用户定义，明确服务对象为负责违规判定和执法决策的监管人员，强调判定准确性和取证指导性。"
+    },
+    {
+      "id": "config:subagents/rule-reasoning-agent/config.yaml",
+      "type": "config",
+      "name": "config.yaml",
+      "filePath": "subagents/rule-reasoning-agent/config.yaml",
+      "summary": "规则推理子智能体的配置文件，定义专利参数、法规标准限值（GB 18918-2002一级A标）、工艺规则阈值和专家案例库配置。",
+      "tags": ["configuration", "agent-config", "thresholds", "standards"],
+      "complexity": "moderate",
+      "languageNotes": "YAML格式配置，包含相似度阈值、嫌疑等级规则、各污染物排放限值和工艺参数阈值，支持专利要求的可配置参数。"
+    },
+    {
+      "id": "data:subagents/rule-reasoning-agent/state.json",
+      "type": "table",
+      "name": "state.json",
+      "filePath": "subagents/rule-reasoning-agent/state.json",
+      "summary": "规则推理子智能体的运行状态数据，记录agent状态、执行统计、风险检测结果和当前任务信息。",
+      "tags": ["runtime-state", "statistics", "execution-tracking"],
+      "complexity": "simple",
+      "languageNotes": "JSON格式状态文件，包含执行统计计数器（成功/失败/风险级别检测次数）和最后更新时间戳，用于智能体状态追踪。"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:subagents/rule-reasoning-agent/AGENTS.md",
+      "target": "document:subagents/rule-reasoning-agent/SOUL.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/AGENTS.md",
+      "target": "document:subagents/rule-reasoning-agent/IDENTITY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/AGENTS.md",
+      "target": "document:subagents/rule-reasoning-agent/TOOLS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/AGENTS.md",
+      "target": "document:subagents/rule-reasoning-agent/MEMORY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/AGENTS.md",
+      "target": "document:subagents/rule-reasoning-agent/USER.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/SOUL.md",
+      "target": "document:subagents/rule-reasoning-agent/IDENTITY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/SOUL.md",
+      "target": "document:subagents/rule-reasoning-agent/MEMORY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/MEMORY.md",
+      "target": "document:subagents/rule-reasoning-agent/TOOLS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/TOOLS.md",
+      "target": "config:subagents/rule-reasoning-agent/config.yaml",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/MEMORY.md",
+      "target": "config:subagents/rule-reasoning-agent/config.yaml",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/rule-reasoning-agent/AGENTS.md",
+      "target": "data:subagents/rule-reasoning-agent/state.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:subagents/rule-reasoning-agent/config.yaml",
+      "target": "data:subagents/rule-reasoning-agent/state.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

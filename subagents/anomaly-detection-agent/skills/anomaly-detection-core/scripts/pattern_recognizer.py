@@ -97,6 +97,7 @@ class PatternRecognizer:
             anomaly = {
                 "indicator": moment["indicator"],
                 "times": moment["times"],
+                "index": moment.get("index", -1),  # 新增：传递索引字段
                 "score": moment["score"],
                 "pattern": pattern,
                 "severity": self._calculate_severity(moment["score"])
@@ -177,26 +178,39 @@ class PatternRecognizer:
     def _is_spike_pattern(self, series: pd.Series, index: int,
                          window: int = 5) -> bool:
         """检查是否为突变异常"""
-        start = max(0, index - window)
-        end = min(len(series), index + window + 1)
-
-        window_data = series.iloc[start:end]
-        center_value = series.iloc[index] if index < len(series) else None
-
-        if center_value is None:
+        if index < 2 or index >= len(series) - 2:
             return False
 
-        # 计算与邻域的差异
-        neighbors = window_data[window_data != center_value]
+        center_value = series.iloc[index]
 
-        if len(neighbors) == 0:
-            return False
+        # 检查与前一个点的变化
+        prev_value = series.iloc[index - 1]
+        next_value = series.iloc[index + 1] if index + 1 < len(series) else prev_value
 
-        mean_neighbor = neighbors.mean()
-        std_neighbor = neighbors.std()
+        # 计算变化幅度
+        change_from_prev = abs(center_value - prev_value)
+        change_to_next = abs(center_value - next_value)
+        avg_change = (change_from_prev + change_to_next) / 2
 
-        # 如果中心值远大于邻域均值
-        if abs(center_value - mean_neighbor) > 3 * std_neighbor:
+        # 获取局部数据范围
+        local_range = series.iloc[max(0, index - window):min(len(series), index + window + 1)]
+        local_std = local_range.std()
+        local_mean = local_range.mean()
+
+        # 相对变化判断
+        if local_mean != 0:
+            relative_change = avg_change / abs(local_mean)
+        else:
+            relative_change = 0
+
+        # 满足以下任一条件即为突变：
+        # 1. 相对变化超过 20%
+        # 2. 绝对变化超过 2 倍局部标准差
+        # 3. 前后点之间的变化率显著（点值在前后点范围外）
+        is_outlier = (center_value > prev_value + 2 * local_std or
+                     center_value < prev_value - 2 * local_std)
+
+        if (relative_change > 0.2 or avg_change > 2 * local_std or is_outlier):
             return True
 
         return False
@@ -217,11 +231,23 @@ class PatternRecognizer:
         z = np.polyfit(x, window_data, 1)
         slope = z[0]
 
-        # 检查斜率是否异常
-        threshold = 3 * series.std() / len(series)
+        # 简化判断：直接检查斜率的绝对值和方向一致性
+        # 计算整体变化方向
+        first_half = window_data[:len(window_data)//2].mean()
+        second_half = window_data[len(window_data)//2:].mean()
+        overall_change = second_half - first_half
 
-        if abs(slope) > threshold:
-            return True
+        # 如果变化方向一致且斜率非零
+        if (slope > 0 and overall_change > 0) or (slope < 0 and overall_change < 0):
+            # 检查变化的幅度是否显著
+            data_range = window_data.max() - window_data.min()
+            if data_range > 0:
+                change_ratio = abs(overall_change) / data_range
+                # 变化超过范围的 15% 且方向一致
+                if change_ratio > 0.15 and abs(slope) > 0.01:
+                    return True
+
+        return False
 
         return False
 

@@ -155,241 +155,249 @@ request_count = 0
 LOG_EVERY_N_REQUESTS = 50  # 每50条请求打印一次
 
 
-def run_llm_analysis():
-    """
-    执行两层LLM分析
+# ========== 实时LLM分析功能已暂时禁用 ==========
+# 后续开发时请取消以下注释
+#
+# def run_llm_analysis():
+#     """
+#     执行两层LLM分析
+#
+#     取缓冲区中的最新数据进行分析
+#     """
+#     global last_llm_analysis_time, llm_analysis_in_progress, total_llm_analysis
+#
+#     with buffer_lock:
+#         if len(data_buffer) == 0:
+#             logger.warning("[LLM-ANALYSIS] 缓冲区无数据，跳过分析")
+#             return
+#
+#         # 取缓冲区中的所有数据进行时序分析
+#         recent_data_list = list(data_buffer)
+#
+#         # 构建时序数据结构
+#         recent_data = {
+#             'timestamp': recent_data_list[-1].get('timestamp'),
+#             'data_count': len(recent_data_list),
+#             'influent_timeseries': [],
+#             'effluent_timeseries': [],
+#             'time_range': {
+#                 'start': recent_data_list[0].get('timestamp'),
+#                 'end': recent_data_list[-1].get('timestamp')
+#             },
+#             # 添加单点数据供task_receiving使用
+#             'influent': recent_data_list[-1].get('influent', {}) if recent_data_list else {},
+#             'effluent': recent_data_list[-1].get('effluent', {}) if recent_data_list else {},
+#             # 添加显式的start_time和end_time
+#             'start_time': recent_data_list[0].get('timestamp') if recent_data_list else None,
+#             'end_time': recent_data_list[-1].get('timestamp') if recent_data_list else None
+#         }
+#
+#         # 提取进水和出水时序数据
+#         for data_point in recent_data_list:
+#             if 'influent' in data_point:
+#                 recent_data['influent_timeseries'].append(data_point['influent'])
+#             if 'effluent' in data_point:
+#                 recent_data['effluent_timeseries'].append(data_point['effluent'])
+#
+#     try:
+#         llm_analysis_in_progress = True
+#         analysis_start = datetime.now()
+#
+#         logger.info("")
+#         logger.info("=" * 60)
+#         logger.info("[LLM-ANALYSIS] 开始两层LLM分析")
+#         logger.info(f"[LLM-ANALYSIS] 数据时间: {recent_data.get('timestamp')}")
+#         logger.info(f"[LLM-ANALYSIS] 时序数据量: {recent_data.get('data_count', 0)}条")
+#         logger.info(f"[LLM-ANALYSIS] 时间范围: {recent_data.get('time_range', {}).get('start')} ~ {recent_data.get('time_range', {}).get('end')}")
+#         logger.info("=" * 60)
+#
+#         # ========== 阶段1: 任务接收与解析 ==========
+#         logger.info("[STAGE 1/3] 任务接收与解析...")
+#         parse_result = task_receiving_module.process(recent_data)
+#
+#         if parse_result['status'] != 'success':
+#             logger.error(f"[ERROR] 任务解析失败: {parse_result}")
+#             data_processed.labels(status='error').inc()
+#             return
+#
+#         structured_task = parse_result['structured_task']
+#         intent = parse_result['intent']
+#         logger.info(f"[STAGE 1] 任务解析完成: {structured_task['task_id']}")
+#
+#         # ========== 阶段2: 大模型协调子智能体执行 ==========
+#         logger.info("[STAGE 2/3] 大模型协调子智能体执行...")
+#
+#         execution_results = llm_coordinator.coordinate_all_agents(
+#             task=structured_task,
+#             analysis_scope="full"  # 强制执行完整分析，包含所有4个子智能体
+#         )
+#
+#         logger.info(f"[STAGE 2] 子智能体执行完成: {len(execution_results)}个")
+#
+#         # ========== 阶段3: 结果解释输出 ==========
+#         logger.info("[STAGE 3/3] 结果解释与报告生成...")
+#
+#         interpretation_result = result_interpretation.interpret_results(
+#             execution_results=execution_results,
+#             task_info={
+#                 "task_id": structured_task['task_id'],
+#                 "task_name": structured_task['task_name'],
+#                 "timestamp": recent_data.get('timestamp')
+#             }
+#         )
+#
+#         logger.info("[STAGE 3] 报告生成完成")
+#
+#         # ========== 处理告警和异常 ==========
+#         alerts = []
+#         violations = []
+#         anomalies = []
+#
+#         for agent_id, result in execution_results.items():
+#             if result.get('status') == 'error':
+#                 logger.error(f"[ERROR] {agent_id} 执行失败: {result.get('error')}")
+#                 continue
+#
+#             if agent_id == 'anomaly-detection-agent':
+#                 anomalies = result.get('anomalies', [])
+#                 for anom in anomalies:
+#                     anomaly_type = anom.get('type', 'unknown')
+#                     anomaly_detected.labels(anomaly_type=anomaly_type).inc()
+#
+#             if agent_id == 'rule-reasoning-agent':
+#                 violations = result.get('violations', [])
+#
+#                 # 如果没有violations字段，从reasoning结果中提取
+#                 if not violations and 'reasoning' in result:
+#                     reasoning = result['reasoning']
+#                     # 从matched_patterns中提取违规
+#                     matched_patterns = reasoning.get('matched_patterns', [])
+#                     for pattern in matched_patterns:
+#                         if pattern.get('suspicion_level') in ['high', 'critical']:
+#                             violations.append({
+#                                 'type': pattern.get('name', 'unknown'),
+#                                 'level': pattern.get('suspicion_level', 'high'),
+#                                 'message': f"{pattern.get('name')}: 匹配度{pattern.get('match_score', 0):.2%}, 置信度{pattern.get('confidence', 0):.2%}",
+#                                 'confidence': pattern.get('confidence', 0.0)
+#                             })
+#
+#                     # 从has_violation标志检查
+#                     if result.get('has_violation') and result.get('suspicion_level') in ['high', 'critical']:
+#                         if not violations:
+#                             violations.append({
+#                                 'type': result.get('violation_type', 'suspected_violation'),
+#                                 'level': result.get('suspicion_level', 'high'),
+#                                 'message': f"嫌疑等级: {result.get('suspicion_level')}, 置信度: {result.get('confidence', 0):.2%}",
+#                                 'confidence': result.get('confidence', 0.0)
+#                             })
+#
+#                 for vio in violations:
+#                     alert_total.labels(
+#                         pattern_type=vio.get('type', 'unknown'),
+#                         level=vio.get('level', 'medium')
+#                     ).inc()
+#
+#                     alert = {
+#                         'type': vio.get('type'),
+#                         'level': vio.get('level'),
+#                         'message': vio.get('message'),
+#                         'legal_reference': vio.get('legal_reference')
+#                     }
+#                     alerts.append(alert)
+#
+#                     logger.warning(f"[ALERT] {vio.get('type')} ({vio.get('level')}): {vio.get('message')}")
+#
+#         # 保存分析结果
+#         analysis_result = {
+#             'timestamp': recent_data.get('timestamp'),
+#             'analysis_time': analysis_start.isoformat(),
+#             'task_id': structured_task['task_id'],
+#             'analysis': interpretation_result.get('analysis', {}),
+#             'alerts': alerts,
+#             'report': interpretation_result.get('report', ''),
+#             'anomalies_count': len(anomalies),
+#             'violations_count': len(violations)
+#         }
+#
+#         with buffer_lock:
+#             llm_analysis_results.append(analysis_result)
+#             # 只保留最近10次分析结果
+#             if len(llm_analysis_results) > 10:
+#                 llm_analysis_results.pop(0)
+#
+#         total_llm_analysis += 1
+#         last_llm_analysis_time = datetime.now()
+#
+#         analysis_duration = (datetime.now() - analysis_start).total_seconds()
+#         logger.info("")
+#         logger.info("=" * 60)
+#         logger.info(f"[LLM-ANALYSIS] 分析完成，耗时: {analysis_duration:.1f}秒")
+#         logger.info(f"[LLM-ANALYSIS] 异常: {len(anomalies)}, 违规: {len(violations)}")
+#         logger.info("=" * 60)
+#
+#         # ========== 打印报告 ==========
+#         report_text = interpretation_result.get('report', '')
+#         if report_text:
+#             logger.info("")
+#             logger.info("=" * 60)
+#             logger.info("[REPORT] 分析报告")
+#             logger.info("=" * 60)
+#             logger.info(report_text)
+#             logger.info("=" * 60)
+#             logger.info("")
+#
+#         data_processed.labels(status='success').inc()
+#
+#     except Exception as e:
+#         logger.error(f"[ERROR] LLM分析失败: {e}")
+#         import traceback
+#         traceback.print_exc()
+#         data_processed.labels(status='error').inc()
+#
+#     finally:
+#         llm_analysis_in_progress = False
+#
+#
+# def llm_analysis_worker():
+#     """
+#     后台线程：定期触发LLM分析
+#
+#     每10分钟检查一次是否需要进行分析
+#     """
+#     logger.info("[LLM-WORKER] LLM分析后台线程启动")
+#     logger.info(f"[LLM-WORKER] 分析间隔: {LLM_ANALYSIS_INTERVAL}秒")
+#
+#     while True:
+#         try:
+#             time.sleep(LLM_ANALYSIS_INTERVAL)
+#
+#             # 检查是否有足够的数据
+#             with buffer_lock:
+#                 data_count = len(data_buffer)
+#
+#             if data_count > 0:
+#                 logger.info(f"[LLM-WORKER] 触发LLM分析，缓冲区数据: {data_count}条")
+#                 run_llm_analysis()
+#             else:
+#                 logger.debug("[LLM-WORKER] 无数据，跳过分析")
+#
+#         except Exception as e:
+#             logger.error(f"[LLM-WORKER] 后台线程错误: {e}")
+#             time.sleep(60)  # 出错后等待1分钟再重试
+#
+#
+# # 启动后台线程
+# llm_worker_thread = threading.Thread(target=llm_analysis_worker, daemon=True)
+# llm_worker_thread.start()
+#
+# logger.info("[INIT] 双流处理架构启动")
+# logger.info(f"[INIT] - Prometheus: 实时更新（每秒）")
+# logger.info(f"[INIT] - LLM分析: 每{LLM_ANALYSIS_INTERVAL//60}分钟一次")
+# logger.info(f"[INIT] - 数据缓冲: 最大{DATA_BUFFER_SIZE}条")
 
-    取缓冲区中的最新数据进行分析
-    """
-    global last_llm_analysis_time, llm_analysis_in_progress, total_llm_analysis
-
-    with buffer_lock:
-        if len(data_buffer) == 0:
-            logger.warning("[LLM-ANALYSIS] 缓冲区无数据，跳过分析")
-            return
-
-        # 取缓冲区中的所有数据进行时序分析
-        recent_data_list = list(data_buffer)
-
-        # 构建时序数据结构
-        recent_data = {
-            'timestamp': recent_data_list[-1].get('timestamp'),
-            'data_count': len(recent_data_list),
-            'influent_timeseries': [],
-            'effluent_timeseries': [],
-            'time_range': {
-                'start': recent_data_list[0].get('timestamp'),
-                'end': recent_data_list[-1].get('timestamp')
-            },
-            # 添加单点数据供task_receiving使用
-            'influent': recent_data_list[-1].get('influent', {}) if recent_data_list else {},
-            'effluent': recent_data_list[-1].get('effluent', {}) if recent_data_list else {},
-            # 添加显式的start_time和end_time
-            'start_time': recent_data_list[0].get('timestamp') if recent_data_list else None,
-            'end_time': recent_data_list[-1].get('timestamp') if recent_data_list else None
-        }
-
-        # 提取进水和出水时序数据
-        for data_point in recent_data_list:
-            if 'influent' in data_point:
-                recent_data['influent_timeseries'].append(data_point['influent'])
-            if 'effluent' in data_point:
-                recent_data['effluent_timeseries'].append(data_point['effluent'])
-
-    try:
-        llm_analysis_in_progress = True
-        analysis_start = datetime.now()
-
-        logger.info("")
-        logger.info("=" * 60)
-        logger.info("[LLM-ANALYSIS] 开始两层LLM分析")
-        logger.info(f"[LLM-ANALYSIS] 数据时间: {recent_data.get('timestamp')}")
-        logger.info(f"[LLM-ANALYSIS] 时序数据量: {recent_data.get('data_count', 0)}条")
-        logger.info(f"[LLM-ANALYSIS] 时间范围: {recent_data.get('time_range', {}).get('start')} ~ {recent_data.get('time_range', {}).get('end')}")
-        logger.info("=" * 60)
-
-        # ========== 阶段1: 任务接收与解析 ==========
-        logger.info("[STAGE 1/3] 任务接收与解析...")
-        parse_result = task_receiving_module.process(recent_data)
-
-        if parse_result['status'] != 'success':
-            logger.error(f"[ERROR] 任务解析失败: {parse_result}")
-            data_processed.labels(status='error').inc()
-            return
-
-        structured_task = parse_result['structured_task']
-        intent = parse_result['intent']
-        logger.info(f"[STAGE 1] 任务解析完成: {structured_task['task_id']}")
-
-        # ========== 阶段2: 大模型协调子智能体执行 ==========
-        logger.info("[STAGE 2/3] 大模型协调子智能体执行...")
-
-        execution_results = llm_coordinator.coordinate_all_agents(
-            task=structured_task,
-            analysis_scope="full"  # 强制执行完整分析，包含所有4个子智能体
-        )
-
-        logger.info(f"[STAGE 2] 子智能体执行完成: {len(execution_results)}个")
-
-        # ========== 阶段3: 结果解释输出 ==========
-        logger.info("[STAGE 3/3] 结果解释与报告生成...")
-
-        interpretation_result = result_interpretation.interpret_results(
-            execution_results=execution_results,
-            task_info={
-                "task_id": structured_task['task_id'],
-                "task_name": structured_task['task_name'],
-                "timestamp": recent_data.get('timestamp')
-            }
-        )
-
-        logger.info("[STAGE 3] 报告生成完成")
-
-        # ========== 处理告警和异常 ==========
-        alerts = []
-        violations = []
-        anomalies = []
-
-        for agent_id, result in execution_results.items():
-            if result.get('status') == 'error':
-                logger.error(f"[ERROR] {agent_id} 执行失败: {result.get('error')}")
-                continue
-
-            if agent_id == 'anomaly-detection-agent':
-                anomalies = result.get('anomalies', [])
-                for anom in anomalies:
-                    anomaly_type = anom.get('type', 'unknown')
-                    anomaly_detected.labels(anomaly_type=anomaly_type).inc()
-
-            if agent_id == 'rule-reasoning-agent':
-                violations = result.get('violations', [])
-
-                # 如果没有violations字段，从reasoning结果中提取
-                if not violations and 'reasoning' in result:
-                    reasoning = result['reasoning']
-                    # 从matched_patterns中提取违规
-                    matched_patterns = reasoning.get('matched_patterns', [])
-                    for pattern in matched_patterns:
-                        if pattern.get('suspicion_level') in ['high', 'critical']:
-                            violations.append({
-                                'type': pattern.get('name', 'unknown'),
-                                'level': pattern.get('suspicion_level', 'high'),
-                                'message': f"{pattern.get('name')}: 匹配度{pattern.get('match_score', 0):.2%}, 置信度{pattern.get('confidence', 0):.2%}",
-                                'confidence': pattern.get('confidence', 0.0)
-                            })
-
-                    # 从has_violation标志检查
-                    if result.get('has_violation') and result.get('suspicion_level') in ['high', 'critical']:
-                        if not violations:
-                            violations.append({
-                                'type': result.get('violation_type', 'suspected_violation'),
-                                'level': result.get('suspicion_level', 'high'),
-                                'message': f"嫌疑等级: {result.get('suspicion_level')}, 置信度: {result.get('confidence', 0):.2%}",
-                                'confidence': result.get('confidence', 0.0)
-                            })
-
-                for vio in violations:
-                    alert_total.labels(
-                        pattern_type=vio.get('type', 'unknown'),
-                        level=vio.get('level', 'medium')
-                    ).inc()
-
-                    alert = {
-                        'type': vio.get('type'),
-                        'level': vio.get('level'),
-                        'message': vio.get('message'),
-                        'legal_reference': vio.get('legal_reference')
-                    }
-                    alerts.append(alert)
-
-                    logger.warning(f"[ALERT] {vio.get('type')} ({vio.get('level')}): {vio.get('message')}")
-
-        # 保存分析结果
-        analysis_result = {
-            'timestamp': recent_data.get('timestamp'),
-            'analysis_time': analysis_start.isoformat(),
-            'task_id': structured_task['task_id'],
-            'analysis': interpretation_result.get('analysis', {}),
-            'alerts': alerts,
-            'report': interpretation_result.get('report', ''),
-            'anomalies_count': len(anomalies),
-            'violations_count': len(violations)
-        }
-
-        with buffer_lock:
-            llm_analysis_results.append(analysis_result)
-            # 只保留最近10次分析结果
-            if len(llm_analysis_results) > 10:
-                llm_analysis_results.pop(0)
-
-        total_llm_analysis += 1
-        last_llm_analysis_time = datetime.now()
-
-        analysis_duration = (datetime.now() - analysis_start).total_seconds()
-        logger.info("")
-        logger.info("=" * 60)
-        logger.info(f"[LLM-ANALYSIS] 分析完成，耗时: {analysis_duration:.1f}秒")
-        logger.info(f"[LLM-ANALYSIS] 异常: {len(anomalies)}, 违规: {len(violations)}")
-        logger.info("=" * 60)
-
-        # ========== 打印报告 ==========
-        report_text = interpretation_result.get('report', '')
-        if report_text:
-            logger.info("")
-            logger.info("=" * 60)
-            logger.info("[REPORT] 分析报告")
-            logger.info("=" * 60)
-            logger.info(report_text)
-            logger.info("=" * 60)
-            logger.info("")
-
-        data_processed.labels(status='success').inc()
-
-    except Exception as e:
-        logger.error(f"[ERROR] LLM分析失败: {e}")
-        import traceback
-        traceback.print_exc()
-        data_processed.labels(status='error').inc()
-
-    finally:
-        llm_analysis_in_progress = False
-
-
-def llm_analysis_worker():
-    """
-    后台线程：定期触发LLM分析
-
-    每10分钟检查一次是否需要进行分析
-    """
-    logger.info("[LLM-WORKER] LLM分析后台线程启动")
-    logger.info(f"[LLM-WORKER] 分析间隔: {LLM_ANALYSIS_INTERVAL}秒")
-
-    while True:
-        try:
-            time.sleep(LLM_ANALYSIS_INTERVAL)
-
-            # 检查是否有足够的数据
-            with buffer_lock:
-                data_count = len(data_buffer)
-
-            if data_count > 0:
-                logger.info(f"[LLM-WORKER] 触发LLM分析，缓冲区数据: {data_count}条")
-                run_llm_analysis()
-            else:
-                logger.debug("[LLM-WORKER] 无数据，跳过分析")
-
-        except Exception as e:
-            logger.error(f"[LLM-WORKER] 后台线程错误: {e}")
-            time.sleep(60)  # 出错后等待1分钟再重试
-
-
-# 启动后台线程
-llm_worker_thread = threading.Thread(target=llm_analysis_worker, daemon=True)
-llm_worker_thread.start()
-
-logger.info("[INIT] 双流处理架构启动")
+logger.info("[INIT] 单流处理架构启动")
 logger.info(f"[INIT] - Prometheus: 实时更新（每秒）")
-logger.info(f"[INIT] - LLM分析: 每{LLM_ANALYSIS_INTERVAL//60}分钟一次")
+logger.info(f"[INIT] - LLM分析: 已禁用（待后续开发）")
 logger.info(f"[INIT] - 数据缓冲: 最大{DATA_BUFFER_SIZE}条")
 
 
@@ -525,14 +533,15 @@ def receive_dual_stream():
             logger.info(f"[API] 已接收 {request_count} 条数据，缓冲区: {current_buffer_size}")
 
         # ========== 调用multi-dimensional-data-perception-agent流水线 ==========
+        # 已暂时禁用，待后续开发
         pipeline_result = None
-        if data_pipeline:
-            try:
-                pipeline_result = data_pipeline.process_stream_data(data)
-                logger.debug(f"[PIPELINE] 流水线处理完成: {pipeline_result.get('status')}")
-            except Exception as e:
-                logger.error(f"[PIPELINE] 流水线处理失败: {e}")
-                pipeline_result = {"status": "error", "error": str(e)}
+        # if data_pipeline:
+        #     try:
+        #         pipeline_result = data_pipeline.process_stream_data(data)
+        #         logger.debug(f"[PIPELINE] 流水线处理完成: {pipeline_result.get('status')}")
+        #     except Exception as e:
+        #         logger.error(f"[PIPELINE] 流水线处理失败: {e}")
+        #         pipeline_result = {"status": "error", "error": str(e)}
 
         # ========== 返回快速响应 ==========
         # 获取最近一次分析结果（如果有的话）
@@ -585,36 +594,43 @@ def trigger_llm_analysis():
 
     用于测试或需要立即分析的场合
     """
-    try:
-        if llm_analysis_in_progress:
-            return jsonify({
-                'status': 'busy',
-                'message': 'LLM分析正在进行中'
-            })
+    return jsonify({
+        'status': 'disabled',
+        'message': 'LLM实时分析功能已暂时禁用，待后续开发'
+    }), 503
 
-        with buffer_lock:
-            data_count = len(data_buffer)
-
-        if data_count == 0:
-            return jsonify({
-                'status': 'no_data',
-                'message': '缓冲区无数据'
-            })
-
-        # 在后台线程中执行分析
-        def run_in_background():
-            run_llm_analysis()
-
-        thread = threading.Thread(target=run_in_background)
-        thread.start()
-
-        return jsonify({
-            'status': 'triggered',
-            'message': f'LLM分析已触发，缓冲区数据: {data_count}条'
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    # 以下代码已禁用，后续开发时取消注释
+    #
+    # try:
+    #     if llm_analysis_in_progress:
+    #         return jsonify({
+    #             'status': 'busy',
+    #             'message': 'LLM分析正在进行中'
+    #         })
+    #
+    #     with buffer_lock:
+    #         data_count = len(data_buffer)
+    #
+    #     if data_count == 0:
+    #         return jsonify({
+    #             'status': 'no_data',
+    #             'message': '缓冲区无数据'
+    #         })
+    #
+    #     # 在后台线程中执行分析
+    #     def run_in_background():
+    #         run_llm_analysis()
+    #
+    #     thread = threading.Thread(target=run_in_background)
+    #     thread.start()
+    #
+    #     return jsonify({
+    #         'status': 'triggered',
+    #         'message': f'LLM分析已触发，缓冲区数据: {data_count}条'
+    #     })
+    #
+    # except Exception as e:
+    #     return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/analyze/results', methods=['GET'])
@@ -624,19 +640,29 @@ def get_analysis_results():
 
     返回最近N次分析结果
     """
-    try:
-        with buffer_lock:
-            results = list(llm_analysis_results)
+    return jsonify({
+        'status': 'disabled',
+        'message': 'LLM实时分析功能已暂时禁用，待后续开发',
+        'total_analysis': 0,
+        'last_analysis_time': None,
+        'results': []
+    })
 
-        return jsonify({
-            'status': 'ok',
-            'total_analysis': total_llm_analysis,
-            'last_analysis_time': last_llm_analysis_time.isoformat() if last_llm_analysis_time else None,
-            'results': results
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    # 以下代码已禁用，后续开发时取消注释
+    #
+    # try:
+    #     with buffer_lock:
+    #         results = list(llm_analysis_results)
+    #
+    #     return jsonify({
+    #         'status': 'ok',
+    #         'total_analysis': total_llm_analysis,
+    #         'last_analysis_time': last_llm_analysis_time.isoformat() if last_llm_analysis_time else None,
+    #         'results': results
+    #     })
+    #
+    # except Exception as e:
+    #     return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/analyze/stats', methods=['GET'])

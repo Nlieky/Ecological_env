@@ -6,9 +6,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Wastewater false discharge monitoring system based on a patent architecture using 6 layers: human-computer interaction, data collection, master agent, task orchestration, sub-agent, and data support layers. The system uses a Large Language Model (LLM) as a core coordinator that reads master/sub-agent identity files and calls pre-developed scripts from four sub-agents.
 
+**最新功能**: Web智能查询界面，支持自然语言查询、图表可视化、异常点标注。
+
 ## Common Commands
 
-### Real-time Monitoring (Orchestrator-Core Architecture)
+### Web智能查询界面（推荐）
+
+```bash
+# Terminal 1: 启动查询接口
+cd middleware
+python query_interface.py
+# 访问 http://localhost:8080
+
+# Terminal 2: 启动监控服务（可选）
+python app_orchestrator.py
+```
+
+### 示例自然语言查询
+- "检测最近一周数据异常情况"
+- "analyze pH COD anomalies in past 24 hours"
+- "查看昨天总氮和总磷的趋势"
+
+### 实时监测（Orchestrator-Core架构）
 
 ```bash
 # Terminal 1: Start Flask middleware with full orchestrator-core pipeline
@@ -77,7 +96,7 @@ curl http://localhost:5000/health
 
 ### Patent 6-Layer Architecture
 
-1. **Human-Computer Interaction Layer** (middleware/): Flask API, CLI, Grafana dashboards
+1. **Human-Computer Interaction Layer** (middleware/): Flask API, CLI, Grafana dashboards, **Web智能查询界面** ⭐
 2. **Data Collection Layer** (stream/): Dual data stream simulator for influent/effluent data
 3. **Master Agent Layer** (workspace/): Identity files (IDENTITY.md, AGENTS.md, MEMORY.md, SOUL.md, HEARTBEAT.md, TOOLS.md)
 4. **Task Orchestration Layer** (workspace/skills/orchestrator-core/scripts/): Task structuring, flow generation, resource matching, execution control
@@ -109,6 +128,26 @@ Real-time data flows through three stages with **complete LLM driving**:
 3. **Result Interpretation** (result_interpretation.py):
    - Master agent reads knowledge base (regulations, patterns, expert experience)
    - LLM generates natural language report
+
+### Web智能查询架构（新增）
+
+```
+用户自然语言输入
+    ↓
+LLM意图解析（Haiku快速模型）
+    ↓
+HistoricalDataFetcher获取历史数据
+    ↓
+LLM协调子智能体分析：
+  1. multi-dimensional-data-perception-agent（数据预处理）
+  2. anomaly-detection-agent（异常检测）
+    ↓
+LLM生成自然语言报告（Sonnet主模型）
+    ↓
+返回完整数据（时序数据+异常详情）
+    ↓
+前端Chart.js可视化展示
+```
 
 ## LLM Integration
 
@@ -174,6 +213,7 @@ Each sub-agent has its own identity files:
 
 ## Data Flow
 
+### 实时监测流程
 ```
 stream/dual_data_stream.py → Flask /api/dual-stream
     ↓
@@ -190,14 +230,60 @@ Result Interpretation (knowledge base loaded)
 Natural language report + alerts
 ```
 
+### Web智能查询流程（新增）
+```
+Web界面 → middleware/query_interface.py
+    ↓
+LLM解析查询意图（Haiku）
+    ↓
+获取历史数据（HistoricalDataFetcher）
+    ↓
+LLM协调子智能体：
+  - multi-dimensional-data-perception-agent
+  - anomaly-detection-agent
+    ↓
+LLM生成报告（Sonnet）
+    ↓
+返回时序数据 + 异常详情
+    ↓
+前端Chart.js可视化
+```
+
 ## Key Files
 
+### Web智能查询（新增）
+- `middleware/query_interface.py`: Flask查询接口，LLM驱动的自然语言查询
+- `middleware/historical_data_fetcher.py`: 历史数据获取器
+- `middleware/static/index.html`: Web前端界面
+- `middleware/static/js/charts.js`: Chart.js图表模块
+- `middleware/static/js/app.js`: 前端应用逻辑
+
+### 核心模块
 - `middleware/app_orchestrator.py`: Flask middleware implementing full orchestrator-core pipeline
 - `stream/dual_data_stream.py`: Dual data stream simulator (reads from data/pollution_water_*.csv)
 - `workspace/skills/orchestrator-core/scripts/`: Core orchestration modules
 - `shared/configs/llm_client.py`: LLM client wrapper with configuration loading
 - `shared/knowledge/`: Knowledge base (regulations/, process_knowledge/, violation_patterns/, expert_experience/)
 - `shared/operators/`: Anomaly detection operators (statistical/, ml/, deep_learning/)
+
+## Web界面功能
+
+### 查询面板
+- 自然语言输入框
+- 实时状态显示
+- 结果摘要展示
+- 时序图表可视化
+
+### 监控面板
+- Grafana仪表板嵌入
+- 实时数据展示
+- 指标对比图表
+
+### 分析报告面板
+- Chart.js时序图表
+- 多指标显示（pH、COD、TN、NH3-N、TP）
+- 异常点红色标注
+- 交互式tooltip
 
 ## Violation Detection
 
@@ -213,3 +299,5 @@ The system detects 4 types of violations:
 - Path resolution uses multiple strategies to find workspace/ and subagents/ directories dynamically
 - IntentResult is a dataclass - access attributes via dot notation, not `.get()` method
 - Prometheus metrics expose influent/effluent pH, COD, TN, AN, TP, flow rate, and counters for data processed, anomalies detected, and alerts
+- **Web查询支持中英文自然语言输入**
+- **图表自动标注异常点，支持图例点击切换**

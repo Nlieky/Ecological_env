@@ -98,12 +98,44 @@ def proxy_monitoring_metrics():
 
 @app.route('/api/web/monitoring/analysis', methods=['GET'])
 def proxy_monitoring_analysis():
-    """代理监控分析结果请求"""
+    """
+    代理分析结果请求
+
+    优先从查询接口获取分析报告（方案2），
+    如果没有则尝试从监控服务获取
+    """
+    try:
+        # 首先尝试从查询接口获取
+        response = requests.get('http://localhost:5001/api/query/analysis', timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            # 将查询报告转换为前端期望的格式
+            results = []
+            for report in data.get('results', []):
+                results.append({
+                    'timestamp': report.get('timestamp'),
+                    'anomalies_count': report.get('anomalies_count', 0),
+                    'violations_count': report.get('violations_count', 0),
+                    'report': report.get('report', report.get('summary', '')),
+                    'query': report.get('query', ''),
+                    'alerts': []  # 查询接口暂不提供alerts
+                })
+            return jsonify({
+                'status': 'ok',
+                'total': len(results),
+                'results': results
+            })
+    except requests.exceptions.ConnectionError:
+        pass  # 继续尝试监控服务
+    except Exception as e:
+        pass  # 继续尝试监控服务
+
+    # 如果查询接口失败，尝试监控服务
     try:
         response = requests.get('http://localhost:5000/api/analyze/results', timeout=10)
         return jsonify(response.json()), response.status_code
     except requests.exceptions.ConnectionError:
-        return jsonify({'error': '监控服务未启动'}), 503
+        return jsonify({'status': 'ok', 'total': 0, 'results': []})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -1,0 +1,277 @@
+{
+  "nodes": [
+    {
+      "id": "config:shared/configs/agent_registry.yaml",
+      "type": "config",
+      "name": "agent_registry.yaml",
+      "filePath": "shared/configs/agent_registry.yaml",
+      "summary": "子智能体注册表，定义所有可用的子智能体及其能力描述、脚本路径和身份文件映射",
+      "tags": ["配置", "智能体注册", "能力映射", "任务路由"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:shared/configs/anomaly_config.json",
+      "type": "config",
+      "name": "anomaly_config.json",
+      "filePath": "shared/configs/anomaly_config.json",
+      "summary": "废水监测异常检测参数配置，包含进出水各水质指标（pH、COD、TN、NH3-N、TP、SS）的统计阈值、IQR参数、Hampel滤波器参数及多变量PCA配置",
+      "tags": ["配置", "异常检测", "统计参数", "水质指标", "阈值配置"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:shared/configs/config.v2.yaml",
+      "type": "config",
+      "name": "config.v2.yaml",
+      "filePath": "shared/configs/config.v2.yaml",
+      "summary": "系统统一配置文件 v2.1.0，包含主智能体、任务编排、四个子智能体（多维数据感知、异常检测、规则推理、研判处置）的完整配置，以及数据源、缓存、日志、监控、API和外部服务配置",
+      "tags": ["配置", "系统核心", "智能体配置", "任务编排", "基础设施"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:shared/configs/consensus_config.yaml",
+      "type": "config",
+      "name": "consensus_config.yaml",
+      "filePath": "shared/configs/consensus_config.yaml",
+      "summary": "融合共识算法配置，定义异常检测与规则推理的基础权重、场景权重（默认/关键/正常）、动态调整参数及特殊情况处理",
+      "tags": ["配置", "共识算法", "权重分配", "结果融合"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:shared/configs/disposition_config.yaml",
+      "type": "config",
+      "name": "disposition_config.yaml",
+      "filePath": "shared/configs/disposition_config.yaml",
+      "summary": "研判预警与处置执行配置，定义飞书推送、监管平台推送、本地归档三种处置执行方式及报告生成器配置",
+      "tags": ["配置", "处置执行", "推送通知", "工单归档"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:shared/configs/llm_config.yaml",
+      "type": "config",
+      "name": "llm_config.yaml",
+      "filePath": "shared/configs/llm_config.yaml",
+      "summary": "LLM配置文件，定义主/快速/分析三种Claude模型、各智能体的系统提示词、工具定义、缓存策略、性能配置、成本控制及监控配置",
+      "tags": ["配置", "LLM模型", "提示词", "工具定义", "性能优化"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:shared/configs/operator_config.json",
+      "type": "config",
+      "name": "operator_config.json",
+      "filePath": "shared/configs/operator_config.json",
+      "summary": "时序异常检测算子库配置，包含17个统计算子（IQR、Z-Score、Hampel等）、7个机器学习算子（孤立森林、单类SVM等）及预留的8个深度学习算子",
+      "tags": ["配置", "异常检测算子", "统计算法", "机器学习", "深度学习"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:shared/configs/patent_config.yaml",
+      "type": "config",
+      "name": "patent_config.yaml",
+      "filePath": "shared/configs/patent_config.yaml",
+      "summary": "基于发明专利的核心参数配置，包含结果复用判决参数、异常检测模式阈值、违规模式检测参数、工艺机理校验参数及GB 18918-2002排放标准限值",
+      "tags": ["配置", "专利参数", "违规检测", "工艺机理", "排放标准"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:shared/configs/rule_config.yaml",
+      "type": "config",
+      "name": "rule_config.yaml",
+      "filePath": "shared/configs/rule_config.yaml",
+      "summary": "规则推理子智能体规则配置，定义4种违规检测规则（插瓶干扰、人工拟合、稀释排放、恶意作弊）的条件、推理逻辑及法规引用，以及2种误报过滤规则",
+      "tags": ["配置", "规则推理", "违规判定", "误报过滤", "法规匹配"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:shared/configs/skill_registry.json",
+      "type": "config",
+      "name": "skill_registry.json",
+      "filePath": "shared/configs/skill_registry.json",
+      "summary": "技能注册表，定义4个核心技能包（数据治理、特征分析、异常检测、规则推理）的能力、模块、类、方法、依赖项及配置路径映射",
+      "tags": ["配置", "技能注册", "能力映射", "模块依赖"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:shared/configs/subagent_registry.json",
+      "type": "config",
+      "name": "subagent_registry.json",
+      "filePath": "shared/configs/subagent_registry.json",
+      "summary": "子智能体注册表，定义4个子智能体的ID、名称、版本、路径、技能、优先级和超时配置，以及默认工作流和缓存配置",
+      "tags": ["配置", "智能体注册", "工作流定义", "优先级"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:shared/configs/system_config.yaml",
+      "type": "config",
+      "name": "system_config.yaml",
+      "filePath": "shared/configs/system_config.yaml",
+      "summary": "系统级配置文件，定义主智能体、任务编排、结果复用、双驱动机制、数据层（时序数据库、知识库、算子库）及监测标准（进出水限值）配置",
+      "tags": ["配置", "系统架构", "数据层", "监测标准", "双驱动机制"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:shared/configs/validation_rules.yaml",
+      "type": "config",
+      "name": "validation_rules.yaml",
+      "filePath": "shared/configs/validation_rules.yaml",
+      "summary": "配置验证规则文件，定义config.v2.yaml中所有配置项的类型、范围、格式验证规则，包括系统、主智能体、任务编排、各子智能体、数据源、缓存、日志、监控、API和状态管理的验证规则",
+      "tags": ["配置", "验证规则", "参数校验", "类型约束"],
+      "complexity": "complex"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/agent_registry.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/anomaly_config.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/consensus_config.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/disposition_config.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/llm_config.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/operator_config.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/patent_config.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/rule_config.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/skill_registry.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/subagent_registry.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/system_config.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/config.v2.yaml",
+      "target": "config:shared/configs/validation_rules.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/anomaly_config.json",
+      "target": "config:shared/configs/operator_config.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/patent_config.yaml",
+      "target": "config:shared/configs/anomaly_config.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:shared/configs/patent_config.yaml",
+      "target": "config:shared/configs/rule_config.yaml",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:shared/configs/rule_config.yaml",
+      "target": "config:shared/configs/patent_config.yaml",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:shared/configs/skill_registry.json",
+      "target": "config:shared/configs/subagent_registry.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/subagent_registry.json",
+      "target": "config:shared/configs/agent_registry.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/validation_rules.yaml",
+      "target": "config:shared/configs/config.v2.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/llm_config.yaml",
+      "target": "config:shared/configs/config.v2.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/consensus_config.yaml",
+      "target": "config:shared/configs/disposition_config.yaml",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:shared/configs/system_config.yaml",
+      "target": "config:shared/configs/config.v2.yaml",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

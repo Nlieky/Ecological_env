@@ -1,0 +1,12 @@
+{
+  "projectRoot": "E:/project/Ecological_env",
+  "batchFiles": [
+    {"path": "subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/__init__.py", "language": "python", "sizeLines": 28, "fileCategory": "code"},
+    {"path": "subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/action_executor.py", "language": "python", "sizeLines": 423, "fileCategory": "code"},
+    {"path": "subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/alert_classifier.py", "language": "python", "sizeLines": 111, "fileCategory": "code"},
+    {"path": "subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/consensus_engine.py", "language": "python", "sizeLines": 164, "fileCategory": "code"},
+    {"path": "subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/report_generator.py", "language": "python", "sizeLines": 414, "fileCategory": "code"},
+    {"path": "subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/work_order_generator.py", "language": "python", "sizeLines": 163, "fileCategory": "code"}
+  ],
+  "batchImportData": {"subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/__init__.py":["subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/action_executor.py","subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/alert_classifier.py","subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/consensus_engine.py","subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/report_generator.py","subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/work_order_generator.py"],"subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/action_executor.py":[],"subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/alert_classifier.py":[],"subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/consensus_engine.py":[],"subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/report_generator.py":[],"subagents/disposition-execution-agent/skills/disposition-execution-core/scripts/work_order_generator.py":[]}
+}

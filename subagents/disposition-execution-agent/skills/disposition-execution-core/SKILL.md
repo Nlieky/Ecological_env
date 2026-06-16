@@ -1,45 +1,169 @@
-# 研判预警与处置执行核心技能包
+---
+name: disposition-execution-core
+description: Alert classification, consensus fusion, and execution coordination for environmental monitoring. Use when classifying alerts, fusing multi-source results, generating work orders, or coordinating enforcement actions. Supports three-level alert classification (general/moderate/serious), consensus engine with dynamic weight adaptation, standardized work order generation with evidence and legal references, and multi-channel execution (RegulatoryPlatformPush, FeishuPush, LocalArchive). Required for violation response coordination and enforcement workflow.
+---
 
-## 技能描述
-本技能包提供融合共识、预警分级、工单生成、行动执行和报告生成能力，完成从违规识别到处置执行的闭环。
+# Disposition, Alert, and Execution
 
-## 核心脚本
+## Overview
 
-### 1. alert_classifier.py (AlertClassifier)
-**功能**: 三级预警分级
-- classify_alert(): 对异常和违规结果进行预警分级
-- 支持一般/较重/严重三级预警
+Provides alert classification, consensus fusion of detection results, work order generation, and multi-channel execution coordination for environmental monitoring violations.
 
-### 2. work_order_generator.py (WorkOrderGenerator)
-**功能**: 处置工单生成
-- generate_work_order(): 生成标准化处置工单
-- 工单包含：数据溯源、核查要点、法规条款、历史参考
+## Quick Start
 
-### 3. action_executor.py (ActionExecutor)
-**功能**: 行动执行
-- execute(): 并行执行多渠道推送
-- 支持渠道：RegulatoryPlatformPush, FeishuPush, LocalArchive
-- 接口抽象：PushChannel 基类
+```python
+from scripts.alert_classifier import AlertClassifier
+from scripts.consensus_engine import ConsensusEngine
+from scripts.work_order_generator import WorkOrderGenerator
+from scripts.action_executor import ActionExecutor
 
-### 4. consensus_engine.py (ConsensusEngine)
-**功能**: 融合共识算法
-- fuse_results(): 融合异常检测和规则推理结果
-- adapt_weights(): 动态调整权重
-- 支持场景化融合策略（default, critical, normal）
-- 提供融合过程元数据和自适应权重信息
-- 配置文件：shared/configs/consensus_config.yaml
+# Alert classification
+classifier = AlertClassifier()
+alert = classifier.classify_alert(anomaly_result, violation_result)
 
-### 5. report_generator.py (ReportGenerator)
-**功能**: 报告生成
-- generate_alert_report(): 生成预警报告
-- generate_summary_report(): 生成汇总报告
-- generate_trend_report(): 生成趋势分析报告
-- 支持 JSON 和 Markdown 输出格式
+# Consensus fusion
+engine = ConsensusEngine()
+fused = engine.fuse_results(
+    anomaly_results=[...],
+    violation_results=[...],
+    scene="default"
+)
 
-## LLM决策点
-1. 融合策略: 根据场景动态调整定量定性权重
-2. 分级判定: 综合判断预警级别
-3. 工单内容: 根据违规类型生成个性化工单
+# Work order generation
+generator = WorkOrderGenerator()
+work_order = generator.generate_work_order(fused, raw_data)
 
-## 输出格式
-标准化预警信息、处置工单和报告
+# Multi-channel execution
+executor = ActionExecutor()
+executor.execute(work_order, channels=["FeishuPush", "LocalArchive"])
+```
+
+## Core Modules
+
+### alert_classifier.py
+- `classify_alert(anomaly_result, violation_result)`: Three-level classification
+  - General (low risk)
+  - Moderate (medium risk)
+  - Serious (high/critical risk)
+
+### consensus_engine.py
+- `fuse_results(anomaly_results, violation_results, scene)`: Multi-source fusion
+  - Scenes: default, critical, normal
+  - Dynamic weight adaptation
+  - Fusion metadata tracking
+- `adapt_weights(scene, confidence)`: Adjust weights based on context
+- Configuration: `shared/configs/consensus_config.yaml`
+
+### work_order_generator.py
+- `generate_work_order(fused_result, raw_data)`: Standardized work order
+  - Data traceability
+  - Inspection points
+  - Legal references
+  - Historical comparison
+
+### action_executor.py
+- `execute(work_order, channels)`: Multi-channel parallel execution
+  - RegulatoryPlatformPush: Regulatory platform API
+  - FeishuPush: Feishu notification
+  - LocalArchive: Local file storage
+- Abstract interface: PushChannel base class
+
+### report_generator.py
+- `generate_alert_report(fused_result)`: Alert report generation
+- `generate_summary_report(results)`: Summary report
+- `generate_trend_report(trend_data)`: Trend analysis report
+- Formats: JSON, Markdown
+
+## Consensus Engine Configuration
+
+### Default Weights
+```yaml
+anomaly_sources:
+  operator_result: 0.6
+  pattern_recognizer: 0.4
+violation_sources:
+  regulation_matcher: 0.4
+  process_validator: 0.3
+  expert_reasoner: 0.3
+```
+
+### Scene-Based Strategies
+- **default**: Balanced weights
+- **critical**: Higher violation weight (0.6 anomaly, 0.4 violation)
+- **normal**: Higher anomaly weight (0.7 anomaly, 0.3 violation)
+
+## Alert Classification Rules
+
+| Inputs | Alert Level |
+|--------|-------------|
+| High suspicion + multiple violations | Serious |
+| Medium suspicion + single violation | Moderate |
+| Low suspicion + no violations | General |
+
+## Work Order Structure
+
+```python
+{
+    "order_id": "...",
+    "alert_level": "serious",
+    "violation_type": "dilution_discharge",
+    "evidence": {...},
+    "inspection_points": [...],
+    "legal_references": [...],
+    "timestamp": "..."
+}
+```
+
+## Execution Channels
+
+### RegulatoryPlatformPush
+- API endpoint integration
+- Standard format submission
+- Response tracking
+
+### FeishuPush
+- Webhook notification
+- Rich text formatting
+- Alert escalation
+
+### LocalArchive
+- JSON/Markdown storage
+- Timestamped records
+- Searchable archive
+
+## LLM Decision Points
+
+### Fusion Strategy
+- High confidence → Use default weights
+- Critical violations → Increase violation weight
+- Normal operations → Increase anomaly weight
+
+### Alert Classification
+- Consider both anomaly severity and violation count
+- Evaluate detection confidence
+- Assess potential environmental impact
+
+### Execution Selection
+- Serious alerts → All channels
+- Moderate alerts → FeishuPush + LocalArchive
+- General alerts → LocalArchive only
+
+## Output Format
+
+```python
+{
+    "alert": {...},
+    "fused_result": {
+        "conclusion": "...",
+        "confidence": 0.85,
+        "weights_used": {...},
+        "metadata": {...}
+    },
+    "work_order": {...},
+    "execution_status": {...}
+}
+```
+
+## References
+
+For detailed configuration: `shared/configs/consensus_config.yaml`, patent documentation

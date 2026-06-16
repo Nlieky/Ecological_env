@@ -1,0 +1,30 @@
+{
+  "projectRoot": "E:/project/Ecological_env",
+  "batchFiles": [
+    {"path": ".claude/skills/document-skills/skill-creator/skill-metrics.md", "language": "markdown", "sizeLines": 105, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/templates/extraction-prompt.md", "language": "markdown", "sizeLines": 72, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/templates/find-unused-mcp-servers.md", "language": "markdown", "sizeLines": 29, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/templates/interactive-evals-loop.md", "language": "markdown", "sizeLines": 238, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/templates/repair-skill-description.md", "language": "markdown", "sizeLines": 67, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/templates/skill-usage-logging.md", "language": "markdown", "sizeLines": 54, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/templates/skill-usage-report.md", "language": "markdown", "sizeLines": 35, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/templates/skill-usage-tracker.md", "language": "markdown", "sizeLines": 99, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/templates/test-skill-triggering.md", "language": "markdown", "sizeLines": 146, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/before-deployment-checklist.md", "language": "markdown", "sizeLines": 92, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/broken-skill-for-testing-autosave.md", "language": "markdown", "sizeLines": 19, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/comprehensive-eval-test-cases.md", "language": "markdown", "sizeLines": 79, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/directory-watching.md", "language": "markdown", "sizeLines": 48, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/eval-results-data-spec.md", "language": "markdown", "sizeLines": 41, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/interactive-eval-loops.md", "language": "markdown", "sizeLines": 40, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/multi-stage-creation.md", "language": "markdown", "sizeLines": 63, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/nested-skill-creation.md", "language": "markdown", "sizeLines": 40, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/proxy-patterns.md", "language": "markdown", "sizeLines": 62, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/recursive-trigger-detection.md", "language": "markdown", "sizeLines": 61, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/skill-deprecation.md", "language": "markdown", "sizeLines": 30, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/skill-env-var-resolution.md", "language": "markdown", "sizeLines": 52, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/skill-naming.md", "language": "markdown", "sizeLines": 52, "fileCategory": "docs"},
+    {"path": ".claude/skills/document-skills/skill-creator/tests/variant-management.md", "language": "markdown", "sizeLines": 89, "fileCategory": "docs"}
+  ],
+  "batchImportData": {},
+  "neighborMap": {}
+}

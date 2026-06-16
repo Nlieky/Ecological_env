@@ -77,7 +77,7 @@ class AnomalyScorer:
                             "indicator": indicator,
                             "index": int(idx),
                             "score": float(indicator_scores["scores"][idx]),
-                            "times": data.iloc[idx].get("times", data.iloc[idx].get("timestamp", idx))
+                            "times": data.iloc[idx].get("timestamp", data.iloc[idx].get("times", str(idx)))
                         }
                         results["anomaly_moments"].append(moment)
 
@@ -139,8 +139,19 @@ class AnomalyScorer:
         # 综合异常判定（至少两个算子认为是异常）
         combined_anomalies = np.sum(all_anomalies, axis=0) >= 1
 
-        # 计算阈值（百分位数）
-        threshold = np.percentile(combined_scores, 80)
+        # 计算自适应阈值
+        # 如果有异常点，使用较低的百分位数；否则使用较高的百分位数
+        if combined_anomalies.sum() > 0:
+            # 有异常点：使用60分位数（更敏感）
+            threshold = np.percentile(combined_scores, 60)
+        else:
+            # 没有异常点：使用80分位数（更保守）
+            threshold = np.percentile(combined_scores, 80)
+
+        # 确保阈值不会太高（防止过滤掉所有异常）
+        threshold = min(threshold, 0.6)
+
+        logger.info(f"[SCORER] 计算阈值: {threshold:.3f}, 异常点数: {combined_anomalies.sum()}")
 
         return {
             "scores": combined_scores,

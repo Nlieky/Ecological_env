@@ -1,0 +1,1517 @@
+{
+  "nodes": [
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/__init__.py",
+      "summary": "任务编排脚本模块的入口点，统一导出任务结构化、任务流生成、资源匹配、执行控制、跨领域分析和结果复用等核心组件，为编排层提供标准化的API接口。",
+      "tags": ["入口点", "barrel", "exports", "编排层"],
+      "complexity": "simple",
+      "languageNotes": "Python包模块，使用from导入和__all__列表进行导出管理"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "type": "file",
+      "name": "cross_domain_analyzer.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "summary": "跨领域分析器实现双数据流（进水+出水）联合分析，提供相关性计算、处理效率分析和跨数据流异常检测功能，支持插瓶干扰、暗管偷排、清水稀释等违规行为的识别。",
+      "tags": ["分析器", "双数据流", "异常检测", "相关性分析"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:StreamData",
+      "type": "class",
+      "name": "StreamData",
+      "filePath": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "lineRange": [22, 28],
+      "summary": "数据流数据类，封装流ID、流类型（进水/出水）、数据内容、指标列表和时间戳信息。",
+      "tags": ["数据模型", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:CorrelationResult",
+      "type": "class",
+      "name": "CorrelationResult",
+      "filePath": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "lineRange": [32, 40],
+      "summary": "相关性分析结果数据类，包含两数据流的相关系数、P值、显著性和描述信息。",
+      "tags": ["数据模型", "相关性", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:DualStreamAnalysisResult",
+      "type": "class",
+      "name": "DualStreamAnalysisResult",
+      "filePath": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "lineRange": [43, 50],
+      "summary": "双数据流分析结果数据类，汇总进出水摘要、相关性、处理效率和跨流异常信息。",
+      "tags": ["数据模型", "分析结果", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:CrossDomainAnalyzer",
+      "type": "class",
+      "name": "CrossDomainAnalyzer",
+      "filePath": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "lineRange": [53, 330],
+      "summary": "跨领域分析器主类，执行双数据流联合分析、相关性计算、处理效率分析和跨数据流异常检测，内置常见指标去除率范围标准。",
+      "tags": ["分析器", "双数据流", "异常检测"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:analyze_dual_stream",
+      "type": "function",
+      "name": "analyze_dual_stream",
+      "filePath": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "lineRange": [80, 114],
+      "summary": "执行双数据流联合分析，提取摘要、计算相关性、分析处理效率并检测跨流异常。",
+      "tags": ["分析", "双数据流"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:calculate_correlation",
+      "type": "function",
+      "name": "calculate_correlation",
+      "filePath": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "lineRange": [139, 188],
+      "summary": "计算两数据流之间的皮尔逊相关系数并判断显著性等级。",
+      "tags": ["相关性", "计算"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:detect_anomalies_across_streams",
+      "type": "function",
+      "name": "detect_anomalies_across_streams",
+      "filePath": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "lineRange": [308, 330],
+      "summary": "对多数据流列表进行跨数据流异常检测，分离进出水流并执行分析。",
+      "tags": ["异常检测", "跨流分析"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "type": "file",
+      "name": "dynamic_orchestrator.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "summary": "动态编排器根据任务类型、数据状态和历史结果动态决策子智能体组合和执行顺序，从YAML配置加载智能体注册表并创建执行计划。",
+      "tags": ["编排器", "任务调度", "智能体协调"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:ExecutionMode",
+      "type": "class",
+      "name": "ExecutionMode",
+      "filePath": "workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "lineRange": [27, 31],
+      "summary": "执行模式枚举，定义串行、并行和混合三种执行模式。",
+      "tags": ["枚举", "执行模式"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:AgentTask",
+      "type": "class",
+      "name": "AgentTask",
+      "filePath": "workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "lineRange": [35, 43],
+      "summary": "子智能体任务数据类，包含任务ID、名称、能力、脚本路径、输入数据、配置和依赖关系。",
+      "tags": ["数据模型", "任务", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:ExecutionPlan",
+      "type": "class",
+      "name": "ExecutionPlan",
+      "filePath": "workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "lineRange": [47, 54],
+      "summary": "执行计划数据类，包含任务类型、执行模式、智能体列表、预估时长和并行对信息。",
+      "tags": ["数据模型", "执行计划", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:DynamicOrchestrator",
+      "type": "class",
+      "name": "DynamicOrchestrator",
+      "filePath": "workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "lineRange": [56, 258],
+      "summary": "动态编排器主类，从agent_registry.yaml加载子智能体配置，根据任务类型创建执行计划，支持智能体ID解析和并行对检测。",
+      "tags": ["编排器", "任务调度", "配置加载"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:create_execution_plan",
+      "type": "function",
+      "name": "create_execution_plan",
+      "filePath": "workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "lineRange": [170, 224],
+      "summary": "根据任务字典创建执行计划，解析所需智能体并建立依赖关系链，确定执行模式和并行对。",
+      "tags": ["执行计划", "编排"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:detect_parallel_pairs",
+      "type": "function",
+      "name": "detect_parallel_pairs",
+      "filePath": "workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "lineRange": [235, 258],
+      "summary": "基于智能体依赖关系和能力检测可并行执行的智能体对，识别数据感知与异常检测的流水线并行机会。",
+      "tags": ["并行检测", "优化"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "type": "file",
+      "name": "execution_control.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "summary": "执行控制模块驱动子智能体按流程执行任务，监控执行状态并处理异常。集成了大模型协调器和动态编排器，支持两层LLM驱动的子智能体协调、脚本动态执行和数据流传递。",
+      "tags": ["执行控制", "大模型协调", "智能体驱动"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionStatus",
+      "type": "class",
+      "name": "ExecutionStatus",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [60, 67],
+      "summary": "执行状态枚举，定义pending、running、completed、failed、timeout和cancelled六种状态。",
+      "tags": ["枚举", "执行状态"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionPhase",
+      "type": "class",
+      "name": "ExecutionPhase",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [70, 76],
+      "summary": "执行阶段枚举，定义initializing、dispatching、executing、collecting和finalizing五个阶段。",
+      "tags": ["枚举", "执行阶段"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionResult",
+      "type": "class",
+      "name": "ExecutionResult",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [79, 114],
+      "summary": "执行结果数据类，记录任务ID、智能体ID、状态、输出数据、错误信息、时间戳和执行时长。",
+      "tags": ["数据模型", "执行结果", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionReport",
+      "type": "class",
+      "name": "ExecutionReport",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [117, 146],
+      "summary": "执行报告数据类，汇总任务流ID、任务统计、详细结果和时间信息。",
+      "tags": ["数据模型", "执行报告", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:SubAgentIdentity",
+      "type": "class",
+      "name": "SubAgentIdentity",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [162, 176],
+      "summary": "子智能体身份信息数据类，包含智能体ID、名称、技能路径、身份文件和脚本路径。",
+      "tags": ["数据模型", "智能体身份", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:SubAgentIdentityLoader",
+      "type": "class",
+      "name": "SubAgentIdentityLoader",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [179, 289],
+      "summary": "子智能体身份加载器，从SUB_AGENTS配置加载智能体身份文件（SKILL.md、AGENTS.md、SOUL.md、MEMORY.md）和脚本路径。",
+      "tags": ["加载器", "智能体身份"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:LLMAgentCoordinator",
+      "type": "class",
+      "name": "LLMAgentCoordinator",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [291, 1929],
+      "summary": "大模型子智能体协调器，实现两层LLM驱动的协调机制：第一层主智能体决策执行计划并处理输出，第二层子智能体内决策脚本调用并分析结果。支持脚本动态执行、数据流传递和异常处理。",
+      "tags": ["协调器", "大模型", "智能体协调"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:coordinate_agent_execution",
+      "type": "function",
+      "name": "coordinate_agent_execution",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [318, 349],
+      "summary": "协调子智能体执行任务，优先使用LLM协调模式，失败时回退到本地规则模式。",
+      "tags": ["协调", "智能体执行"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_llm_coordinate_agent",
+      "type": "function",
+      "name": "_llm_coordinate_agent",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [483, 597],
+      "summary": "完全LLM驱动的协调流程：获取子智能体专属系统提示词、构建决策prompt、LLM决策脚本选择、执行脚本并分析结果。",
+      "tags": ["大模型", "协调"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_local_coordinate_agent",
+      "type": "function",
+      "name": "_local_coordinate_agent",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [599, 620],
+      "summary": "本地规则模式回退方案，使用配置中的推荐脚本直接执行。",
+      "tags": ["回退", "本地执行"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_execute_script_by_decision",
+      "type": "function",
+      "name": "_execute_script_by_decision",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [762, 864],
+      "summary": "根据LLM决策执行脚本，自动注入时序数据到params，支持数据在智能体间传递。",
+      "tags": ["脚本执行", "数据注入"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_dynamic_execute_script",
+      "type": "function",
+      "name": "_dynamic_execute_script",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [866, 1199],
+      "summary": "动态执行Python脚本，支持多种调用方式（标准函数、特定命名函数、类实例化），处理包内模块相对导入和__init__.py特殊加载。",
+      "tags": ["脚本执行", "动态加载", "import"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:coordinate_all_agents",
+      "type": "function",
+      "name": "coordinate_all_agents",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [1806, 1929],
+      "summary": "两层LLM驱动的完整子智能体协调流程：第一层主智能体决策执行计划，按计划执行子智能体，传递处理后数据，第二层子智能体内决策脚本调用。",
+      "tags": ["协调", "大模型", "智能体编排"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionControlModule",
+      "type": "class",
+      "name": "ExecutionControlModule",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [1932, 2421],
+      "summary": "执行控制模块主类，集成LLM协调器和动态编排器，提供任务执行、流程执行、任务取消、历史记录和统计查询等功能。",
+      "tags": ["执行控制", "模块"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_task",
+      "type": "function",
+      "name": "execute_task",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [1968, 2044],
+      "summary": "异步执行单个任务，更新执行状态、记录活跃执行、分派到智能体并处理超时和异常。",
+      "tags": ["执行", "异步"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_flow",
+      "type": "function",
+      "name": "execute_flow",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [2136, 2198],
+      "summary": "异步执行完整任务流，按阶段执行所有任务，记录结果并生成执行报告。",
+      "tags": ["执行", "任务流"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_plan",
+      "type": "function",
+      "name": "execute_plan",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [2200, 2244],
+      "summary": "执行DynamicOrchestrator创建的执行计划，按顺序或并行执行智能体任务，传递处理后数据给下一个智能体。",
+      "tags": ["执行", "计划"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_single_task_sync",
+      "type": "function",
+      "name": "execute_single_task_sync",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [2353, 2365],
+      "summary": "执行单个任务的同步包装函数，供主智能体便捷调用。",
+      "tags": ["便捷函数", "同步执行"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_task_flow_sync",
+      "type": "function",
+      "name": "execute_task_flow_sync",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "lineRange": [2385, 2397],
+      "summary": "执行任务流的同步包装函数，供主智能体便捷调用。",
+      "tags": ["便捷函数", "同步执行"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "type": "file",
+      "name": "execution_engine.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "summary": "执行引擎负责执行DynamicOrchestrator创建的执行计划，遍历智能体任务、检查依赖关系、执行单个智能体并汇总结果。",
+      "tags": ["执行引擎", "计划执行"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_engine.py:AgentResult",
+      "type": "class",
+      "name": "AgentResult",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "lineRange": [19, 27],
+      "summary": "单个智能体的执行结果数据类，包含智能体ID、状态、输出、错误和执行时长。",
+      "tags": ["数据模型", "执行结果", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_engine.py:ExecutionResult",
+      "type": "class",
+      "name": "ExecutionResult",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "lineRange": [30, 36],
+      "summary": "完整执行结果数据类，包含执行计划、智能体结果列表、总时长和成功标志。",
+      "tags": ["数据模型", "执行结果", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/execution_engine.py:ExecutionEngine",
+      "type": "class",
+      "name": "ExecutionEngine",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "lineRange": [38, 112],
+      "summary": "执行引擎主类，执行DynamicOrchestrator创建的执行计划，按顺序处理智能体任务并汇总结果。",
+      "tags": ["执行引擎", "计划执行"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/execution_engine.py:execute_plan",
+      "type": "function",
+      "name": "execute_plan",
+      "filePath": "workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "lineRange": [45, 87],
+      "summary": "执行一个执行计划，遍历智能体任务、检查依赖、执行并汇总统计成功数。",
+      "tags": ["执行", "计划"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "type": "file",
+      "name": "resource_matching.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "summary": "资源匹配模块将任务匹配到合适的子智能体并检查资源可用性。集成了调度决策模块，实现基于专利公式的任务优先级计算（P = wp×priority + wt×wait_time + wd×critical_path）。",
+      "tags": ["资源匹配", "任务调度", "专利算法"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:TriggerSource",
+      "type": "class",
+      "name": "TriggerSource",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [22, 26],
+      "summary": "触发信号来源枚举，定义natural_language和realtime_monitoring两种来源。",
+      "tags": ["枚举", "触发源"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:AgentStatus",
+      "type": "class",
+      "name": "AgentStatus",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [28, 33],
+      "summary": "子智能体状态枚举，定义available、busy、unavailable和degraded四种状态。",
+      "tags": ["枚举", "智能体状态"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:SchedulingDecision",
+      "type": "class",
+      "name": "SchedulingDecision",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [44, 82],
+      "summary": "调度决策结果数据类（专利核心），包含综合优先级分数、执行顺序、实时标志和分解的优先级分量（优先级、等待时间、关键路径）。",
+      "tags": ["数据模型", "调度决策", "专利", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:SchedulingDecisionModule",
+      "type": "class",
+      "name": "SchedulingDecisionModule",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [85, 309],
+      "summary": "调度决策模块（专利），实现优先级计算公式P = wp×priority + wt×wait_time + wd×critical_path，识别实时监测任务并赋予最高优先级，生成全局调度策略。",
+      "tags": ["调度决策", "专利", "优先级计算"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:calculate_task_priority",
+      "type": "function",
+      "name": "calculate_task_priority",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [110, 198],
+      "summary": "计算任务优先级（专利核心算法），使用公式P = wp×priority + wt×wait_time + wd×critical_path，实时监测任务直接获得最高优先级10.0。",
+      "tags": ["优先级", "专利算法", "计算"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:generate_scheduling_strategy",
+      "type": "function",
+      "name": "generate_scheduling_strategy",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [200, 283],
+      "summary": "生成全局调度策略（专利），计算所有任务的优先级，按分数排序分配执行顺序，实时任务优先。",
+      "tags": ["调度策略", "专利算法"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:AgentCapability",
+      "type": "class",
+      "name": "AgentCapability",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [312, 340],
+      "summary": "子智能体能力描述数据类，包含智能体ID、名称、能力列表、状态、负载、并发限制、超时和性能指标。",
+      "tags": ["数据模型", "智能体能力", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:ResourceAllocation",
+      "type": "class",
+      "name": "ResourceAllocation",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [344, 372],
+      "summary": "资源分配结果数据类，包含任务ID、智能体ID、匹配分数、匹配原因、分配时间、预估时长和备选智能体列表。",
+      "tags": ["数据模型", "资源分配", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:ResourceMatchingModule",
+      "type": "class",
+      "name": "ResourceMatchingModule",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [385, 679],
+      "summary": "资源匹配模块主类，注册新架构的4个子智能体，按任务类别匹配能力、状态和负载，计算匹配分数并分配资源。",
+      "tags": ["资源匹配", "智能体分配"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:match_task_to_agent",
+      "type": "function",
+      "name": "match_task_to_agent",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [503, 556],
+      "summary": "将任务匹配到最合适的子智能体，基于能力匹配（60%）、状态可用性（20%）和负载情况（20%）计算匹配分数。",
+      "tags": ["匹配", "任务分配"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:batch_match_tasks",
+      "type": "function",
+      "name": "batch_match_tasks",
+      "filePath": "workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "lineRange": [599, 624],
+      "summary": "批量匹配任务，对每个任务调用match_task_to_agent，无可用智能体时创建失败分配记录。",
+      "tags": ["批量", "任务匹配"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "type": "file",
+      "name": "result_reuse.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "summary": "结果复用判决模块判断是否可复用历史分析结果，通过数据匹配（Jaccard相似系数M≥0.7）、新鲜度判断和语义匹配度（编辑距离S≥0.8）三重决策实现专利算法。",
+      "tags": ["结果复用", "专利算法", "缓存"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ParsedIntent",
+      "type": "class",
+      "name": "ParsedIntent",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "lineRange": [22, 35],
+      "summary": "解析后的意图数据类，包含意图类型、指标列表、监测点位、时间范围、分析目标和输出格式。",
+      "tags": ["数据模型", "意图", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ReuseDecision",
+      "type": "class",
+      "name": "ReuseDecision",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "lineRange": [39, 46],
+      "summary": "复用决策结果数据类，包含是否可复用、决策类型、缓存结果、原因和置信度。",
+      "tags": ["数据模型", "决策结果", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ResultReuseModule",
+      "type": "class",
+      "name": "ResultReuseModule",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "lineRange": [48, 525],
+      "summary": "结果复用判决模块主类（专利），实现三重判决：数据匹配使用Jaccard相似系数M≥0.7和时间重叠度≥0.5，新鲜度检查时间窗口，语义匹配使用编辑距离相似度S≥0.8。",
+      "tags": ["结果复用", "专利算法", "缓存管理"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:decide",
+      "type": "function",
+      "name": "decide",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "lineRange": [89, 143],
+      "summary": "判断是否可复用历史分析结果，执行数据匹配、新鲜度和语义匹配三重判决，综合生成决策结果。",
+      "tags": ["决策", "结果复用"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_check_data_match",
+      "type": "function",
+      "name": "_check_data_match",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "lineRange": [145, 204],
+      "summary": "数据匹配判决（专利核心算法），使用Jaccard相似系数计算指标匹配度M≥0.7，计算时间范围重叠度≥0.5。",
+      "tags": ["专利算法", "数据匹配", "jaccard"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_levenshtein_distance",
+      "type": "function",
+      "name": "_levenshtein_distance",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "lineRange": [362, 396],
+      "summary": "计算Levenshtein编辑距离（专利核心算法），表示将一个字符串转换为另一个字符串所需的最少编辑操作次数。",
+      "tags": ["专利算法", "编辑距离", "字符串"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_calculate_semantic_similarity",
+      "type": "function",
+      "name": "_calculate_semantic_similarity",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "lineRange": [398, 420],
+      "summary": "计算语义相似度（基于编辑距离），相似度=1-(编辑距离/最大长度)，用于语义匹配判决。",
+      "tags": ["专利算法", "相似度"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "type": "file",
+      "name": "task_flow_generation.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "summary": "任务流生成模块根据结构化任务生成执行流程，分析任务依赖关系，确定并行/串行执行模式，检测循环依赖并生成执行阶段。",
+      "tags": ["任务流", "依赖分析", "执行模式"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:ExecutionMode",
+      "type": "class",
+      "name": "ExecutionMode",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [21, 25],
+      "summary": "执行模式枚举，定义sequential、parallel和hybrid三种模式。",
+      "tags": ["枚举", "执行模式"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskStatus",
+      "type": "class",
+      "name": "TaskStatus",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [28, 35],
+      "summary": "任务状态枚举，定义pending、ready、running、completed、failed和skipped六种状态。",
+      "tags": ["枚举", "任务状态"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskNode",
+      "type": "class",
+      "name": "TaskNode",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [39, 63],
+      "summary": "任务节点数据类，包含任务ID、数据、状态、依赖关系、下游任务和执行信息。",
+      "tags": ["数据模型", "任务节点", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:ExecutionStage",
+      "type": "class",
+      "name": "ExecutionStage",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [67, 79],
+      "summary": "执行阶段数据类，同一阶段内的任务可以并行执行。",
+      "tags": ["数据模型", "执行阶段", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskFlow",
+      "type": "class",
+      "name": "TaskFlow",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [83, 105],
+      "summary": "任务流数据类，包含流ID、任务字典、阶段列表、执行模式、任务数量、预估时长和元数据。",
+      "tags": ["数据模型", "任务流", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskFlowGenerationModule",
+      "type": "class",
+      "name": "TaskFlowGenerationModule",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [118, 380],
+      "summary": "任务流生成模块主类，创建任务流、构建依赖图、检测循环依赖、确定执行模式、生成执行阶段并优化任务流。",
+      "tags": ["任务流生成", "依赖分析"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:create_task_flow",
+      "type": "function",
+      "name": "create_task_flow",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [134, 182],
+      "summary": "创建任务流，生成任务节点、构建依赖图、检测循环依赖、确定执行模式、生成阶段并估算时长。",
+      "tags": ["任务流", "创建"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:_detect_circular_dependencies",
+      "type": "function",
+      "name": "_detect_circular_dependencies",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [191, 217],
+      "summary": "检测循环依赖，使用DFS三色着色算法，发现环时抛出异常。",
+      "tags": ["循环检测", "dfs"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:_generate_execution_stages",
+      "type": "function",
+      "name": "_generate_execution_stages",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [234, 272],
+      "summary": "生成执行阶段，迭代找出依赖已满足的任务，创建阶段并更新任务状态和执行顺序。",
+      "tags": ["阶段生成", "调度"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:optimize_flow",
+      "type": "function",
+      "name": "optimize_flow",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [287, 309],
+      "summary": "优化任务流，根据优化目标（速度或可靠性优先）调整任务流参数。",
+      "tags": ["优化", "任务流"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:get_ready_tasks",
+      "type": "function",
+      "name": "get_ready_tasks",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [311, 325],
+      "summary": "获取当前可以执行的任务列表，返回状态为READY的任务ID。",
+      "tags": ["查询", "可执行任务"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:mark_task_completed",
+      "type": "function",
+      "name": "mark_task_completed",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "lineRange": [327, 348],
+      "summary": "标记任务完成，更新任务状态并激活依赖此任务的下游任务。",
+      "tags": ["状态更新", "依赖激活"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "type": "file",
+      "name": "task_structuring.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "summary": "任务结构化模块将主智能体的调度决策转换为标准化的任务格式，定义任务类别、优先级、参数和依赖关系，提供任务验证和复杂度估算功能。",
+      "tags": ["任务结构化", "任务定义"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:TaskCategory",
+      "type": "class",
+      "name": "TaskCategory",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [21, 49],
+      "summary": "任务类别枚举，定义数据获取、治理、清洗、时序对齐、标准化、特征分析、异常检测、违规推理和报告生成等类别。",
+      "tags": ["枚举", "任务类别"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:TaskPriority",
+      "type": "class",
+      "name": "TaskPriority",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [52, 57],
+      "summary": "任务优先级枚举，定义CRITICAL、HIGH、MEDIUM和LOW四个等级。",
+      "tags": ["枚举", "优先级"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:TaskParameter",
+      "type": "class",
+      "name": "TaskParameter",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [61, 67],
+      "summary": "任务参数数据类，包含参数名、值、是否必需和描述信息。",
+      "tags": ["数据模型", "参数", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:StructuredTask",
+      "type": "class",
+      "name": "StructuredTask",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [70, 107],
+      "summary": "结构化任务数据类，包含任务ID、名称、类别、优先级、描述、输入参数、输出模式、执行约束和元数据。",
+      "tags": ["数据模型", "结构化任务", "dataclass"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:TaskStructuringModule",
+      "type": "class",
+      "name": "TaskStructuringModule",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [115, 285],
+      "summary": "任务结构化模块主类，将任务请求转换为结构化任务，支持单个或批量处理，提供目标智能体获取、任务验证和复杂度估算功能。",
+      "tags": ["任务结构化", "验证"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_structuring.py:structure_task",
+      "type": "function",
+      "name": "structure_task",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [142, 199],
+      "summary": "将任务请求结构化，解析类别、优先级、输入参数，创建结构化任务对象。",
+      "tags": ["结构化", "任务"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_structuring.py:structure_batch_tasks",
+      "type": "function",
+      "name": "structure_batch_tasks",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [201, 219],
+      "summary": "批量结构化任务，对每个任务请求调用structure_task，跳过失败任务。",
+      "tags": ["批量", "结构化"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_structuring.py:validate_task",
+      "type": "function",
+      "name": "validate_task",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [233, 263],
+      "summary": "验证结构化任务的有效性，检查必需参数、参数值、超时时间和重试次数。",
+      "tags": ["验证", "任务"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/task_structuring.py:estimate_task_complexity",
+      "type": "function",
+      "name": "estimate_task_complexity",
+      "filePath": "workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "lineRange": [265, 284],
+      "summary": "估算任务复杂度，基于输入参数数量和依赖关系判断为simple、medium或complex。",
+      "tags": ["估算", "复杂度"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "file:workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "file:workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "file:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "file:workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:TaskStructuringModule",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:StructuredTask",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:TaskCategory",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:TaskPriority",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_structuring.py:structure_task",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_structuring.py:structure_batch_tasks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskFlowGenerationModule",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskFlow",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskNode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:create_task_flow",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:get_ready_tasks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:ResourceMatchingModule",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:ResourceAllocation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:match_task_to_agent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:batch_match_tasks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:get_available_agents",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionControlModule",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionReport",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_single_task_sync",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_task_flow_sync",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:CrossDomainAnalyzer",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:StreamData",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:CorrelationResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:DualStreamAnalysisResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ResultReuseModule",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ReuseDecision",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/__init__.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ParsedIntent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "file:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:DynamicOrchestrator",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:ExecutionPlan",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "target": "file:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:ExecutionPlan",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:AgentTask",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:LLMAgentCoordinator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionControlModule",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:SubAgentIdentityLoader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:SubAgentIdentity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionReport",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:coordinate_all_agents",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_single_task_sync",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_control.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:execute_task_flow_sync",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_engine.py:ExecutionEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_engine.py:AgentResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/execution_engine.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_engine.py:ExecutionResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:SchedulingDecisionModule",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/resource_matching.py:ResourceMatchingModule",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:match_task_to_agent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:batch_match_tasks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:get_available_agents",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:calculate_task_priority",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/resource_matching.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:generate_scheduling_strategy",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:CrossDomainAnalyzer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:StreamData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:CorrelationResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:DualStreamAnalysisResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py:detect_anomalies_across_streams",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:DynamicOrchestrator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:AgentTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:ExecutionPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:create_execution_plan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:detect_parallel_pairs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ResultReuseModule",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ParsedIntent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_reuse.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_reuse.py:ReuseDecision",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskFlowGenerationModule",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskFlow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:TaskNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:create_task_flow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_flow_generation.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:get_ready_tasks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:TaskStructuringModule",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/task_structuring.py:StructuredTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_structuring.py:structure_task",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/task_structuring.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_structuring.py:structure_batch_tasks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionControlModule",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:LLMAgentCoordinator",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:ExecutionControlModule",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:DynamicOrchestrator",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:LLMAgentCoordinator",
+      "target": "class:workspace/skills/orchestrator-core/scripts/execution_control.py:SubAgentIdentityLoader",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:coordinate_all_agents",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:coordinate_agent_execution",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:coordinate_agent_execution",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_llm_coordinate_agent",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_llm_coordinate_agent",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_execute_script_by_decision",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_execute_script_by_decision",
+      "target": "function:workspace/skills/orchestrator-core/scripts/execution_control.py:_dynamic_execute_script",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:workspace/skills/orchestrator-core/scripts/execution_engine.py:ExecutionEngine",
+      "target": "class:workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py:ExecutionPlan",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:create_task_flow",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:_detect_circular_dependencies",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:create_task_flow",
+      "target": "function:workspace/skills/orchestrator-core/scripts/task_flow_generation.py:_generate_execution_stages",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:generate_scheduling_strategy",
+      "target": "function:workspace/skills/orchestrator-core/scripts/resource_matching.py:calculate_task_priority",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:decide",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_check_data_match",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:decide",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_check_freshness",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:decide",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_check_semantic_match",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_check_semantic_match",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_calculate_semantic_similarity",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_calculate_semantic_similarity",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_reuse.py:_levenshtein_distance",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

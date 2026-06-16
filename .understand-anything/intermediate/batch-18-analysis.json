@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "id": "data:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operator_manifest.json",
+      "type": "schema",
+      "name": "operator_manifest.json",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operator_manifest.json",
+      "summary": "异常检测算子库的JSON清单，定义了统计类、机器学习类、深度学习类和专用类四类算子的完整配置参数、选择规则和置信度计算方法。",
+      "tags": ["数据模式定义", "异常检测", "算法配置", "置信度计算"],
+      "complexity": "moderate",
+      "languageNotes": "结构化JSON Schema，包含算子分类、参数配置和选择规则的完整定义"
+    },
+    {
+      "id": "document:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operators.md",
+      "type": "document",
+      "name": "operators.md",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operators.md",
+      "summary": "异常检测算子库的参考文档，包含算子分类表、选择策略决策树、专利要求的参数规范、接口定义和参考实现代码。",
+      "tags": ["技术文档", "算法说明", "接口规范", "代码示例"],
+      "complexity": "moderate",
+      "languageNotes": "Markdown格式的技术文档，包含表格、代码块和决策树图示"
+    },
+    {
+      "id": "document:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/violation_patterns.md",
+      "type": "document",
+      "name": "violation_patterns.md",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/violation_patterns.md",
+      "summary": "违规模式特征库文档，详细描述插瓶干扰、人工拟合、稀释排放、恶意逃避四类环保监测违规模式的特征、检测逻辑和工艺规则。",
+      "tags": ["违规检测", "环保监测", "特征库", "工艺规则"],
+      "complexity": "moderate",
+      "languageNotes": "Markdown格式的专业文档，包含伪代码逻辑、法规引用和案例说明"
+    }
+  ],
+  "edges": [
+    {
+      "source": "data:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operator_manifest.json",
+      "target": "document:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operators.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operators.md",
+      "target": "document:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/violation_patterns.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "data:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operator_manifest.json",
+      "target": "document:subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/violation_patterns.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

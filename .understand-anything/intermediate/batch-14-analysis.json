@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "id": "config:grafana/dashboards/dual_stream_monitoring.json",
+      "type": "config",
+      "name": "dual_stream_monitoring.json",
+      "filePath": "grafana/dashboards/dual_stream_monitoring.json",
+      "summary": "废水监测双数据流的简化Grafana仪表板配置，包含10个进出水指标（pH、COD、总氮、氨氮、总磷）的仪表盘和一个综合时序图面板。",
+      "tags": ["监控", "可视化", "仪表板", "配置"],
+      "complexity": "simple",
+      "languageNotes": "Grafana仪表板JSON格式，定义面板布局和Prometheus查询表达式。"
+    },
+    {
+      "id": "config:grafana/dashboards/prometheus.yml",
+      "type": "config",
+      "name": "prometheus.yml",
+      "filePath": "grafana/dashboards/prometheus.yml",
+      "summary": "Prometheus监控配置文件，定义5秒采集间隔、Alertmanager集成、告警规则文件路径以及Windows Exporter和废水监测系统的指标采集目标。",
+      "tags": ["监控", "配置", "指标采集", "告警"],
+      "complexity": "simple",
+      "languageNotes": "YAML格式配置，包含全局配置、告警管理器、规则文件和采集作业定义。"
+    },
+    {
+      "id": "config:grafana/dashboards/stream_01.json",
+      "type": "config",
+      "name": "stream_01.json",
+      "filePath": "grafana/dashboards/stream_01.json",
+      "summary": "完整的废水处理双数据流监控Grafana仪表板配置，包含14个面板：异常统计、处理速率、流量对比、排放量对比、pH/COD/总氮/氨氮/总磷/悬浮物浓度对比等，每5秒刷新一次。",
+      "tags": ["监控", "可视化", "仪表板", "配置"],
+      "complexity": "complex",
+      "languageNotes": "大型Grafana仪表板JSON，包含复杂的时间序列图表配置、阈值设置和多指标对比面板。"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:grafana/dashboards/prometheus.yml",
+      "target": "config:grafana/dashboards/stream_01.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "config:grafana/dashboards/prometheus.yml",
+      "target": "config:grafana/dashboards/dual_stream_monitoring.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "config:grafana/dashboards/stream_01.json",
+      "target": "config:grafana/dashboards/dual_stream_monitoring.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

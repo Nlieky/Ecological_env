@@ -1,0 +1,342 @@
+{
+  "nodes": [
+    {
+      "id": "file:tests/verify_architecture.py",
+      "type": "file",
+      "name": "verify_architecture.py",
+      "filePath": "tests/verify_architecture.py",
+      "summary": "四层架构验证脚本，用于检查基于专利的架构文件结构完整性。验证主智能体层、任务编排层、子智能体层和数据支撑层的目录结构与合规性，并生成总结报告。",
+      "tags": ["test", "验证", "架构合规", "专利规范"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:workspace/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "workspace/__init__.py",
+      "summary": "工作空间Python包初始化文件（空文件）。",
+      "tags": ["初始化", "python包"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:workspace/memory/2026-05-15.md",
+      "type": "document",
+      "name": "2026-05-15.md",
+      "filePath": "workspace/memory/2026-05-15.md",
+      "summary": "主智能体会话日志文档，记录2026-05-15当天的5次会话详情。包含异常分析、违规判定、报告生成等典型场景的执行流程、分析结果和处理建议，以及系统运行统计数据和优化建议。",
+      "tags": ["会话日志", "工作空间记忆", "系统记录", "性能分析"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:workspace/skills/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "workspace/skills/__init__.py",
+      "summary": "工作空间技能包Python包初始化文件（空文件）。",
+      "tags": ["初始化", "python包"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator_core/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "workspace/skills/orchestrator_core/__init__.py",
+      "summary": "编排器核心包的别名初始化文件，提供带下划线的导入路径兼容性。通过动态导入机制将orchestrator-core模块注入到orchestrator_core命名空间。",
+      "tags": ["初始化", "别名导入", "模块兼容"],
+      "complexity": "simple",
+      "languageNotes": "使用importlib动态导入实现模块别名注入，允许使用orchestrator_core和orchestrator-core两种导入路径。"
+    },
+    {
+      "id": "config:workspace/skills/orchestrator-core/assets/dashboard_configs/monitoring_dashboard.json",
+      "type": "config",
+      "name": "monitoring_dashboard.json",
+      "filePath": "workspace/skills/orchestrator-core/assets/dashboard_configs/monitoring_dashboard.json",
+      "summary": "废水监测监控仪表板配置文件，定义了监控面板的布局、数据源、刷新间隔和告警规则。包含系统状态概览、实时监测数据、异常检测摘要、相关性分析图表、违规事件列表和趋势分析等面板。",
+      "tags": ["仪表板配置", "监控面板", "可视化配置", "告警规则"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:workspace/skills/orchestrator-core/evals/evals_advanced.json",
+      "type": "config",
+      "name": "evals_advanced.json",
+      "filePath": "workspace/skills/orchestrator-core/evals/evals_advanced.json",
+      "summary": "编排器核心技能包的高级评估测试用例配置。包含结果复用判决、调度决策优先级、结果解释格式和自适应优化反馈等高级功能的4个评估用例，每个用例定义了测试场景、期望输出和验证断言。",
+      "tags": ["评估配置", "高级测试用例", "结果复用", "调度优化"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:workspace/skills/orchestrator-core/evals/evals.json",
+      "type": "config",
+      "name": "evals.json",
+      "filePath": "workspace/skills/orchestrator-core/evals/evals.json",
+      "summary": "编排器核心技能包的基础评估测试用例配置。包含违规检测查询、相关性分析查询、双数据流分析查询和复杂编排查询等4个核心功能评估用例，每个用例定义了测试场景、期望输出和验证断言。",
+      "tags": ["评估配置", "测试用例", "意图识别", "任务规划"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "type": "file",
+      "name": "result_interpretation.py",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "summary": "结果解释与输出模块，负责接收子智能体执行结果并生成自然语言报告。包含主智能体身份加载器、知识库加载器和结果解释模块，支持大模型生成报告和模板报告两种方式，输出包含执行概述、数据质量、异常分析、违规判定和结论建议的完整报告。",
+      "tags": ["结果解释", "报告生成", "大模型集成", "知识库加载"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:check_directory_structure",
+      "type": "function",
+      "name": "check_directory_structure",
+      "filePath": "tests/verify_architecture.py",
+      "lineRange": [16, 133],
+      "summary": "检查四层架构的目录结构完整性，验证主智能体层、子智能体层、数据与支撑层、配置文件和知识库的存在性和文件数量。",
+      "tags": ["验证", "架构检查", "目录结构"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:check_architecture_compliance",
+      "type": "function",
+      "name": "check_architecture_compliance",
+      "filePath": "tests/verify_architecture.py",
+      "lineRange": [136, 206],
+      "summary": "检查专利架构合规性，验证主智能体层六大功能模块、任务编排层四大模块、子智能体层四类标准和数据支撑层三大组件的完整性。",
+      "tags": ["验证", "合规检查", "专利架构"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:generate_summary_report",
+      "type": "function",
+      "name": "generate_summary_report",
+      "filePath": "tests/verify_architecture.py",
+      "lineRange": [209, 240],
+      "summary": "生成四层架构重构总结报告，统计文件数量并展示架构特性和专利规范符合情况。",
+      "tags": ["报告生成", "统计", "总结"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:load_master_identity",
+      "type": "function",
+      "name": "load_master_identity",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [62, 92],
+      "summary": "加载主智能体完整身份文件内容，包括IDENTITY、AGENTS、MEMORY、HEARTBEAT、TOOLS和SKILL等文件，用于构建大模型系统提示词。",
+      "tags": ["身份加载", "文件读取", "主智能体"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:load_knowledge_base",
+      "type": "function",
+      "name": "load_knowledge_base",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [94, 125],
+      "summary": "加载知识库内容，包括法规知识和违规模式知识，从规则推理子智能体的references目录中读取Markdown文件。",
+      "tags": ["知识库", "法规加载", "模式加载"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:interpret_results",
+      "type": "function",
+      "name": "interpret_results",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [142, 185],
+      "summary": "解释执行结果并生成报告，加载主智能体身份和知识库，分析各子智能体执行结果，使用大模型或模板生成包含执行概述、数据质量、异常分析、违规判定和结论建议的完整报告。",
+      "tags": ["结果解释", "报告生成", "大模型调用"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:_analyze_execution_results",
+      "type": "function",
+      "name": "_analyze_execution_results",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [187, 225],
+      "summary": "分析各子智能体的执行结果，提取参与执行的子智能体列表、异常情况、违规情况、嫌疑等级、数据质量和特征信息。",
+      "tags": ["结果分析", "数据提取", "异常汇总"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:_generate_llm_report",
+      "type": "function",
+      "name": "_generate_llm_report",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [227, 296],
+      "summary": "使用大模型生成监测分析报告，构建包含主智能体身份、知识库、任务信息和分析结果的系统提示词和用户消息，调用大模型API并返回自然语言报告。",
+      "tags": ["大模型调用", "报告生成", "提示词构建"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:_generate_template_report",
+      "type": "function",
+      "name": "_generate_template_report",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [338, 414],
+      "summary": "使用预定义模板生成监测分析报告（备用方案），当大模型调用失败时使用。生成包含执行概述、数据质量、异常分析、违规判定和结论建议的Markdown格式报告。",
+      "tags": ["模板报告", "备用方案", "Markdown格式化"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:create_result_interpretation_module",
+      "type": "function",
+      "name": "create_result_interpretation_module",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [418, 420],
+      "summary": "创建结果解释与输出模块实例的便捷函数。",
+      "tags": ["工厂函数", "便捷接口"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:interpret_execution_results",
+      "type": "function",
+      "name": "interpret_execution_results",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [423, 438],
+      "summary": "解释执行结果的便捷函数，创建模块实例并调用interpret_results方法。",
+      "tags": ["便捷接口", "结果解释"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/result_interpretation.py:KnowledgeBase",
+      "type": "class",
+      "name": "KnowledgeBase",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [43, 48],
+      "summary": "知识库内容数据类，包含法规、违规模式和专家经验三个字典字段，用于存储从规则推理子智能体加载的知识库内容。",
+      "tags": ["数据类", "知识库", "法规存储"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/result_interpretation.py:MasterAgentKnowledgeLoader",
+      "type": "class",
+      "name": "MasterAgentKnowledgeLoader",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [51, 125],
+      "summary": "主智能体知识与身份加载器，负责加载主智能体的身份文件（IDENTITY、AGENTS、MEMORY等）和知识库内容（法规、违规模式），为大模型生成报告提供上下文信息。",
+      "tags": ["加载器", "身份管理", "知识库管理"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:workspace/skills/orchestrator-core/scripts/result_interpretation.py:ResultInterpretationModule",
+      "type": "class",
+      "name": "ResultInterpretationModule",
+      "filePath": "workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "lineRange": [128, 415],
+      "summary": "结果解释与输出模块，接收各子智能体的执行结果并生成自然语言分析报告。支持使用大模型生成报告或使用模板生成备用报告，输出包含执行概述、数据质量、异常分析、违规判定和结论建议的完整监测分析报告。",
+      "tags": ["结果解释", "报告生成", "大模型集成", "模板渲染"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:workspace/skills/orchestrator-core/SKILL.md",
+      "type": "document",
+      "name": "SKILL.md",
+      "filePath": "workspace/skills/orchestrator-core/SKILL.md",
+      "summary": "主智能体核心技能包说明文档，描述orchestrator-core技能包的功能、调用时机、可用脚本、子智能体列表和标准工作流示例。包含任务结构化、任务流生成、资源匹配、执行控制、跨领域分析和结果复用判决六大核心脚本的详细使用说明和代码示例。",
+      "tags": ["技能文档", "编排器", "主智能体", "工作流说明"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:tests/verify_architecture.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:check_directory_structure",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/verify_architecture.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:check_architecture_compliance",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/verify_architecture.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:generate_summary_report",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:interpret_results",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:create_result_interpretation_module",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "target": "function:workspace/skills/orchestrator-core/scripts/result_interpretation.py:interpret_execution_results",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_interpretation.py:KnowledgeBase",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_interpretation.py:MasterAgentKnowledgeLoader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "target": "class:workspace/skills/orchestrator-core/scripts/result_interpretation.py:ResultInterpretationModule",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:workspace/skills/orchestrator-core/scripts/result_interpretation.py",
+      "target": "document:workspace/skills/orchestrator-core/SKILL.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:workspace/skills/orchestrator-core/evals/evals.json",
+      "target": "document:workspace/skills/orchestrator-core/SKILL.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:workspace/skills/orchestrator-core/evals/evals_advanced.json",
+      "target": "document:workspace/skills/orchestrator-core/SKILL.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:workspace/skills/orchestrator-core/assets/dashboard_configs/monitoring_dashboard.json",
+      "target": "document:workspace/skills/orchestrator-core/SKILL.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:workspace/memory/2026-05-15.md",
+      "target": "document:workspace/skills/orchestrator-core/SKILL.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:tests/verify_architecture.py",
+      "target": "document:workspace/skills/orchestrator-core/SKILL.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

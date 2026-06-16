@@ -1,0 +1,25 @@
+{
+  "projectRoot": "E:/project/Ecological_env",
+  "batchFiles": [
+    {"path": "shared/operators/__init__.py", "language": "python", "sizeLines": 108, "fileCategory": "code"},
+    {"path": "shared/operators/deep_learning/__init__.py", "language": "python", "sizeLines": 19, "fileCategory": "code"},
+    {"path": "shared/operators/deep_learning/lstm_autoencoder.py", "language": "python", "sizeLines": 178, "fileCategory": "code"},
+    {"path": "shared/operators/deep_learning/variational_autoencoder.py", "language": "python", "sizeLines": 248, "fileCategory": "code"},
+    {"path": "shared/operators/specialized/__init__.py", "language": "python", "sizeLines": 25, "fileCategory": "code"},
+    {"path": "shared/operators/specialized/change_point_detector.py", "language": "python", "sizeLines": 146, "fileCategory": "code"},
+    {"path": "shared/operators/specialized/constant_detector.py", "language": "python", "sizeLines": 106, "fileCategory": "code"},
+    {"path": "shared/operators/specialized/forgery_detector.py", "language": "python", "sizeLines": 238, "fileCategory": "code"},
+    {"path": "shared/operators/specialized/smoothness_detector.py", "language": "python", "sizeLines": 172, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "shared/operators/__init__.py": ["shared/operators/deep_learning/__init__.py", "shared/operators/machine_learning/__init__.py", "shared/operators/specialized/__init__.py"],
+    "shared/operators/deep_learning/__init__.py": ["shared/operators/deep_learning/lstm_autoencoder.py", "shared/operators/deep_learning/variational_autoencoder.py"],
+    "shared/operators/deep_learning/lstm_autoencoder.py": [],
+    "shared/operators/deep_learning/variational_autoencoder.py": [],
+    "shared/operators/specialized/__init__.py": ["shared/operators/specialized/change_point_detector.py", "shared/operators/specialized/constant_detector.py", "shared/operators/specialized/forgery_detector.py", "shared/operators/specialized/smoothness_detector.py"],
+    "shared/operators/specialized/change_point_detector.py": [],
+    "shared/operators/specialized/constant_detector.py": [],
+    "shared/operators/specialized/forgery_detector.py": [],
+    "shared/operators/specialized/smoothness_detector.py": []
+  }
+}

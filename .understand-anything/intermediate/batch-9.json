@@ -1,0 +1,121 @@
+{
+  "nodes": [
+    {
+      "id": "config:.understand-anything/config.json",
+      "type": "config",
+      "name": "config.json",
+      "filePath": ".understand-anything/config.json",
+      "summary": "Understand Anything 插件配置文件，设置输出语言为中文并禁用自动更新。",
+      "tags": ["配置", "插件设置", "本地化"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/knowledge-graph.json",
+      "type": "config",
+      "name": "knowledge-graph.json",
+      "filePath": ".understand-anything/knowledge-graph.json",
+      "summary": "项目完整知识图谱数据，包含 442 个节点和 598 条边，涵盖代码结构、模块关系和架构层级信息。",
+      "tags": ["知识图谱", "数据存储", "项目元数据"],
+      "complexity": "complex",
+      "languageNotes": "大型 JSON 数据文件，存储整个代码库的知识图谱数据，包含节点、边和项目元信息。"
+    },
+    {
+      "id": "config:.understand-anything/meta.json",
+      "type": "config",
+      "name": "meta.json",
+      "filePath": ".understand-anything/meta.json",
+      "summary": "项目分析元数据，记录生成时间、Git 提交哈希、项目统计信息（272 个文件，229 个已分析）和架构层级。",
+      "tags": ["元数据", "项目统计", "分析报告"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.understand-anything/restart-dashboard-clean.ps1",
+      "type": "file",
+      "name": "restart-dashboard-clean.ps1",
+      "filePath": ".understand-anything/restart-dashboard-clean.ps1",
+      "summary": "重启仪表板并获取新 token 的 PowerShell 脚本，自动停止旧进程并启动新的仪表板实例。",
+      "tags": ["启动脚本", "仪表板", "进程管理"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.understand-anything/restart-dashboard.ps1",
+      "type": "file",
+      "name": "restart-dashboard.ps1",
+      "filePath": ".understand-anything/restart-dashboard.ps1",
+      "summary": "使用固定 token 重启仪表板的 PowerShell 脚本，设置环境变量并启动开发服务器。",
+      "tags": ["启动脚本", "仪表板", "token配置"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.understand-anything/start-dashboard-fixed-token.ps1",
+      "type": "file",
+      "name": "start-dashboard-fixed-token.ps1",
+      "filePath": ".understand-anything/start-dashboard-fixed-token.ps1",
+      "summary": "使用固定 token 启动仪表板的 PowerShell 脚本，提供预设的访问令牌以简化认证流程。",
+      "tags": ["启动脚本", "仪表板", "认证"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.understand-anything/start-dashboard.bat",
+      "type": "file",
+      "name": "start-dashboard.bat",
+      "filePath": ".understand-anything/start-dashboard.bat",
+      "summary": "Windows 批处理脚本，用于启动 Understand Anything 仪表板，设置项目目录和仪表板路径环境变量。",
+      "tags": ["启动脚本", "批处理", "仪表板"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.understand-anything/start-dashboard.ps1",
+      "type": "file",
+      "name": "start-dashboard.ps1",
+      "filePath": ".understand-anything/start-dashboard.ps1",
+      "summary": "Understand Anything 仪表板启动脚本，设置项目目录环境变量并启动 Vite 开发服务器。",
+      "tags": ["启动脚本", "仪表板", "入口点"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:.understand-anything/config.json",
+      "target": "config:.understand-anything/knowledge-graph.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.understand-anything/meta.json",
+      "target": "config:.understand-anything/knowledge-graph.json",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:.understand-anything/restart-dashboard-clean.ps1",
+      "target": "file:.understand-anything/start-dashboard.ps1",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:.understand-anything/restart-dashboard.ps1",
+      "target": "file:.understand-anything/start-dashboard.ps1",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:.understand-anything/start-dashboard-fixed-token.ps1",
+      "target": "file:.understand-anything/start-dashboard.ps1",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:.understand-anything/start-dashboard.bat",
+      "target": "file:.understand-anything/start-dashboard.ps1",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

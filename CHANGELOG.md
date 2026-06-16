@@ -2,6 +2,96 @@
 
 All notable changes to the wastewater monitoring system will be documented in this file.
 
+## [2.2.0] - 2026-06-05
+
+### Web界面增强与智能问答系统
+
+**新增 - Web智能查询界面**
+- **自然语言查询接口** (`middleware/query_interface.py`)
+  - LLM驱动的意图解析（Haiku快速模型）
+  - 自动时间范围识别和指标提取
+  - 历史数据获取器集成
+  - 支持中英文自然语言查询
+- **多维度数据感知集成**
+  - 自动调用multi-dimensional-data-perception-agent进行数据预处理
+  - 时序数据质量控制和标准化
+  - 数据分解和多维分类
+- **异常检测智能体集成**
+  - 自动调用anomaly-detection-agent进行异常分析
+  - 支持11种异常模式识别（spike, drop, trend, constant等）
+  - 置信度评估和严重度分级
+- **LLM报告生成**
+  - Sonnet模型生成自然语言监测报告
+  - 包含数据概况、异常情况、建议措施
+
+**新增 - Web前端界面**
+- **查询面板** (`middleware/static/index.html`)
+  - 自然语言输入框
+  - 实时状态显示和进度提示
+  - 结果展示（摘要+可视化图表）
+- **实时监控面板**
+  - Grafana仪表板嵌入（iframe集成）
+  - 备选跳转按钮
+  - 仪表板URL: http://localhost:3000/goto/cfo42tuskodtsf?orgId=1
+- **分析报告面板**
+  - Chart.js 4.x时序图表可视化
+  - 多指标显示（pH、COD、TN、NH3-N、TP）
+  - 异常点红色标注
+  - 交互式tooltip显示异常详情
+  - 图例点击切换指标显示
+- **响应式设计**
+  - 支持桌面和移动设备
+  - 现代化UI设计
+
+**新增 - 图表可视化模块**
+- **综合时序图表** (`middleware/static/js/charts.js`)
+  - createMultiIndicatorChart: 多指标时序图表
+  - createSingleIndicatorChart: 单指标详细图表
+  - 异常点自动标注和索引匹配
+  - 颜色编码（pH绿色、COD蓝色、TN紫色、NH3-N橙色、TP粉色）
+- **数据流处理**
+  - API完整时序数据返回（influent + effluent）
+  - 异常详情结构化返回（indicator, times, score, pattern, severity）
+  - 索引到时间戳自动转换
+
+**新增 - 历史数据获取器**
+- **HistoricalDataFetcher** (`middleware/historical_data_fetcher.py`)
+  - CSV数据读取（pollution_water_*.csv）
+  - 时间范围查询和过滤
+  - 数据源选择（influent/effluent/both）
+  - 指标筛选（pH、COD、TN、NH3-N、TP）
+  - 列名标准化（中文→英文映射）
+
+**配置文件**
+- `middleware/.env` - LLM API密钥配置
+- `shared/configs/llm_config.yaml` - LLM模型和提示词配置
+- `grafana.ini` - allow_embedding配置（支持iframe嵌入）
+
+**API端点**
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| /api/query | POST | 自然语言查询接口 |
+| /api/web/query | POST | Web界面查询接口 |
+| /api/web/status | GET | 服务状态检查 |
+| /api/web/monitoring | GET | 监控数据接口 |
+
+**已验证功能**
+- ✅ 自然语言查询解析（中英文）
+- ✅ 多指标时序数据可视化
+- ✅ 异常点自动标注（索引→时间戳转换）
+- ✅ Grafana仪表板嵌入
+- ✅ 响应式布局
+- ✅ LLM主智能体和子智能体协同分析
+- ✅ 分析过程日志终端显示
+
+**技术栈**
+- 后端: Python Flask + Anthropic Claude API
+- 前端: HTML5 + CSS3 + Vanilla JavaScript
+- 图表: Chart.js 4.x
+- 监控: Grafana 8.x
+
+---
+
 ## [2.1.0] - 2026-06-02
 
 ### Major Architecture Refactor (6-agent → 4-agent)
@@ -107,96 +197,55 @@ Updated `workspace/skills/orchestrator-core/scripts/execution_control.py`:
 
 | Version | Date | Major Changes |
 |---------|------|---------------|
+| 2.2.0 | 2026-06-05 | Web界面增强、自然语言查询、图表可视化、Grafana集成 |
 | 2.1.0 | 2026-06-02 | Architecture refactor: 6-agent → 4-agent, ConsensusEngine, ViolationDetector |
 | 2.0.0 | 2026-05-29 | Initial architecture with orchestrator-core |
 
 ---
 
-## Migration Guide for Local Claude
+## Commit History (2026-06-05)
 
-### What Changed on Server
-1. **Agent Structure**: 4 agents instead of 6
-2. **New Modules**: ConsensusEngine, ViolationDetector, DataPerception, DispositionExecution
-3. **Configuration Files**: agent_registry.yaml, consensus_config.yaml, rule_config.yaml
-4. **Test Paths**: Updated for new structure
+### Web界面与智能问答 (2026-06-05)
+- feat: 实现自然语言查询接口（LLM驱动）
+- feat: 添加历史数据获取器
+- feat: 实现Web前端界面（查询、监控、分析报告面板）
+- feat: 添加Chart.js时序图表可视化
+- feat: 集成Grafana仪表板
+- fix: 异常点索引到时间戳转换
+- fix: 图表异常点标注显示
+- refactor: 优化图表样式和布局
+- test: 验证智能问答功能（主智能体+子智能体协同）
 
-### How to Sync
-```bash
-# On local machine
-cd /path/to/local/Ecological_env
-git fetch origin
-git pull origin main  # Or appropriate branch
-python -m pytest tests/ -v  # Verify all tests pass
-```
-
-### Verification
-```python
-# Test imports work
-from subagents.disposition_execution_agent.scripts import ConsensusEngine
-from subagents.rule_reasoning_agent.scripts import ViolationDetector
-from subagents.multi_dimensional_data_perception_agent.scripts import DataAcquisitionModule
-
-# Verify configuration loads
-import yaml
-yaml.safe_load(open('shared/configs/agent_registry.yaml'))
-yaml.safe_load(open('shared/configs/consensus_config.yaml'))
-yaml.safe_load(open('shared/configs/rule_config.yaml'))
-```
+### Project Cleanup (2026-06-05)
+- chore: 删除多余的测试文件和临时文件
+- chore: 删除Python缓存文件
+- chore: 更新项目文档
 
 ---
 
-## Commit History (2026-06-01 to 2026-06-02)
+## Migration Guide
 
-### Architecture Refactor (2026-06-02)
-- 23e2516 refactor: update integration tests for new agent architecture
-- 9c2d562 refactor: migrate feature analysis to anomaly-detection-agent
-- a6ae4df refactor: update orchestrator-core scripts for new agent architecture
+### Web界面部署
+```bash
+# 1. 配置LLM API
+cd middleware
+cp .env.example .env
+# 编辑.env添加API密钥
 
-### Consensus Engine (2026-06-01)
-- ebab4a8 docs: update SKILL.md to document implemented consensus_engine module
-- 60e020d feat: integrate ConsensusEngine into AlertClassifier
-- 313e0c2 test: add unit tests for consensus engine
-- b042f7f feat: export ConsensusEngine, FusionResult, SceneType in __init__.py
-- 450e39c feat: implement config loading in _load_config method
-- 0ace07e feat: add consensus engine configuration file
-- bb170de feat: implement dynamic weight adjustment algorithm in adapt_weights method
-- 6170004 feat: add consensus engine basic structure
+# 2. 启动查询接口
+python query_interface.py
 
-### Violation Detector (2026-06-01)
-- bb4e594 feat: implement violation detector with rule engine
-- faccf34 fix: enhance rule_config.yaml with metadata section and enable flags
+# 3. 启动监控服务
+python app_orchestrator.py
 
-### Data Perception (2026-06-01)
-- 58cee95 docs: enhance data-perception-core SKILL.md with YAML frontmatter
-- cc17692 fix: enhance error handling and metadata tracking in data perception modules
-- b392b1d fix: improve data cleaning and standardization modules
-- d87b2f7 feat: implement data cleaning and standardization modules
-- 82d520c fix: improve code quality in data_decomposition.py and time_alignment.py
-- 33a0390 feat: export data decomposition and time alignment modules in __init__.py
-- 1464a13 fix(data-acquisition): add exception handling, input validation
-- 13518f1 feat: implement data acquisition module
-- f67cff8 fix: standardize multi-dimensional-data-perception-agent identity files
+# 4. 访问Web界面
+http://localhost:8080
 
-### Dynamic Orchestrator (2026-06-01)
-- 28141ed fix: update AGENTS.md with correct 4-agent architecture
-- a550483 fix: improve code quality in dynamic_orchestrator.py
-- bbcd97b feat: add dynamic orchestrator for master agent
+# 5. 配置Grafana（如需嵌入）
+# 编辑 grafana.ini 设置 allow_embedding = true
+```
 
-### Disposition Execution (2026-06-01)
-- 3fde987 docs: update SKILL.md for action_executor and report_generator
-- 10dcee1 refactor: update exports for action_executor and report_generator
-- 18cf4da config: add disposition execution configuration
-- 5115226 feat: implement ReportGenerator.generate_trend_report
-- 8520bd0 feat: implement ReportGenerator.generate_summary_report
-- ff07db6 fix: reorganize imports in report_generator.py
-- e61ff30 feat: implement ReportGenerator.generate_alert_report()
-- 91a6ea1 fix: use real newlines in markdown report generation
-- 0097f24 feat: add report data classes
-- b58f6ee feat: implement ActionExecutor coordinator
-- e3f628c feat: implement RegulatoryPlatformPush channel
-
-### Testing (2026-06-01)
-- 0ffcd21 fix: add pytest to requirements and fix test path issue
-- 42f2a8f fix: address code quality issues in e2e integration tests
-- 5cfe1a4 test: add end-to-end architecture integration tests
-- dde5ea3 fix: improve code quality in violation_detector.py
+### 示例查询
+- "检测最近一周数据异常情况"
+- "analyze pH COD anomalies in past 24 hours"
+- "查看昨天总氮和总磷的趋势"

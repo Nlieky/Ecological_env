@@ -1,0 +1,13 @@
+{
+  "projectRoot": "E:/project/Ecological_env",
+  "batchFiles": [
+    {"path": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py", "language": "python", "sizeLines": 1373, "fileCategory": "code"},
+    {"path": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py", "language": "python", "sizeLines": 255, "fileCategory": "code"},
+    {"path": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py", "language": "python", "sizeLines": 119, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py": [],
+    "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py": ["subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py"],
+    "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py": ["subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py"]
+  }
+}

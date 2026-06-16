@@ -1,0 +1,116 @@
+{
+  "nodes": [
+    {
+      "id": "document:subagents/disposition-execution-agent/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "subagents/disposition-execution-agent/AGENTS.md",
+      "summary": "任务指令文档，定义了处置执行智能体的核心工作流程：接收异常检测结果、执行融合共识、进行三级预警判定、生成处置工单并推送归档。",
+      "tags": ["documentation", "任务流程", "处置执行"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:subagents/disposition-execution-agent/IDENTITY.md",
+      "type": "document",
+      "name": "IDENTITY.md",
+      "filePath": "subagents/disposition-execution-agent/IDENTITY.md",
+      "summary": "身份卡片文档，定义了研判预警与处置执行子智能体的基本信息、核心职责、预警分级标准（一般/较重/严重）、工单内容规范和LLM决策范围。",
+      "tags": ["documentation", "身份定义", "预警分级", "工单规范"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:subagents/disposition-execution-agent/MEMORY.md",
+      "type": "document",
+      "name": "MEMORY.md",
+      "filePath": "subagents/disposition-execution-agent/MEMORY.md",
+      "summary": "专业记忆文档，存储预警分级标准和阈值、历史工单模板、监管平台API接口规范等执行所需的专业知识。",
+      "tags": ["documentation", "知识存储", "预警标准", "接口规范"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:subagents/disposition-execution-agent/SOUL.md",
+      "type": "document",
+      "name": "SOUL.md",
+      "filePath": "subagents/disposition-execution-agent/SOUL.md",
+      "summary": "工作风格文档，定义了处置执行智能体的行为准则：高效执行、规范操作、闭环管理，确保每条预警都有处置结果。",
+      "tags": ["documentation", "行为准则", "工作风格"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:subagents/disposition-execution-agent/TOOLS.md",
+      "type": "document",
+      "name": "TOOLS.md",
+      "filePath": "subagents/disposition-execution-agent/TOOLS.md",
+      "summary": "环境信息文档，记录了执行任务所需的外部系统配置：监管平台API地址、飞书推送配置、工单归档路径。",
+      "tags": ["documentation", "环境配置", "集成接口"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:subagents/disposition-execution-agent/USER.md",
+      "type": "document",
+      "name": "USER.md",
+      "filePath": "subagents/disposition-execution-agent/USER.md",
+      "summary": "用户信息文档，存储监管人员联系方式和预警推送偏好，用于个性化处置工单推送。",
+      "tags": ["documentation", "用户配置", "推送偏好"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:subagents/disposition-execution-agent/IDENTITY.md",
+      "target": "document:subagents/disposition-execution-agent/AGENTS.md",
+      "type": "defines_schema",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "document:subagents/disposition-execution-agent/MEMORY.md",
+      "target": "document:subagents/disposition-execution-agent/IDENTITY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/disposition-execution-agent/SOUL.md",
+      "target": "document:subagents/disposition-execution-agent/AGENTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/disposition-execution-agent/TOOLS.md",
+      "target": "document:subagents/disposition-execution-agent/AGENTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/disposition-execution-agent/USER.md",
+      "target": "document:subagents/disposition-execution-agent/AGENTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/disposition-execution-agent/IDENTITY.md",
+      "target": "document:subagents/disposition-execution-agent/MEMORY.md",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:subagents/disposition-execution-agent/TOOLS.md",
+      "target": "document:subagents/disposition-execution-agent/MEMORY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:subagents/disposition-execution-agent/USER.md",
+      "target": "document:subagents/disposition-execution-agent/TOOLS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

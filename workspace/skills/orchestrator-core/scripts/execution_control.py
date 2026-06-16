@@ -791,7 +791,7 @@ class LLMAgentCoordinator:
                 # 构建标准data格式
                 data_values = {}
 
-                # 需要跳过的非数值字段
+                # 需要跳过的非数值字段（包括时间戳）
                 skip_keys = {"监测时间", "timestamp", "time", "时间"}
 
                 # 处理进水数据
@@ -838,7 +838,7 @@ class LLMAgentCoordinator:
 
                 if data_values:
                     data_to_inject = {"values": data_values}
-                    print(f"[AUTO-INJECT] 自动注入时序数据: {len(data_values)}个指标, 每个指标{len(influent_ts)}条")
+                    print(f"[AUTO-INJECT] 自动注入时序数据: {len(data_values)}个指标（含timestamp）, 每个指标{len(influent_ts)}条")
 
         # 3. 如果有数据要注入，添加到params中
         if data_to_inject and "data" not in params:

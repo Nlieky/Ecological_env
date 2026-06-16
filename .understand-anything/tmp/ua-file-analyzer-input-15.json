@@ -1,0 +1,14 @@
+{
+  "projectRoot": "E:\\project\\Ecological_env",
+  "batchFiles": [
+    {"path": "interfaces/config_validation.md", "language": "markdown", "sizeLines": 353, "fileCategory": "docs"},
+    {"path": "interfaces/error_codes.md", "language": "markdown", "sizeLines": 69, "fileCategory": "docs"},
+    {"path": "interfaces/input_schema.json", "language": "json", "sizeLines": 152, "fileCategory": "data"},
+    {"path": "interfaces/output_schema.json", "language": "json", "sizeLines": 246, "fileCategory": "data"},
+    {"path": "interfaces/skill_interface.md", "language": "markdown", "sizeLines": 153, "fileCategory": "docs"},
+    {"path": "interfaces/skill_template.md", "language": "markdown", "sizeLines": 263, "fileCategory": "docs"},
+    {"path": "interfaces/state_management.md", "language": "markdown", "sizeLines": 310, "fileCategory": "docs"},
+    {"path": "interfaces/subagent_protocol.md", "language": "markdown", "sizeLines": 291, "fileCategory": "docs"}
+  ],
+  "batchImportData": {}
+}

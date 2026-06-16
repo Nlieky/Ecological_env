@@ -164,6 +164,30 @@ class HistoricalDataFetcher:
             end_time = time_range.get("end")
 
             if start_time and end_time:
+                # 获取数据的实际年份范围
+                data_year_start = df[timestamp_col].dt.year.min()
+                data_year_end = df[timestamp_col].dt.year.max()
+
+                # 如果查询年份与数据年份不匹配，进行年份映射
+                query_year = start_time.year if hasattr(start_time, 'year') else pd.Timestamp(start_time).year
+
+                if data_year_start and query_year != data_year_start:
+                    print(f"[DATA_FETCHER] 年份不匹配: 数据为{data_year_start}年，查询为{query_year}年，进行年份映射")
+                    # 将查询时间范围映射到数据年份
+                    # 保持相同的月日时分秒，只改变年份
+                    if isinstance(start_time, str):
+                        start_time = pd.Timestamp(start_time)
+                    if isinstance(end_time, str):
+                        end_time = pd.Timestamp(end_time)
+
+                    # 映射到数据年份
+                    mapped_start = start_time.replace(year=data_year_start)
+                    mapped_end = end_time.replace(year=data_year_start)
+
+                    print(f"[DATA_FETCHER] 映射时间范围: {mapped_start} ~ {mapped_end}")
+                    start_time = mapped_start
+                    end_time = mapped_end
+
                 mask = (df[timestamp_col] >= start_time) & (df[timestamp_col] <= end_time)
                 df_filtered = df[mask]
 
@@ -230,8 +254,23 @@ class HistoricalDataFetcher:
             indicators = DEFAULT_INDICATORS
             print(f"[DATA_FETCHER] 未指定指标，使用默认指标: {indicators}")
 
+        # 标准化指标名称（处理大小写问题）
+        normalized_indicators = []
+        for ind in indicators:
+            # 特殊处理pH的大小写
+            if ind.upper() == "PH":
+                normalized_indicators.append("pH")
+            # 特殊处理氨氮的格式
+            elif "AMMONIA" in ind.upper() or "NH3" in ind.upper():
+                normalized_indicators.append("NH3-N")
+            # 其他指标转大写
+            else:
+                normalized_indicators.append(ind.upper())
+
+        print(f"[DATA_FETCHER] 标准化指标名称: {list(zip(indicators, normalized_indicators))}")
+
         # 首先找出存在的指标列
-        available_indicators = [ind for ind in indicators if ind in df.columns]
+        available_indicators = [ind for ind in normalized_indicators if ind in df.columns]
 
         if not available_indicators:
             print(f"[DATA_FETCHER] No indicator columns found. Available: {list(df.columns)}")

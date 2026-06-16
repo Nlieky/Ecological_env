@@ -16,6 +16,7 @@ __all__ = [
     "TimeSeriesFeatures",  # 从feature-analysis迁移
     "CorrelationAnalyzer",  # 从feature-analysis迁移
     "TrendAnalyzer",  # 从feature-analysis迁移
+    "IntentOperatorMapper",  # 新增：意图-算子映射器
     "detect_anomalies",
     "run_anomaly_detection",
     "extract_features",  # 新增：特征提取入口
@@ -101,7 +102,6 @@ def standardize_anomaly_output(anomaly_output: Dict[str, Any]) -> Dict[str, Any]
 def _format_indicator(anomaly: Dict[str, Any]) -> str:
     """格式化指标名称为标准格式: {source}_{indicator}"""
     indicator = anomaly.get("indicator", anomaly.get("feature", "unknown"))
-    source = anomaly.get("source", "effluent")  # 默认为出水
 
     # 移除可能的单位后缀
     indicator = indicator.replace("（毫克/升）", "").replace("(mg/L)", "")
@@ -118,6 +118,16 @@ def _format_indicator(anomaly: Dict[str, Any]) -> str:
     if indicator in field_mapping:
         indicator = field_mapping[indicator]
 
+    # 检查指标是否已经包含来源前缀
+    known_prefixes = ["influent_", "effluent_"]
+    has_prefix = any(indicator.startswith(prefix) for prefix in known_prefixes)
+
+    # 如果已经有前缀，直接返回
+    if has_prefix:
+        return indicator
+
+    # 否则，添加来源前缀
+    source = anomaly.get("source", "effluent")  # 默认为出水
     return f"{source}_{indicator}"
 
 def _format_timestamp(anomaly: Dict[str, Any]) -> str:
@@ -168,6 +178,7 @@ def _get_classes():
     from .time_series_features import TimeSeriesFeatureExtractor
     from .correlation_analysis import CorrelationAnalyzer
     from .trend_analysis import TrendAnalyzer
+    from .operator_mapping import IntentOperatorMapper  # 新增导入
     return {
         'OperatorAdapter': OperatorAdapter,
         'AnomalyScorer': AnomalyScorer,
@@ -177,7 +188,8 @@ def _get_classes():
         'TimeSeriesFeatureExtractor': TimeSeriesFeatureExtractor,
         'TimeSeriesFeatures': TimeSeriesFeatureExtractor,  # 别名兼容
         'CorrelationAnalyzer': CorrelationAnalyzer,
-        'TrendAnalyzer': TrendAnalyzer
+        'TrendAnalyzer': TrendAnalyzer,
+        'IntentOperatorMapper': IntentOperatorMapper  # 新增导出
     }
 
 
@@ -212,8 +224,14 @@ def detect_anomalies(data: "pd.DataFrame", indicators: list,
 
     if config is None:
         config = {
-            "operators": ["zscore", "iqr", "isolation_forest"],
-            "pattern_threshold": 0.7,
+            "operators": [
+                "hampel",           # 时序抗噪
+                "iqr_conservative", # 极端异常
+                "zscore",           # 统计检测
+                "gradient_detection", # 突变检测
+                "ewm_anomaly"       # 近期敏感检测
+            ],
+            "pattern_threshold": 0.4,  # 提高阈值，只对高置信度异常进行模式识别
             "contamination": 0.1
         }
 
@@ -250,7 +268,7 @@ def detect_anomalies(data: "pd.DataFrame", indicators: list,
         # 3. 模式识别
         logger.info("[ANOMALY] 识别异常模式...")
         recognizer = PatternRecognizer()
-        pattern_threshold = config.get("pattern_threshold", 0.7)
+        pattern_threshold = config.get("pattern_threshold", 0.4)  # 提高默认阈值，只对高置信度异常进行模式识别
         pattern_results = recognizer.recognize_patterns(
             data, anomaly_scores, pattern_threshold
         )

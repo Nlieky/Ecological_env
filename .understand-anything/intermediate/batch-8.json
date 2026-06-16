@@ -1,0 +1,420 @@
+{
+  "nodes": [
+    {
+      "id": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "type": "file",
+      "name": "operator_adapter.py",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "summary": "算子调用与适配模块，集成统计类、机器学习类、深度学习类三类异常检测算子，支持基于意图的动态算子选择。提供20+种异常检测算法，包括zscore、IQR、孤立森林、VAE等，并支持相关性和趋势分析算子。",
+      "tags": ["异常检测", "算子适配器", "机器学习", "统计方法", "深度学习", "特征分析"],
+      "complexity": "complex",
+      "languageNotes": "使用策略模式注册算子，支持可选依赖（sklearn、PyOD、PyTorch）的优雅降级。通过鲁棒参数估计器增强统计方法的抗干扰能力。"
+    },
+    {
+      "id": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "type": "class",
+      "name": "OperatorAdapter",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [76, 1302],
+      "summary": "算子适配器核心类，管理20+种异常检测算子的注册、选择和执行。支持统计类、机器学习类、PyOD、深度学习、特征分析五大类算子，并集成意图映射器实现基于自然语言意图的动态算子选择。",
+      "tags": ["算子管理", "异常检测", "意图映射", "适配器模式"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [1305, 1368],
+      "summary": "主入口函数，接收数据字典、指标列表和算子列表，执行异常检测并返回结果。提供默认算子选择（优先使用鲁棒方法）。",
+      "tags": ["入口点", "异常检测", "数据处理"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:process",
+      "type": "function",
+      "name": "process",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [1371, 1373],
+      "summary": "处理函数别名，调用main函数执行异常检测。",
+      "tags": ["别名", "处理函数"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:select_operators_by_intent",
+      "type": "function",
+      "name": "select_operators_by_intent",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [181, 227],
+      "summary": "基于自然语言意图选择合适的异常检测算子。通过IntentOperatorMapper将用户意图（异常检测、相关性分析、趋势分析）映射到具体算子列表，支持数据特征适配。",
+      "tags": ["意图识别", "算子选择", "自然语言"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:apply_operators",
+      "type": "function",
+      "name": "apply_operators",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [229, 294],
+      "summary": "应用多个算子进行异常检测或特征分析。区分普通异常检测算子（逐指标处理）和特征分析算子（处理整个DataFrame），返回各算子的检测结果。",
+      "tags": ["算子执行", "批量处理", "异常检测"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:get_available_operators",
+      "type": "function",
+      "name": "get_available_operators",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [1266, 1301],
+      "summary": "获取可用算子分类，按统计类、机器学习类、PyOD、深度学习、特征分析五大类返回当前可用的算子列表。根据依赖库的可用性动态返回。",
+      "tags": ["元数据", "算子列表", "分类"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_zscore_anomaly",
+      "type": "function",
+      "name": "_zscore_anomaly",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [298, 322],
+      "summary": "Z-score异常检测，支持鲁棒参数估计。使用迭代鲁棒估计器（基于MAD）计算均值和标准差，对异常值不敏感。返回异常分数和异常掩码。",
+      "tags": ["统计方法", "异常检测", "z-score"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_iqr_anomaly",
+      "type": "function",
+      "name": "_iqr_anomaly",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [324, 359],
+      "summary": "IQR异常检测，基于四分位距识别异常值。支持鲁棒参数估计，计算到边界的距离作为异常分数，归一化到IQR单位。",
+      "tags": ["统计方法", "异常检测", "iqr"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_hampel_anomaly",
+      "type": "function",
+      "name": "_hampel_anomaly",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [516, 553],
+      "summary": "Hampel Filter异常检测，基于中位数绝对偏差（MAD）。使用中位数代替均值、MAD代替标准差，对异常值更鲁棒。使用1.4826系数将MAD转换为标准差单位。",
+      "tags": ["统计方法", "异常检测", "鲁棒估计"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_isolation_forest_anomaly",
+      "type": "function",
+      "name": "_isolation_forest_anomaly",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [592, 618],
+      "summary": "孤立森林异常检测，基于sklearn实现。通过随机树划分隔离异常点，返回异常分数和异常掩码。当sklearn不可用时降级到zscore。",
+      "tags": ["机器学习", "异常检测", "孤立森林"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_vae_anomaly",
+      "type": "function",
+      "name": "_vae_anomaly",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [928, 1053],
+      "summary": "VAE（变分自编码器）异常检测，使用PyTorch实现。通过训练VAE重构正常数据，重构误差大的样本被标记为异常。当深度学习库不可用时降级到zscore。",
+      "tags": ["深度学习", "异常检测", "vae", "pytorch"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:plot_anomalies",
+      "type": "function",
+      "name": "plot_anomalies",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "lineRange": [1055, 1114],
+      "summary": "绘制异常检测结果可视化，生成时间序列图并标记异常点。支持保存到文件或返回base64编码。当matplotlib不可用时返回错误信息。",
+      "tags": ["可视化", "绘图", "异常展示"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "type": "file",
+      "name": "test_feature_operators.py",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "summary": "测试特征分析算子（相关性、趋势）的测试套件。验证Pearson/Spearman相关性分析、线性趋势、Mann-Kendall趋势检验以及混合算子场景，包含基于意图的特征分析算子选择测试。",
+      "tags": ["测试", "特征分析", "相关性分析", "趋势分析"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:create_test_data",
+      "type": "function",
+      "name": "create_test_data",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "lineRange": [24, 42],
+      "summary": "创建包含相关性（COD与pH弱相关）和趋势的测试数据。生成带有时间戳的COD、pH、TN三个指标的模拟数据。",
+      "tags": ["测试数据", "数据生成"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:test_correlation_operators",
+      "type": "function",
+      "name": "test_correlation_operators",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "lineRange": [45, 96],
+      "summary": "测试Pearson和Spearman相关性分析算子。验证相关性结果的方法标识、指标对数量、高/中/低相关对统计以及相关性系数示例输出。",
+      "tags": ["测试", "相关性分析"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:test_trend_operators",
+      "type": "function",
+      "name": "test_trend_operators",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "lineRange": [98, 148],
+      "summary": "测试线性趋势和Mann-Kendall趋势检验算子。验证趋势统计（上升/下降/平稳数量）、各指标趋势详情及方向强度。",
+      "tags": ["测试", "趋势分析"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:test_mixed_operators",
+      "type": "function",
+      "name": "test_mixed_operators",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "lineRange": [150, 188],
+      "summary": "测试混合算子场景，同时应用异常检测和特征分析算子。验证不同类型算子的结果格式，区分特征分析结果和异常检测统计。",
+      "tags": ["测试", "混合算子", "集成测试"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:test_intent_mapping_with_features",
+      "type": "function",
+      "name": "test_intent_mapping_with_features",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "lineRange": [190, 245],
+      "summary": "测试基于意图的特征分析算子选择。验证相关性分析意图和趋势分析意图是否能正确映射到相应的算子（correlation_*、trend_*）。",
+      "tags": ["测试", "意图映射", "特征分析"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "type": "file",
+      "name": "test_operator_mapping.py",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "summary": "测试算子适配器的意图映射功能。验证单指标异常检测、相关性分析、综合分析（大数据量）等场景下的算子选择逻辑，以及意图映射未启用时的默认行为。",
+      "tags": ["测试", "意图映射", "算子选择"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py:create_test_data",
+      "type": "function",
+      "name": "create_test_data",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "lineRange": [26, 33],
+      "summary": "创建简单的多指标测试数据。生成包含时间戳和COD、pH、TN三个指标的模拟环境监测数据。",
+      "tags": ["测试数据", "数据生成"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py:test_intent_mapping",
+      "type": "function",
+      "name": "test_intent_mapping",
+      "filePath": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "lineRange": [36, 115],
+      "summary": "意图映射功能的主测试函数。覆盖四个场景：单指标异常检测、相关性分析、综合分析（大数据量）、意图映射未启用时的默认行为。",
+      "tags": ["测试", "意图映射", "集成测试"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "target": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:main",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:main",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "target": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:process",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:select_operators_by_intent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:apply_operators",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:get_available_operators",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_zscore_anomaly",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_iqr_anomaly",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_hampel_anomaly",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_isolation_forest_anomaly",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:_vae_anomaly",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:plot_anomalies",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:create_test_data",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:test_correlation_operators",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:test_trend_operators",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:test_mixed_operators",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py:test_intent_mapping_with_features",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py:create_test_data",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py:test_intent_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "target": "function:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "target": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_operator_mapping.py",
+      "target": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/test_feature_operators.py",
+      "target": "class:subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/operator_adapter.py:OperatorAdapter",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

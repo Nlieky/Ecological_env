@@ -1,1 +1,0 @@
-{"eval_id": 7, "eval_name": "result_interpretation_format", "prompt": "违规检测分析完成，检测到疑似插瓶干扰异常。请说明系统会如何向监管人员展示这个分析结果？", "assertions": [{"name": "报告结构", "check": "输出提到报告包含监测概况、分析结果、违规判定、取证建议或类似结构"}, {"name": "可视化展示", "check": "输出提到图表展示或告警颜色标识"}]}

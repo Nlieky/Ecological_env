@@ -1,0 +1,465 @@
+{
+  "nodes": [
+    {
+      "id": "file:middleware/app_orchestrator.py",
+      "type": "file",
+      "name": "app_orchestrator.py",
+      "filePath": "middleware/app_orchestrator.py",
+      "summary": "基于Orchestrator-Core架构的Flask中间件，提供废水监测双流处理。实时流更新Prometheus指标，分析流（已禁用）执行两层LLM分析。集成任务接收、子智能体协调和结果解释模块。",
+      "tags": ["中间件", "api-handler", "orchestrator-core", "监控", "入口点"],
+      "complexity": "complex",
+      "languageNotes": "使用Flask构建REST API，集成Prometheus指标采集。LLM分析功能已暂时禁用但保留了完整代码框架。"
+    },
+    {
+      "id": "file:middleware/query_interface.py",
+      "type": "file",
+      "name": "query_interface.py",
+      "filePath": "middleware/query_interface.py",
+      "summary": "自然语言查询接口，使用LLM驱动架构解析用户查询意图、调度子智能体分析并整合结果生成报告。支持历史数据获取、异常检测和相关性分析。",
+      "tags": ["查询接口", "api-handler", "llm驱动", "数据分析", "入口点"],
+      "complexity": "complex",
+      "languageNotes": "完整的LLM驱动流程：意图解析→数据获取→子智能体协调→结果整合。自定义JSON编码器处理numpy类型。"
+    },
+    {
+      "id": "file:shared/configs/llm_client.py",
+      "type": "file",
+      "name": "llm_client.py",
+      "filePath": "shared/configs/llm_client.py",
+      "summary": "统一的LLM客户端模块，提供Anthropic API封装。支持primary/fast/analysis三种模型配置，单例模式管理客户端实例。从.env加载敏感信息，从YAML加载非敏感配置。",
+      "tags": ["配置", "llm客户端", "工具模块", "单例", "anthropic"],
+      "complexity": "moderate",
+      "languageNotes": "使用dataclass定义配置，单例模式缓存客户端。支持流式和非流式聊天，环境变量优先级高于YAML配置。"
+    },
+    {
+      "id": "file:tests/integration/test_subagent_llm_integration.py",
+      "type": "file",
+      "name": "test_subagent_llm_integration.py",
+      "filePath": "tests/integration/test_subagent_llm_integration.py",
+      "summary": "子智能体LLM配置端到端集成测试。验证各子智能体使用正确的模型类型、system_prompt配置，以及协调器的LLM配置集成。",
+      "tags": ["测试", "集成测试", "llm配置", "子智能体"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:middleware/app_orchestrator.py:update_prometheus_metrics",
+      "type": "function",
+      "name": "update_prometheus_metrics",
+      "filePath": "middleware/app_orchestrator.py",
+      "lineRange": [454, 489],
+      "summary": "更新Prometheus指标，提取进水和出水数据中的各项指标值并设置到对应的Gauge指标中。",
+      "tags": ["指标更新", "prometheus", "数据提取"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:middleware/app_orchestrator.py:safe_float",
+      "type": "function",
+      "name": "safe_float",
+      "filePath": "middleware/app_orchestrator.py",
+      "lineRange": [441, 452],
+      "summary": "安全地将值转换为浮点数，处理None、空字符串、NA等无效情况。",
+      "tags": ["工具函数", "类型转换", "数据清洗"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:middleware/query_interface.py:llm_parse_query_intent",
+      "type": "function",
+      "name": "llm_parse_query_intent",
+      "filePath": "middleware/query_interface.py",
+      "lineRange": [667, 748],
+      "summary": "使用LLM解析自然语言查询意图，提取时间跨度、监测指标、分析类型和数据源。",
+      "tags": ["意图解析", "llm", "自然语言处理"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:middleware/query_interface.py:fetch_data_for_query",
+      "type": "function",
+      "name": "fetch_data_for_query",
+      "filePath": "middleware/query_interface.py",
+      "lineRange": [750, 807],
+      "summary": "根据解析的意图获取历史数据，将2024年CSV数据映射为当前年份实时数据。",
+      "tags": ["数据获取", "时间映射", "历史数据"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:middleware/query_interface.py:llm_generate_summary",
+      "type": "function",
+      "name": "llm_generate_summary",
+      "filePath": "middleware/query_interface.py",
+      "lineRange": [809, 859],
+      "summary": "使用LLM基于子智能体分析结果生成面向监管人员的自然语言报告。",
+      "tags": ["报告生成", "llm", "结果整合"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:middleware/query_interface.py:initialize_components",
+      "type": "function",
+      "name": "initialize_components",
+      "filePath": "middleware/query_interface.py",
+      "lineRange": [166, 197],
+      "summary": "初始化LLM驱动组件：LLM客户端、协调器和数据获取器。",
+      "tags": ["初始化", "组件管理"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:middleware/query_interface.py:convert_numpy_types",
+      "type": "function",
+      "name": "convert_numpy_types",
+      "filePath": "middleware/query_interface.py",
+      "lineRange": [79, 101],
+      "summary": "递归转换numpy和pandas类型为Python原生类型，确保JSON序列化兼容。",
+      "tags": ["类型转换", "工具函数", "序列化"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:middleware/query_interface.py:handle_query",
+      "type": "function",
+      "name": "handle_query",
+      "filePath": "middleware/query_interface.py",
+      "lineRange": [235, 665],
+      "summary": "处理自然语言查询的主端点。执行LLM意图解析、历史数据获取、子智能体协调分析和结果整合的完整流程。",
+      "tags": ["api端点", "查询处理", "主流程"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:shared/configs/llm_client.py:LLMConfig",
+      "type": "class",
+      "name": "LLMConfig",
+      "filePath": "shared/configs/llm_client.py",
+      "lineRange": [39, 75],
+      "summary": "LLM配置数据类，定义模型名称、参数、API配置和性能设置。",
+      "tags": ["配置类", "dataclass", "模型配置"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:shared/configs/llm_client.py:LLMClient",
+      "type": "class",
+      "name": "LLMClient",
+      "filePath": "shared/configs/llm_client.py",
+      "lineRange": [77, 214],
+      "summary": "LLM客户端类，封装Anthropic API调用。支持chat和chat_stream两种模式，支持primary/fast/analysis模型切换。",
+      "tags": ["客户端类", "anthropic", "api封装"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:shared/configs/llm_client.py:load_llm_config",
+      "type": "function",
+      "name": "load_llm_config",
+      "filePath": "shared/configs/llm_client.py",
+      "lineRange": [221, 298],
+      "summary": "从.env和YAML文件加载LLM配置，合并环境变量和文件配置，优先级：环境变量 > YAML > 默认值。",
+      "tags": ["配置加载", "环境变量", "yaml"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:shared/configs/llm_client.py:get_llm_client",
+      "type": "function",
+      "name": "get_llm_client",
+      "filePath": "shared/configs/llm_client.py",
+      "lineRange": [300, 323],
+      "summary": "获取LLM客户端单例实例，支持重新加载配置。",
+      "tags": ["单例", "工厂函数", "客户端获取"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:shared/configs/llm_client.py:get_subagent_llm_client",
+      "type": "function",
+      "name": "get_subagent_llm_client",
+      "filePath": "shared/configs/llm_client.py",
+      "lineRange": [325, 370],
+      "summary": "获取子智能体的LLM客户端，根据配置判断子智能体是否需要LLM支持。",
+      "tags": ["子智能体", "客户端获取", "条件配置"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:tests/integration/test_subagent_llm_integration.py:TestEndToEndSubagentLLM",
+      "type": "class",
+      "name": "TestEndToEndSubagentLLM",
+      "filePath": "tests/integration/test_subagent_llm_integration.py",
+      "lineRange": [26, 102],
+      "summary": "子智能体LLM配置端到端测试类，验证模型配置和system_prompt设置。",
+      "tags": ["测试类", "集成测试", "llm配置验证"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:middleware/app_orchestrator.py",
+      "target": "file:shared/configs/llm_client.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "file:shared/configs/llm_client.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:tests/integration/test_subagent_llm_integration.py",
+      "target": "file:shared/configs/llm_client.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:middleware/app_orchestrator.py",
+      "target": "function:middleware/app_orchestrator.py:update_prometheus_metrics",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:middleware/app_orchestrator.py",
+      "target": "function:middleware/app_orchestrator.py:safe_float",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "function:middleware/query_interface.py:llm_parse_query_intent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "function:middleware/query_interface.py:fetch_data_for_query",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "function:middleware/query_interface.py:llm_generate_summary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "function:middleware/query_interface.py:initialize_components",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "function:middleware/query_interface.py:convert_numpy_types",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "function:middleware/query_interface.py:handle_query",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "function:middleware/query_interface.py:handle_query",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:shared/configs/llm_client.py",
+      "target": "class:shared/configs/llm_client.py:LLMConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:shared/configs/llm_client.py",
+      "target": "class:shared/configs/llm_client.py:LLMClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:shared/configs/llm_client.py",
+      "target": "function:shared/configs/llm_client.py:load_llm_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:shared/configs/llm_client.py",
+      "target": "function:shared/configs/llm_client.py:get_llm_client",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:shared/configs/llm_client.py",
+      "target": "function:shared/configs/llm_client.py:get_llm_client",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:shared/configs/llm_client.py",
+      "target": "function:shared/configs/llm_client.py:get_subagent_llm_client",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:shared/configs/llm_client.py",
+      "target": "function:shared/configs/llm_client.py:get_subagent_llm_client",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:tests/integration/test_subagent_llm_integration.py",
+      "target": "class:tests/integration/test_subagent_llm_integration.py:TestEndToEndSubagentLLM",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "function:middleware/query_interface.py:handle_query",
+      "target": "function:middleware/query_interface.py:llm_parse_query_intent",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:middleware/query_interface.py:handle_query",
+      "target": "function:middleware/query_interface.py:fetch_data_for_query",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:middleware/query_interface.py:handle_query",
+      "target": "function:middleware/query_interface.py:llm_generate_summary",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:middleware/query_interface.py:llm_parse_query_intent",
+      "target": "function:shared/configs/llm_client.py:get_llm_client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:middleware/query_interface.py:llm_generate_summary",
+      "target": "function:shared/configs/llm_client.py:get_llm_client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:middleware/query_interface.py:initialize_components",
+      "target": "function:shared/configs/llm_client.py:get_llm_client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:shared/configs/llm_client.py:get_llm_client",
+      "target": "function:shared/configs/llm_client.py:load_llm_config",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:shared/configs/llm_client.py:get_llm_client",
+      "target": "class:shared/configs/llm_client.py:LLMClient",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:shared/configs/llm_client.py:get_subagent_llm_client",
+      "target": "function:shared/configs/llm_client.py:load_llm_config",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:shared/configs/llm_client.py:get_subagent_llm_client",
+      "target": "class:shared/configs/llm_client.py:LLMClient",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:middleware/app_orchestrator.py",
+      "target": "file:shared/utils/logger.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:middleware/app_orchestrator.py",
+      "target": "file:shared/utils/errors.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "file:middleware/app_orchestrator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "file:shared/utils/logger.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "file:shared/utils/errors.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:tests/integration/test_subagent_llm_integration.py",
+      "target": "file:middleware/app_orchestrator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:tests/integration/test_subagent_llm_integration.py",
+      "target": "file:middleware/query_interface.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:tests/integration/test_subagent_llm_integration.py",
+      "target": "file:shared/configs/llm_client.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:middleware/query_interface.py",
+      "target": "file:middleware/app_orchestrator.py",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:shared/configs/llm_client.py:LLMClient",
+      "target": "class:shared/configs/llm_client.py:LLMConfig",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

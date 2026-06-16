@@ -1,0 +1,340 @@
+{
+  "nodes": [
+    {
+      "id": "config:.understand-anything/intermediate/architecture-analysis.json",
+      "type": "config",
+      "name": "architecture-analysis.json",
+      "filePath": ".understand-anything/intermediate/architecture-analysis.json",
+      "summary": "系统架构分析结果文件，包含废水虚假排放智能监测系统的架构层级、模块边界和依赖关系的结构化分析数据。",
+      "tags": ["架构分析", "系统文档", "元数据", "知识图谱"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/assembled-graph.json",
+      "type": "config",
+      "name": "assembled-graph.json",
+      "filePath": ".understand-anything/intermediate/assembled-graph.json",
+      "summary": "项目知识图谱的完整数据集，整合所有批次的节点和边，包含代码文件、配置文件、文档和模块之间的完整关系网络。",
+      "tags": ["知识图谱", "数据集", "节点", "边"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-1.json",
+      "type": "config",
+      "name": "batch-1.json",
+      "filePath": ".understand-anything/intermediate/batch-1.json",
+      "summary": "批次1的知识图谱数据，包含异常检测算子库（shared/operators）的模块、类和函数节点及其相互关系。",
+      "tags": ["知识图谱", "异常检测", "算子库", "批次数据"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-10-analysis.json",
+      "type": "config",
+      "name": "batch-10-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-10-analysis.json",
+      "summary": "批次10的分析结果摘要，包含项目根文档（CHANGELOG、CLAUDE、README、requirements）的节点和关系数据。",
+      "tags": ["分析结果", "项目文档", "依赖配置"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-11-analysis.json",
+      "type": "config",
+      "name": "batch-11-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-11-analysis.json",
+      "summary": "批次11的分析结果摘要，包含项目文档（LLM配置指南、项目总结、质量检查报告、专利文档）的节点和关系数据。",
+      "tags": ["分析结果", "项目文档", "专利文档", "质量检查"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-12-analysis.json",
+      "type": "config",
+      "name": "batch-12-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-12-analysis.json",
+      "summary": "批次12的分析结果摘要，包含设计规范文档（UI重设计、架构重构、执行模块、综合测试、PyOD集成、LLM增强）的节点和关系数据。",
+      "tags": ["分析结果", "设计文档", "架构重构", "测试设计"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-13-analysis.json",
+      "type": "config",
+      "name": "batch-13-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-13-analysis.json",
+      "summary": "批次13的分析结果摘要，包含实施计划文档（UI重设计、架构重构、执行模块、综合测试、数据获取、编排器、PyOD、LLM、Web界面）的节点和关系数据。",
+      "tags": ["分析结果", "实施计划", "架构重构", "开发计划"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-14-analysis.json",
+      "type": "config",
+      "name": "batch-14-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-14-analysis.json",
+      "summary": "批次14的分析结果摘要，包含Grafana监控配置（双流仪表板、Prometheus配置）的节点和关系数据。",
+      "tags": ["分析结果", "监控配置", "Grafana", "可视化"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-15-analysis.json",
+      "type": "config",
+      "name": "batch-15-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-15-analysis.json",
+      "summary": "批次15的分析结果摘要，包含接口规范文档（配置验证、错误码、输入/输出模式、技能接口、技能模板、状态管理、子智能体协议）的节点和关系数据。",
+      "tags": ["分析结果", "接口规范", "数据模式", "通信协议"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-16-analysis.json",
+      "type": "config",
+      "name": "batch-16-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-16-analysis.json",
+      "summary": "批次16的分析结果摘要，包含系统配置文件（智能体注册表、异常配置、config.v2、共识配置、处置配置、LLM配置、算子配置、专利配置、规则配置、技能注册、子智能体注册、系统配置、验证规则）的节点和关系数据。",
+      "tags": ["分析结果", "系统配置", "智能体配置", "参数配置"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-17-analysis.json",
+      "type": "config",
+      "name": "batch-17-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-17-analysis.json",
+      "summary": "批次17的分析结果摘要，包含异常检测子智能体的身份文档（AGENTS、IDENTITY、MEMORY、SOUL、TOOLS、USER、config）的节点和关系数据。",
+      "tags": ["分析结果", "子智能体", "异常检测", "身份文档"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-18-analysis.json",
+      "type": "config",
+      "name": "batch-18-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-18-analysis.json",
+      "summary": "批次18的分析结果摘要，包含异常检测核心技能的参考文档（算子清单、算子说明、违规模式）的节点和关系数据。",
+      "tags": ["分析结果", "异常检测", "算子库", "违规模式"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-19-analysis.json",
+      "type": "config",
+      "name": "batch-19-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-19-analysis.json",
+      "summary": "批次19的分析结果摘要，包含处置执行子智能体的身份文档（AGENTS、IDENTITY、MEMORY、SOUL、TOOLS、USER）的节点和关系数据。",
+      "tags": ["分析结果", "子智能体", "处置执行", "预警分级"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-20-analysis.json",
+      "type": "config",
+      "name": "batch-20-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-20-analysis.json",
+      "summary": "批次20的分析结果摘要，包含多维数据感知子智能体的身份文档（AGENTS、IDENTITY、MEMORY、SOUL、TOOLS、USER）的节点和关系数据。",
+      "tags": ["分析结果", "子智能体", "数据感知", "数据处理"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-21-analysis.json",
+      "type": "config",
+      "name": "batch-21-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-21-analysis.json",
+      "summary": "批次21的分析结果摘要，包含规则推理子智能体的身份文档（AGENTS、IDENTITY、MEMORY、SOUL、TOOLS、USER、config、state）的节点和关系数据。",
+      "tags": ["分析结果", "子智能体", "规则推理", "违规判定"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-22.json",
+      "type": "config",
+      "name": "batch-22.json",
+      "filePath": ".understand-anything/intermediate/batch-22.json",
+      "summary": "批次22的知识图谱数据，包含测试报告文件（HTML和JSON格式）的节点和关系数据。",
+      "tags": ["知识图谱", "测试报告", "HTML", "可视化"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-23-analysis.json",
+      "type": "config",
+      "name": "batch-23-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-23-analysis.json",
+      "summary": "批次23的分析结果摘要，包含集成测试文档（失败分析、集成测试报告、编排器集成报告）的节点和关系数据。",
+      "tags": ["分析结果", "集成测试", "失败分析", "测试报告"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-24-analysis.json",
+      "type": "config",
+      "name": "batch-24-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-24-analysis.json",
+      "summary": "批次24的分析结果摘要，包含主智能体工作空间的身份文档（AGENTS、HEARTBEAT、IDENTITY、MEMORY、SKILL、SOUL、TOOLS、USER）的节点和关系数据。",
+      "tags": ["分析结果", "主智能体", "工作空间", "编排器"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-25-analysis.json",
+      "type": "config",
+      "name": "batch-25-analysis.json",
+      "filePath": ".understand-anything/intermediate/batch-25-analysis.json",
+      "summary": "批次25的分析结果摘要，包含报告模板文件（每日简报、应急简报、违规报告）的节点和关系数据。",
+      "tags": ["分析结果", "报告模板", "监测简报", "违规报告"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/batch-26.json",
+      "type": "config",
+      "name": "batch-26.json",
+      "filePath": ".understand-anything/intermediate/batch-26.json",
+      "summary": "批次26的知识图谱数据，包含编排器核心参考文档（决策规则、升级协议、历史案例、子智能体清单、工作流模式）的节点和关系数据。",
+      "tags": ["知识图谱", "编排器", "决策规则", "工作流"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:.understand-anything/intermediate/assembled-graph.json",
+      "target": "config:.understand-anything/intermediate/architecture-analysis.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/assembled-graph.json",
+      "target": "config:.understand-anything/intermediate/batch-1.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/assembled-graph.json",
+      "target": "config:.understand-anything/intermediate/batch-22.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/assembled-graph.json",
+      "target": "config:.understand-anything/intermediate/batch-26.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-16-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-17-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-16-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-19-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-16-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-20-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-16-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-21-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-18-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-17-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-24-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-26.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-24-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-17-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-24-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-20-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-24-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-19-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-24-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-21-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-26.json",
+      "target": "config:.understand-anything/intermediate/batch-17-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-26.json",
+      "target": "config:.understand-anything/intermediate/batch-21-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-26.json",
+      "target": "config:.understand-anything/intermediate/batch-25-analysis.json",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-23-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-22.json",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-12-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-13-analysis.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-11-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-10-analysis.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-15-analysis.json",
+      "target": "config:.understand-anything/intermediate/batch-16-analysis.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.understand-anything/intermediate/batch-1.json",
+      "target": "config:.understand-anything/intermediate/batch-17-analysis.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

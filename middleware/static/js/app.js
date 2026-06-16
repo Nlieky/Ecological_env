@@ -447,7 +447,15 @@ function createAnomalyStats(anomalyDetails) {
     });
 
     const severityLabels = { 'high': '高', 'critical': '严重', 'medium': '中', 'low': '低', 'unknown': '未知' };
-    const patternLabels = { 'constant': '常数异常', 'spike': '尖峰异常', 'drop': '骤降异常', 'trend': '趋势异常', 'unknown': '未知模式' };
+    // 模式标签与后端 pattern_recognizer.py 保持一致
+    const patternLabels = {
+        'constant': '恒定异常',
+        'spike': '突变异常',
+        'trend': '趋势异常',
+        'periodic': '周期异常',
+        'high_freq_volatility': '高频波动异常',
+        'unknown': '未知模式'
+    };
 
     statsDiv.innerHTML = `
         <h4 style="margin-bottom: 12px; font-size: 14px;">📊 异常统计 (共 ${anomalyDetails.length} 个)</h4>
@@ -462,7 +470,7 @@ function createAnomalyStats(anomalyDetails) {
             </div>
             <div style="background: white; padding: 8px; border-radius: 4px;">
                 <strong>异常模式:</strong><br>
-                ${Object.entries(patternCounts).map(([key, val]) => `${patternLabels[key] || key}: ${val}`).join('<br>')}
+                ${Object.entries(patternLabels).map(([key, label]) => `${label}: ${patternCounts[key] || 0}`).join('<br>')}
             </div>
         </div>
     `;

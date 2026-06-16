@@ -1,0 +1,21 @@
+{
+  "projectRoot": "E:/project/Ecological_env",
+  "batchFiles": [
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/__init__.py", "language": "python", "sizeLines": 20, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_acquisition.py", "language": "python", "sizeLines": 233, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_cleaning.py", "language": "python", "sizeLines": 195, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_decomposition.py", "language": "python", "sizeLines": 155, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_pipeline.py", "language": "python", "sizeLines": 274, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/standardization.py", "language": "python", "sizeLines": 247, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/time_alignment.py", "language": "python", "sizeLines": 219, "fileCategory": "code"}
+  ],
+  "batchImportData": {
+    "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/__init__.py":["subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_acquisition.py","subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_cleaning.py","subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_decomposition.py","subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_pipeline.py","subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/standardization.py","subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/time_alignment.py"],
+    "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_acquisition.py":[],
+    "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_cleaning.py":[],
+    "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_decomposition.py":[],
+    "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/data_pipeline.py":[],
+    "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/standardization.py":[],
+    "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/time_alignment.py":[]
+  }
+}

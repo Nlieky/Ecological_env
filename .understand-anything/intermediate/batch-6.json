@@ -1,0 +1,462 @@
+{
+  "nodes": [
+    {
+      "id": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "summary": "规则推理核心技能包入口文件，整合法规匹配、工艺校验、专家推理和违规结论生成四大模块，提供统一的任务执行接口",
+      "tags": ["entry-point", "barrel", "集成模块"],
+      "complexity": "simple",
+      "languageNotes": "Python包入口文件，采用重导出模式组织模块，提供run_rule_reasoning作为主入口函数"
+    },
+    {
+      "id": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "type": "file",
+      "name": "expert_reasoner.py",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "summary": "专家经验推理模块，应用专家规则库进行造假模式识别、综合嫌疑等级判定和历史案例匹配，支持插瓶干扰、稀释排放、暗管偷排等典型违规模式的识别",
+      "tags": ["推理引擎", "模式匹配", "案例分析"],
+      "complexity": "complex",
+      "languageNotes": "实现基于规则的专家系统，包含造假特征库、典型案例库和相似度匹配算法（相似度≥0.8判定为同类违规）"
+    },
+    {
+      "id": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py",
+      "type": "file",
+      "name": "process_validator.py",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py",
+      "summary": "工艺机理校验模块，通过生化反应联动规则、物料平衡规则、相关性规则和氨氮-总氮转化规则进行物理化学合理性判断，检测数据是否违背污水处理工艺机理",
+      "tags": ["工艺校验", "机理验证", "数据分析"],
+      "complexity": "complex",
+      "languageNotes": "专利增强版，新增氨氮-总氮转化规则校验，包含相关性检测、浓度比值验证和去除率合理性检查"
+    },
+    {
+      "id": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py",
+      "type": "file",
+      "name": "regulation_matcher.py",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py",
+      "summary": "法规规则匹配模块，加载水污染防治法、城镇污水处理厂污染物排放标准等法规库，对异常数据进行合规性校验和超标判定",
+      "tags": ["法规匹配", "合规检查", "标准验证"],
+      "complexity": "moderate",
+      "languageNotes": "内置GB 18918-2002排放标准限值和HJ 355-2019在线监测技术规范，支持多级排放标准判定"
+    },
+    {
+      "id": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "type": "file",
+      "name": "violation_generator.py",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "summary": "违规结论生成模块，综合法规匹配、工艺校验和专家推理结果，生成包含违规类型判定、嫌疑等级分级、取证要点和处罚建议的完整监测报告",
+      "tags": ["报告生成", "结论判定", "处罚建议"],
+      "complexity": "moderate",
+      "languageNotes": "实现专利要求的嫌疑等级判定规则：高风险（异常模式≥2且存在机理违背）、中风险（异常模式=1且存在机理违背）、低风险（仅异常模式无机理违背）"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "type": "function",
+      "name": "run_rule_reasoning",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "lineRange": [23, 97],
+      "summary": "执行规则推理任务的主入口函数，依次调用法规匹配、工艺校验、专家推理和违规结论生成模块，返回完整的推理结果",
+      "tags": ["入口函数", "任务编排", "模块集成"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner",
+      "type": "class",
+      "name": "ExpertReasoner",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "lineRange": [18, 393],
+      "summary": "专家经验推理器，内置造假模式库（插瓶干扰、稀释排放、暗管偷排等）和典型案例库，通过特征提取、模式匹配、组合分析和嫌疑等级判定生成推理结果",
+      "tags": ["推理引擎", "专家系统", "模式识别"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner.reason",
+      "type": "function",
+      "name": "ExpertReasoner.reason",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "lineRange": [141, 214],
+      "summary": "执行专家经验推理，进行特征提取、模式匹配、组合分析、嫌疑等级判定和案例匹配，返回包含匹配模式和嫌疑等级的推理结果",
+      "tags": ["推理逻辑", "模式匹配", "等级判定"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner._match_cases",
+      "type": "function",
+      "name": "ExpertReasoner._match_cases",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "lineRange": [353, 392],
+      "summary": "匹配历史案例库，计算当前异常特征与历史案例的相似度，当相似度≥0.8时判定为同类违规并返回匹配的案例信息",
+      "tags": ["案例匹配", "相似度计算", "违规分类"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "lineRange": [396, 490],
+      "summary": "主入口函数，处理来自异常检测子智能体的数据，支持多种输入格式（task、case_facts、anomaly_result），执行推理并返回标准化结果",
+      "tags": ["入口函数", "数据适配", "结果封装"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator",
+      "type": "class",
+      "name": "ProcessValidator",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py",
+      "lineRange": [19, 399],
+      "summary": "工艺机理校验器，内置生化反应规则、物料平衡规则、相关性规则和氨氮-总氮转化规则知识库，检测数据是否违背污水处理工艺机理",
+      "tags": ["工艺校验", "机理验证", "专利算法"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator.validate",
+      "type": "function",
+      "name": "ProcessValidator.validate",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py",
+      "lineRange": [113, 175],
+      "summary": "执行工艺机理校验，依次进行生化反应规则、物料平衡规则、相关性规则和氨氮-总氮转化规则校验，返回违背清单和合规状态",
+      "tags": ["校验逻辑", "规则执行", "合规判定"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator._validate_nitrogen_conversion_rules",
+      "type": "function",
+      "name": "ProcessValidator._validate_nitrogen_conversion_rules",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py",
+      "lineRange": [279, 391],
+      "summary": "校验氨氮-总氮转化规则（专利核心算法），检测氨氮与总氮的相关性、浓度约束、比值范围和去除率合理性，识别违背氮转化机理的数据造假",
+      "tags": ["专利算法", "氮转化规则", "机理验证"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py:RegulationMatcher",
+      "type": "class",
+      "name": "RegulationMatcher",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py",
+      "lineRange": [19, 182],
+      "summary": "法规规则匹配器，内置城镇污水处理厂污染物排放标准（GB 18918-2002）、水污染源在线监测技术规范（HJ 355-2019）和水污染防治法等法规库，执行合规性校验",
+      "tags": ["法规匹配", "合规检查", "标准库"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py:RegulationMatcher.match",
+      "type": "function",
+      "name": "RegulationMatcher.match",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py",
+      "lineRange": [81, 145],
+      "summary": "匹配法规规则，检查异常数据是否超标（与GB 18918-2002标准比对）或存在数据造假嫌疑（恒定值模式），返回违规清单和合规状态",
+      "tags": ["规则匹配", "超标判定", "违规检测"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator",
+      "type": "class",
+      "name": "ViolationGenerator",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "lineRange": [18, 293],
+      "summary": "违规结论生成器，综合法规匹配、工艺校验和专家推理结果，生成包含违规类型、嫌疑等级、判定结果、取证要点和处罚建议的完整监测报告",
+      "tags": ["报告生成", "结论综合", "处罚建议"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator.generate",
+      "type": "function",
+      "name": "ViolationGenerator.generate",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "lineRange": [36, 98],
+      "summary": "生成违规结论，确定结论类型（违规/可疑/正常）、嫌疑等级、判定结果、取证要点和处罚建议，返回完整的违规结论对象",
+      "tags": ["结论生成", "等级判定", "报告生成"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator._determine_suspicion_level",
+      "type": "function",
+      "name": "ViolationGenerator._determine_suspicion_level",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "lineRange": [122, 152],
+      "summary": "确定嫌疑等级（专利要求规则），基于异常模式匹配数量和工艺机理违背情况判定：高风险（≥2个模式且有机理违背）、中风险（1个模式且有机理违背）、低风险（仅模式无机理违背）",
+      "tags": ["专利规则", "等级判定", "风险评估"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "lineRange": [297, 350],
+      "summary": "主入口函数，提取异常列表、法规匹配、工艺校验和专家推理结果，调用ViolationGenerator生成违规结论并返回标准化结果",
+      "tags": ["入口函数", "结果封装", "数据集成"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py:RegulationMatcher",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py:RegulationMatcher",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py:RegulationMatcher.match",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator.validate",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner.reason",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/__init__.py:run_rule_reasoning",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator.generate",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner.reason",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner._match_cases",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator.validate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator._validate_nitrogen_conversion_rules",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py:RegulationMatcher",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py:RegulationMatcher",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/regulation_matcher.py:RegulationMatcher.match",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator.generate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator._determine_suspicion_level",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:main",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:main",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner.reason",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:main",
+      "target": "class:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:main",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator.generate",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner.reason",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/expert_reasoner.py:ExpertReasoner._match_cases",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator.validate",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/process_validator.py:ProcessValidator._validate_nitrogen_conversion_rules",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator.generate",
+      "target": "function:subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_generator.py:ViolationGenerator._determine_suspicion_level",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

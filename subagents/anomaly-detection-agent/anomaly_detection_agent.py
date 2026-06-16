@@ -93,8 +93,49 @@ class AnomalyDetectionAgent:
                              if col not in ["times", "timestamp"]
                              and not col.startswith("PC")]
 
-            operators = request.get("operators", ["isolation_forest", "statistical"])
-            threshold = request.get("threshold", 0.7)
+            # 新增：基于意图的动态算子选择
+            intent = request.get("intent")
+            operators = request.get("operators")
+
+            if intent is not None and operators is None:
+                # 使用意图映射动态选择算子
+                logger.info(f"[ANOMALY] 使用意图映射选择算子...")
+                logger.info(f"[ANOMALY] 意图: {intent}")
+
+                try:
+                    # 构建简化的 intent 对象用于算子选择
+                    intent_for_mapping = {
+                        "analysis_types": intent.get("analysis_types", ["anomaly"]),
+                        "indicators": indicators,
+                        "query_type": "multi" if len(indicators) > 1 else "single"
+                    }
+
+                    # 调用算子适配器的意图映射功能
+                    selection_result = self.operator_adapter.select_operators_by_intent(
+                        intent=intent_for_mapping,
+                        data=data
+                    )
+
+                    selected_operators = selection_result.get("selected_operators", [])
+                    if selected_operators:
+                        operators = selected_operators
+                        logger.info(f"[ANOMALY] 意图映射选择算子: {operators}")
+                        logger.info(f"[ANOMALY] 选择原因: {selection_result.get('reason', '')}")
+                    else:
+                        # 映射失败，使用默认算子（优先鲁棒方法）
+                        operators = ["hampel", "iqr_conservative", "zscore"]
+                        logger.warning(f"[ANOMALY] 意图映射未返回算子，使用默认算子: {operators}")
+
+                except Exception as e:
+                    # 意图映射失败，使用默认算子（优先鲁棒方法）
+                    operators = ["hampel", "iqr_conservative", "zscore"]
+                    logger.warning(f"[ANOMALY] 意图映射失败: {e}，使用默认算子: {operators}")
+            elif operators is None:
+                # 没有 intent 也没有指定算子，使用默认算子（优先鲁棒方法）
+                operators = ["hampel", "iqr_conservative", "zscore"]
+                logger.info(f"[ANOMALY] 使用默认算子: {operators}")
+
+            threshold = request.get("threshold", 0.5)  # 降低默认阈值从0.7到0.5
 
             # ========== 步骤1: 算子调用与适配 ==========
             logger.info("[STEP 1/4] 算子调用与适配...")

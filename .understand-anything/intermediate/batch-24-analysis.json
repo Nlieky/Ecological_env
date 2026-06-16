@@ -1,0 +1,134 @@
+{
+  "nodes": [
+    {
+      "id": "document:workspace/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "workspace/AGENTS.md",
+      "summary": "主智能体工作空间配置文件，定义了会话启动流程、记忆管理规则、工作原则、职责边界、双驱动运行机制（实时监测模式和查询响应模式）以及子智能体调度规则。",
+      "tags": ["documentation", "configuration", "multi-agent", "orchestration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:workspace/HEARTBEAT.md",
+      "type": "document",
+      "name": "HEARTBEAT.md",
+      "filePath": "workspace/HEARTBEAT.md",
+      "summary": "心跳配置说明文件，定义了任务调度策略（子智能体健康检查、每日/每周/每月报告）以及相关配置路径。",
+      "tags": ["documentation", "configuration", "scheduling", "monitoring"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:workspace/IDENTITY.md",
+      "type": "document",
+      "name": "IDENTITY.md",
+      "filePath": "workspace/IDENTITY.md",
+      "summary": "主智能体身份卡片，定义了基本信息、核心价值、能力边界、管理的4个子智能体、LLM驱动模式和动态编排策略。",
+      "tags": ["documentation", "identity", "multi-agent", "orchestrator"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:workspace/MEMORY.md",
+      "type": "document",
+      "name": "MEMORY.md",
+      "filePath": "workspace/MEMORY.md",
+      "summary": "全局长期记忆文档，包含子智能体架构、六层系统架构、监测指标标准、4个子智能体职责分工、违规模式知识库、结果复用规则、历史决策案例、工作流程经验和优化建议。",
+      "tags": ["documentation", "knowledge-base", "architecture", "domain-knowledge"],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:workspace/SKILL.md",
+      "type": "document",
+      "name": "SKILL.md",
+      "filePath": "workspace/SKILL.md",
+      "summary": "主智能体技能说明文档，详细描述了核心能力（语义解析、任务编排、动态协调、结果复用）、管理的子智能体、任务类型映射、核心技能包组件和专利算法。",
+      "tags": ["documentation", "skills", "orchestration", "api-reference"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:workspace/SOUL.md",
+      "type": "document",
+      "name": "SOUL.md",
+      "filePath": "workspace/SOUL.md",
+      "summary": "主智能体的"灵魂"文档，定义了核心原则、工作哲学（全局优先、数据驱动、及时响应）、边界、响应风格和连续性规则。",
+      "tags": ["documentation", "philosophy", "personality", "guidelines"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:workspace/TOOLS.md",
+      "type": "document",
+      "name": "TOOLS.md",
+      "filePath": "workspace/TOOLS.md",
+      "summary": "环境配置速查表，包含Flask中间件配置、数据路径、子智能体脚本路径、API端点和监控配置。",
+      "tags": ["documentation", "configuration", "environment", "reference"],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:workspace/USER.md",
+      "type": "document",
+      "name": "USER.md",
+      "filePath": "workspace/USER.md",
+      "summary": "用户信息文档，描述了用户的基本信息、项目角色、关注重点（系统稳定性、违规检测准确性、数据完整性、告警及时性）和偏好。",
+      "tags": ["documentation", "user-profile", "preferences"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:workspace/AGENTS.md",
+      "target": "document:workspace/MEMORY.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:workspace/AGENTS.md",
+      "target": "document:workspace/IDENTITY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:workspace/IDENTITY.md",
+      "target": "document:workspace/SKILL.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:workspace/SKILL.md",
+      "target": "document:workspace/MEMORY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:workspace/TOOLS.md",
+      "target": "document:workspace/SKILL.md",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:workspace/USER.md",
+      "target": "document:workspace/AGENTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:workspace/SOUL.md",
+      "target": "document:workspace/IDENTITY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:workspace/HEARTBEAT.md",
+      "target": "document:workspace/TOOLS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

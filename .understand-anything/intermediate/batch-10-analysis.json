@@ -1,0 +1,81 @@
+{
+  "nodes": [
+    {
+      "id": "document:CHANGELOG.md",
+      "type": "document",
+      "name": "CHANGELOG.md",
+      "filePath": "CHANGELOG.md",
+      "summary": "项目变更日志，记录v2.0.0到v2.2.0的版本演进，包括Web智能查询界面、LLM驱动架构、四智能体重构、共识引擎和违规检测模块的完整更新历史。",
+      "tags": ["文档", "变更日志", "版本历史", "发布记录"],
+      "complexity": "moderate",
+      "languageNotes": "Markdown格式的变更日志，采用语义化版本控制，结构化记录新增功能、架构变更和bug修复。"
+    },
+    {
+      "id": "document:CLAUDE.md",
+      "type": "document",
+      "name": "CLAUDE.md",
+      "filePath": "CLAUDE.md",
+      "summary": "Claude Code项目配置文档，提供项目概述、常用命令、架构说明、LLM集成策略和关键文件索引，是理解项目技术细节的权威指南。",
+      "tags": ["文档", "开发指南", "配置文档", "架构说明"],
+      "complexity": "moderate",
+      "languageNotes": "技术文档，包含代码示例、架构图表和详细的命令行使用说明，为开发者提供完整的工作流程指导。"
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "项目主要说明文档，基于专利架构详细描述废水虚假排放智能监测系统，包含专利概述、核心能力、最新功能、目录结构、系统架构和快速开始指南。",
+      "tags": ["文档", "入口点", "项目概述", "用户指南"],
+      "complexity": "moderate",
+      "languageNotes": "综合性的项目文档，采用中文编写，包含ASCII艺术架构图、表格说明和代码示例，适合新用户快速了解系统。"
+    },
+    {
+      "id": "config:requirements.txt",
+      "type": "config",
+      "name": "requirements.txt",
+      "filePath": "requirements.txt",
+      "summary": "Python项目依赖配置文件，定义41个核心依赖包，涵盖数据处理、Web框架、深度学习、LLM集成、可视化和测试框架等技术栈。",
+      "tags": ["配置", "依赖管理", "Python包", "开发环境"],
+      "complexity": "simple",
+      "languageNotes": "标准pip requirements格式，使用精确版本号锁定依赖，包含pandas、Flask、torch、tensorflow、anthropic等核心库。"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:README.md",
+      "target": "document:CHANGELOG.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "document:CLAUDE.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CLAUDE.md",
+      "target": "config:requirements.txt",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "config:requirements.txt",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:requirements.txt",
+      "target": "document:README.md",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

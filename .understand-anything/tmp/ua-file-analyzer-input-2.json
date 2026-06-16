@@ -1,0 +1,15 @@
+{
+  "projectRoot": "E:/project/Ecological_env",
+  "batchFiles": [
+    {"path": "workspace/skills/orchestrator-core/scripts/__init__.py", "language": "python", "sizeLines": 114, "fileCategory": "code"},
+    {"path": "workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py", "language": "python", "sizeLines": 416, "fileCategory": "code"},
+    {"path": "workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py", "language": "python", "sizeLines": 258, "fileCategory": "code"},
+    {"path": "workspace/skills/orchestrator-core/scripts/execution_control.py", "language": "python", "sizeLines": 2420, "fileCategory": "code"},
+    {"path": "workspace/skills/orchestrator-core/scripts/execution_engine.py", "language": "python", "sizeLines": 112, "fileCategory": "code"},
+    {"path": "workspace/skills/orchestrator-core/scripts/resource_matching.py", "language": "python", "sizeLines": 899, "fileCategory": "code"},
+    {"path": "workspace/skills/orchestrator-core/scripts/result_reuse.py", "language": "python", "sizeLines": 582, "fileCategory": "code"},
+    {"path": "workspace/skills/orchestrator-core/scripts/task_flow_generation.py", "language": "python", "sizeLines": 450, "fileCategory": "code"},
+    {"path": "workspace/skills/orchestrator-core/scripts/task_structuring.py", "language": "python", "sizeLines": 334, "fileCategory": "code"}
+  ],
+  "batchImportData": {"workspace/skills/orchestrator-core/scripts/__init__.py":["workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py","workspace/skills/orchestrator-core/scripts/execution_control.py","workspace/skills/orchestrator-core/scripts/resource_matching.py","workspace/skills/orchestrator-core/scripts/result_reuse.py","workspace/skills/orchestrator-core/scripts/task_flow_generation.py","workspace/skills/orchestrator-core/scripts/task_structuring.py"],"workspace/skills/orchestrator-core/scripts/cross_domain_analyzer.py":[],"workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py":[],"workspace/skills/orchestrator-core/scripts/execution_control.py":["workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py"],"workspace/skills/orchestrator-core/scripts/execution_engine.py":["workspace/skills/orchestrator-core/scripts/dynamic_orchestrator.py"],"workspace/skills/orchestrator-core/scripts/resource_matching.py":[],"workspace/skills/orchestrator-core/scripts/result_reuse.py":[],"workspace/skills/orchestrator-core/scripts/task_flow_generation.py":[],"workspace/skills/orchestrator-core/scripts/task_structuring.py":[]}
+}

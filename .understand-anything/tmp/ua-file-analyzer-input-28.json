@@ -1,0 +1,31 @@
+{
+  "projectRoot": "E:/project/Ecological_env",
+  "batchFiles": [
+    {"path": "shared/models/statistical/statistical.py", "language": "python", "sizeLines": 374, "fileCategory": "code"},
+    {"path": "shared/outputs/alerts/alerts.jsonl", "language": "jsonl", "sizeLines": 52, "fileCategory": "code"},
+    {"path": "shared/outputs/alerts/summary.json", "language": "json", "sizeLines": 169, "fileCategory": "config"},
+    {"path": "shared/outputs/reports/daily_20260421.json", "language": "json", "sizeLines": 24, "fileCategory": "config"},
+    {"path": "stream/dual_data_stream.py", "language": "python", "sizeLines": 145, "fileCategory": "code"},
+    {"path": "subagents/__init__.py", "language": "python", "sizeLines": 48, "fileCategory": "code"},
+    {"path": "subagents/anomaly-detection-agent/anomaly_detection_agent.py", "language": "python", "sizeLines": 252, "fileCategory": "code"},
+    {"path": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/SKILL.md", "language": "markdown", "sizeLines": 119, "fileCategory": "docs"},
+    {"path": "subagents/disposition-execution-agent/skills/disposition-execution-core/__init__.py", "language": "python", "sizeLines": 1, "fileCategory": "code"},
+    {"path": "subagents/disposition-execution-agent/skills/disposition-execution-core/SKILL.md", "language": "markdown", "sizeLines": 169, "fileCategory": "docs"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/__init__.py", "language": "python", "sizeLines": 1, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/historical_data_fetcher.py", "language": "python", "sizeLines": 465, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/scripts/standardization.py", "language": "python", "sizeLines": 247, "fileCategory": "code"},
+    {"path": "subagents/multi-dimensional-data-perception-agent/skills/data-perception-core/SKILL.md", "language": "markdown", "sizeLines": 120, "fileCategory": "docs"},
+    {"path": "subagents/rule-reasoning-agent/memory/2026-05-21.md", "language": "markdown", "sizeLines": 23, "fileCategory": "docs"},
+    {"path": "subagents/rule-reasoning-agent/rule_reasoning_agent.py", "language": "python", "sizeLines": 190, "fileCategory": "code"},
+    {"path": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/expert_experience/典型违规模式.md", "language": "markdown", "sizeLines": 134, "fileCategory": "docs"},
+    {"path": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/process_knowledge/生化处理工艺.md", "language": "markdown", "sizeLines": 102, "fileCategory": "docs"},
+    {"path": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/regulations/排放标准.md", "language": "markdown", "sizeLines": 59, "fileCategory": "docs"},
+    {"path": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/regulations/水污染防治法.md", "language": "markdown", "sizeLines": 43, "fileCategory": "docs"},
+    {"path": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/violation_detector.py", "language": "python", "sizeLines": 497, "fileCategory": "code"},
+    {"path": "subagents/rule-reasoning-agent/skills/rule-reasoning-core/SKILL.md", "language": "markdown", "sizeLines": 108, "fileCategory": "docs"},
+    {"path": "subagents/skill-creator/LICENSE.txt", "language": "text", "sizeLines": 202, "fileCategory": "docs"},
+    {"path": "subagents/skill-creator/references/output-patterns.md", "language": "markdown", "sizeLines": 82, "fileCategory": "docs"},
+    {"path": "subagents/skill-creator/references/workflows.md", "language": "markdown", "sizeLines": 28, "fileCategory": "docs"}
+  ],
+  "batchImportData": {}
+}

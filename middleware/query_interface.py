@@ -11,8 +11,9 @@ import logging
 import sys
 import os
 import json
+import threading
 from datetime import datetime, timedelta
-from flask import Flask, request, Response
+from flask import Flask, request, Response, jsonify
 from pathlib import Path
 
 # 添加项目路径
@@ -156,6 +157,11 @@ llm_coordinator = None
 data_fetcher = None
 llm_client = None
 
+# 分析报告存储（保存最近50次查询的分析报告）
+analysis_reports = []
+MAX_REPORTS = 50
+reports_lock = threading.Lock()
+
 
 def initialize_components():
     """初始化LLM驱动组件"""
@@ -200,6 +206,30 @@ def health():
         'llm_available': llm_client is not None
     }, cls=NumpyJSONEncoder)
     return Response(result, mimetype='application/json')
+
+
+@app.route('/api/query/analysis', methods=['GET'])
+def get_analysis_reports():
+    """
+    获取查询分析报告列表
+
+    返回最近的查询分析报告
+    """
+    try:
+        with reports_lock:
+            reports = list(analysis_reports)
+
+        return jsonify({
+            'status': 'ok',
+            'total': len(reports),
+            'results': reports
+        })
+    except Exception as e:
+        log_error(f"[ERROR] 获取分析报告失败: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 
 @app.route('/api/query', methods=['POST'])
@@ -393,6 +423,44 @@ def handle_query():
                 'summary': str(summary) if summary else ''
             }
 
+            # ========== 添加透明度信息 ==========
+            # 从 intent 中获取时间范围信息
+            hours_back = intent.get('hours_back', 24)
+            query_time_desc = f"过去{hours_back}小时" if hours_back >= 24 else f"过去{hours_back}小时"
+
+            # 尝试从 historical_data 的 metadata 中获取实际时间范围
+            actual_time_range = "N/A"
+            if isinstance(historical_data, dict) and 'metadata' in historical_data:
+                metadata = historical_data['metadata']
+                if isinstance(metadata, dict) and 'time_range' in metadata:
+                    tr = metadata['time_range']
+                    if isinstance(tr, dict):
+                        start = tr.get('start', '')
+                        end = tr.get('end', '')
+                        if start and end:
+                            actual_time_range = f"{start} ~ {end}"
+
+            # 从异常检测结果中获取算子信息
+            operators_used = ['zscore', 'iqr', 'isolation_forest']  # 默认算子
+            if anomaly_result and isinstance(anomaly_result, dict):
+                # 尝试从 metadata 中获取算子信息
+                if 'metadata' in anomaly_result:
+                    meta = anomaly_result['metadata']
+                    if isinstance(meta, dict) and 'operators_used' in meta:
+                        operators_used = meta['operators_used']
+
+            # 构建透明度信息
+            result['process_info'] = {
+                'query_time_range': query_time_desc,
+                'actual_time_range': actual_time_range,
+                'actual_data_count': {
+                    'influent': int(len(processed_data.get('influent', []))),
+                    'effluent': int(len(processed_data.get('effluent', [])))
+                },
+                'anomaly_count': 0,  # 将在后面更新
+                'operators_used': operators_used
+            }
+
             # ========== 添加时序数据（用于前端图表绘制）==========
             # 使用预处理后的数据以确保与异常检测使用的数据一致
             result['timeseries_data'] = {
@@ -502,15 +570,23 @@ def handle_query():
 
                     # 转换为前端格式
                     for anomaly in matched_anomalies:
+                        index_value = anomaly.get('index', anomaly.get('data_index', -1))
                         result['anomaly_details'].append({
                             'indicator': anomaly.get('indicator', ''),
                             'times': anomaly.get('times', ''),
+                            'index': index_value,  # 新增：优先使用 index
                             'score': anomaly.get('score', 0),
                             'pattern': anomaly.get('pattern', ''),
                             'severity': anomaly.get('severity', 'medium'),
-                            'data_index': anomaly.get('data_index', -1)
+                            'data_index': anomaly.get('data_index', anomaly.get('index', -1))  # 保持兼容性
                         })
+                        # 调试：打印每个异常点的关键信息
+                        log_info(f"[QUERY] 异常点: indicator={anomaly.get('indicator')}, times={anomaly.get('times')}, index={index_value}")
                     log_info(f"[QUERY] 提取异常点详情: {len(result['anomaly_details'])} 个")
+
+                    # 更新透明度信息中的异常点数量
+                    if 'process_info' in result:
+                        result['process_info']['anomaly_count'] = len(result['anomaly_details'])
 
             # ========== 添加分析结果 ==========
             result['analysis_results'] = {}
@@ -540,6 +616,27 @@ def handle_query():
             log_info(f"[QUERY] Result keys: {list(result.keys())}")
             log_info(f"[QUERY] 时序数据: influent={len(result['timeseries_data']['influent'])}, effluent={len(result['timeseries_data']['effluent'])}")
             log_info(f"[QUERY] 异常点: {len(result['anomaly_details'])} 个")
+
+            # ========== 保存分析报告 ==========
+            report = {
+                'timestamp': datetime.now().isoformat(),
+                'query': query,
+                'summary': result.get('summary', ''),
+                'anomalies_count': len(result.get('anomaly_details', [])),
+                'violations_count': 0,  # 暂时不统计违规
+                'report': result.get('summary', ''),
+                'data_info': result.get('data_info', {}),
+                'process_info': result.get('process_info', {}),
+                'indicators': intent.get('indicators', []),
+                'time_range': intent.get('hours_back', 24)
+            }
+
+            with reports_lock:
+                analysis_reports.append(report)
+                # 只保留最近MAX_REPORTS次报告
+                if len(analysis_reports) > MAX_REPORTS:
+                    analysis_reports.pop(0)
+                log_info(f"[REPORT] 分析报告已保存，当前共 {len(analysis_reports)} 份报告")
 
             json_str = json.dumps(result, ensure_ascii=False, cls=NumpyJSONEncoder)
             log_info("[QUERY] JSON序列化成功")
@@ -580,10 +677,29 @@ def llm_parse_query_intent(query: str) -> dict:
     system_prompt = """你是废水监测系统的查询意图解析器。
 
 你的任务是分析用户的自然语言查询，提取以下信息：
-1. **time_range**: 时间范围（相对时间或绝对时间）
-2. **indicators**: 监测指标列表（pH, COD, NH3-N, TN, TP等）
+
+1. **hours_back**: 查询时间跨度（小时数）
+   - 必须返回具体的数字，表示从现在往回推多少小时
+   - 例如：24小时 = 24，3天 = 72，7天 = 168，1周 = 168
+   - 默认值：24
+
+2. **indicators**: 监测指标列表
+   - 必须使用以下精确的指标名称（区分大小写）：
+   - pH (注意：p是小写，H是大写)
+   - COD (全部大写)
+   - TN (全部大写)
+   - NH3-N (注意：NH3是大写，N是大写，中间有连字符)
+   - TP (全部大写)
+
 3. **analysis_types**: 分析类型列表（correlation相关性, anomaly异常检测, trend趋势分析）
+
 4. **data_source**: 数据源（influent进水, effluent出水, both两者）
+
+**重要规则**：
+- pH必须写为"pH"（不是"PH"也不是"ph"）
+- NH3-N必须写为"NH3-N"（有连字符）
+- 其他指标全部大写：COD, TN, TP
+- 必须将时间表达转换为具体的小时数
 
 请返回JSON格式，不要有任何其他文字。"""
 
@@ -593,7 +709,7 @@ def llm_parse_query_intent(query: str) -> dict:
 
 返回JSON格式：
 {{
-    "time_range": {{"start": "说明开始时间", "end": "说明结束时间"}},
+    "hours_back": 查询时间跨度的小时数（数字）,
     "indicators": ["指标1", "指标2"],
     "analysis_types": ["分析类型1", "分析类型2"],
     "data_source": "influent/effluent/both",
@@ -623,7 +739,7 @@ def llm_parse_query_intent(query: str) -> dict:
     except Exception as e:
         log_warning(f"[LLM_PARSE] LLM解析失败: {e}，使用默认值")
         return {
-            "time_range": {"start": "now - 24h", "end": "now"},
+            "hours_back": 24,
             "indicators": ["pH", "COD"],
             "analysis_types": ["correlation", "anomaly"],
             "data_source": "both",
@@ -643,20 +759,9 @@ def fetch_data_for_query(intent: dict) -> dict:
     Returns:
         历史数据
     """
-    # 解析时间范围 - 从LLM响应中提取小时数
-    time_range_str = intent.get('time_range', {})
-    start_str = time_range_str.get('start', 'now - 24h')
-    end_str = time_range_str.get('end', 'now')
-
-    # 解析相对时间（如 "now - 48h"）
-    hours_back = 24  # 默认24小时
-    if '48' in str(start_str) or '48' in str(time_range_str):
-        hours_back = 48
-    elif '小时' in str(start_str):
-        import re
-        match = re.search(r'(\d+)\s*小时', str(start_str))
-        if match:
-            hours_back = int(match.group(1))
+    # 从LLM解析结果中直接获取小时数
+    hours_back = intent.get('hours_back', 24)  # 默认24小时
+    log_info(f"[DATA] LLM解析的时间跨度: {hours_back}小时")
 
     # 获取CSV数据的实际时间范围
     data_time_range = data_fetcher.get_time_range("influent")
@@ -668,24 +773,21 @@ def fetch_data_for_query(intent: dict) -> dict:
 
         # 计算数据跨度（天数）
         data_span_days = (data_end - data_start).days
+        data_span_hours = data_span_days * 24
 
-        # 使用当前时间作为结束时间，开始时间 = 当前时间 - 数据跨度
+        # 使用当前时间作为结束时间，开始时间 = 当前时间 - 查询小时数
         current_time = datetime.now()
-        mapped_end = current_time
-        mapped_start = current_time - timedelta(days=data_span_days)
+        end_time = current_time
+        start_time = current_time - timedelta(hours=hours_back)
 
-        # 如果查询指定了更短的时间范围，使用查询的时间范围
-        if hours_back < data_span_days * 24:
-            # 使用查询的时间范围（最近的N小时）
-            end_time = current_time
-            start_time = current_time - timedelta(hours=hours_back)
-
+        # 如果查询时间超过数据范围，使用整个数据范围
+        if hours_back > data_span_hours:
+            log_info(f"[DATA] 查询时间({hours_back}小时)超过数据范围({data_span_hours}小时)，使用全部数据")
+            mapped_start = current_time - timedelta(days=data_span_days)
+            time_range = {"start": mapped_start, "end": current_time}
+        else:
             log_info(f"[DATA] 查询时间范围（最近{hours_back}小时）: {start_time.strftime('%m-%d %H:%M')} ~ {end_time.strftime('%m-%d %H:%M')}")
             time_range = {"start": start_time, "end": end_time}
-        else:
-            # 使用整个数据范围
-            log_info(f"[DATA] 使用全部数据范围: {mapped_start.strftime('%Y-%m-%d')} ~ {mapped_end.strftime('%Y-%m-%d')} (映射自2024年数据)")
-            time_range = {"start": mapped_start, "end": mapped_end}
     else:
         # 回退到相对时间
         end_time = datetime.now()

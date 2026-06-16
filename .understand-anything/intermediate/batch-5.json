@@ -1,0 +1,234 @@
+{
+  "nodes": [
+    {
+      "id": "file:shared/operators/machine_learning/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "shared/operators/machine_learning/__init__.py",
+      "summary": "机器学习算子库的包入口文件，重新导出四种无监督异常检测器类：孤立森林、One-Class SVM、局部异常因子和直方图离群值评分。",
+      "tags": [
+        "barrel",
+        "入口点",
+        "机器学习",
+        "异常检测",
+        "导出"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Python包的barrel文件，使用__all__明确导出接口。"
+    },
+    {
+      "id": "file:shared/operators/machine_learning/hbos.py",
+      "type": "file",
+      "name": "hbos.py",
+      "filePath": "shared/operators/machine_learning/hbos.py",
+      "summary": "实现直方图离群值评分(HBOS)异常检测器，通过构建数据直方图计算异常分数，计算效率高，适用于大规模数据。",
+      "tags": [
+        "机器学习",
+        "异常检测",
+        "统计方法",
+        "无监督学习"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:shared/operators/machine_learning/isolation_forest.py",
+      "type": "file",
+      "name": "isolation_forest.py",
+      "filePath": "shared/operators/machine_learning/isolation_forest.py",
+      "summary": "实现孤立森林(Isolation Forest)异常检测器，通过随机划分特征空间来隔离异常点，异常点路径长度更短。",
+      "tags": [
+        "机器学习",
+        "异常检测",
+        "集成学习",
+        "无监督学习"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:shared/operators/machine_learning/lof.py",
+      "type": "file",
+      "name": "lof.py",
+      "filePath": "shared/operators/machine_learning/lof.py",
+      "summary": "实现局部异常因子(LOF)异常检测器，通过比较数据点与其邻居的局部密度来识别异常，LOF>1表示异常。",
+      "tags": [
+        "机器学习",
+        "异常检测",
+        "密度估计",
+        "无监督学习"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:shared/operators/machine_learning/one_class_svm.py",
+      "type": "file",
+      "name": "one_class_svm.py",
+      "filePath": "shared/operators/machine_learning/one_class_svm.py",
+      "summary": "实现One-Class SVM异常检测器，使用支持向量机学习正常数据的边界，超出边界的点被识别为异常。",
+      "tags": [
+        "机器学习",
+        "异常检测",
+        "支持向量机",
+        "无监督学习"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:shared/operators/machine_learning/hbos.py:HBOSDetector",
+      "type": "class",
+      "name": "HBOSDetector",
+      "filePath": "shared/operators/machine_learning/hbos.py",
+      "lineRange": [
+        18,
+        191
+      ],
+      "summary": "直方图离群值评分异常检测器类，通过构建数据直方图计算异常分数，支持单维和多维数据检测，提供sklearn和简化两种实现。",
+      "tags": [
+        "异常检测器",
+        "统计方法",
+        "无监督学习",
+        "直方图"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:shared/operators/machine_learning/isolation_forest.py:IsolationForestDetector",
+      "type": "class",
+      "name": "IsolationForestDetector",
+      "filePath": "shared/operators/machine_learning/isolation_forest.py",
+      "lineRange": [
+        18,
+        143
+      ],
+      "summary": "孤立森林异常检测器类，使用随机森林隔离异常点，提供sklearn和简化(IQR统计)两种实现方式。",
+      "tags": [
+        "异常检测器",
+        "集成学习",
+        "无监督学习",
+        "孤立森林"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:shared/operators/machine_learning/lof.py:LOFDetector",
+      "type": "class",
+      "name": "LOFDetector",
+      "filePath": "shared/operators/machine_learning/lof.py",
+      "lineRange": [
+        18,
+        132
+      ],
+      "summary": "局部异常因子异常检测器类，通过比较局部密度识别异常，提供sklearn和简化(修正Z-score)两种实现。",
+      "tags": [
+        "异常检测器",
+        "密度估计",
+        "无监督学习",
+        "局部异常因子"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:shared/operators/machine_learning/one_class_svm.py:OneClassSVMDetector",
+      "type": "class",
+      "name": "OneClassSVMDetector",
+      "filePath": "shared/operators/machine_learning/one_class_svm.py",
+      "lineRange": [
+        18,
+        130
+      ],
+      "summary": "One-Class SVM异常检测器类，使用支持向量机学习正常数据边界，提供sklearn和简化(标准差)两种实现。",
+      "tags": [
+        "异常检测器",
+        "支持向量机",
+        "无监督学习",
+        "边界检测"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:shared/operators/machine_learning/__init__.py",
+      "target": "file:shared/operators/machine_learning/hbos.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:shared/operators/machine_learning/__init__.py",
+      "target": "file:shared/operators/machine_learning/isolation_forest.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:shared/operators/machine_learning/__init__.py",
+      "target": "file:shared/operators/machine_learning/lof.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:shared/operators/machine_learning/__init__.py",
+      "target": "file:shared/operators/machine_learning/one_class_svm.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:shared/operators/machine_learning/__init__.py",
+      "target": "class:shared/operators/machine_learning/hbos.py:HBOSDetector",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:shared/operators/machine_learning/__init__.py",
+      "target": "class:shared/operators/machine_learning/isolation_forest.py:IsolationForestDetector",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:shared/operators/machine_learning/__init__.py",
+      "target": "class:shared/operators/machine_learning/lof.py:LOFDetector",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:shared/operators/machine_learning/__init__.py",
+      "target": "class:shared/operators/machine_learning/one_class_svm.py:OneClassSVMDetector",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:shared/operators/machine_learning/hbos.py",
+      "target": "class:shared/operators/machine_learning/hbos.py:HBOSDetector",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:shared/operators/machine_learning/isolation_forest.py",
+      "target": "class:shared/operators/machine_learning/isolation_forest.py:IsolationForestDetector",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:shared/operators/machine_learning/lof.py",
+      "target": "class:shared/operators/machine_learning/lof.py:LOFDetector",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:shared/operators/machine_learning/one_class_svm.py",
+      "target": "class:shared/operators/machine_learning/one_class_svm.py:OneClassSVMDetector",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    }
+  ]
+}
