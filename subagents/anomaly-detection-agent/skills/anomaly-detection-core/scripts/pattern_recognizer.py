@@ -15,6 +15,15 @@ import numpy as np
 from scipy.fft import fft, fftfreq
 from scipy.signal import welch
 
+# 导入全局算子库（三库一体架构）
+# 变点检测器位于 shared/operators/specialized/change_point_detector.py
+SHARED_OPERATORS_AVAILABLE = False
+try:
+    from shared.operators.specialized.change_point_detector import ChangePointDetector
+    SHARED_OPERATORS_AVAILABLE = True
+except ImportError:
+    ChangePointDetector = None
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -34,15 +43,15 @@ class PatternRecognizer:
     def __init__(self):
         """初始化异常模式识别器"""
         self.name = "异常模式识别器"
-        self.version = "2.1.0"  # 专利增强版：5类异常特征
+        self.version = "2.2.0"  # 架构重构版：支持全局算子库
 
         # 模式定义（专利5类异常特征）
         self.patterns = {
             "constant": "恒定异常（平稳异常）",
             "spike": "突变异常",
             "trend": "趋势异常",
-            "periodic": "周期异常",        # 新增
-            "high_freq_volatility": "高频波动异常"  # 新增
+            "periodic": "周期异常",
+            "high_freq_volatility": "高频波动异常"
         }
 
         # 专利参数配置
@@ -56,8 +65,17 @@ class PatternRecognizer:
             "sign_change_ratio": 0.6     # 符号变化比例阈值
         }
 
+        # 全局算子库支持（三库一体架构）
+        self.change_point_detector = None
+        if SHARED_OPERATORS_AVAILABLE and ChangePointDetector is not None:
+            self.change_point_detector = ChangePointDetector()
+            logger.info("[INIT] 全局算子库可用，ChangePointDetector 已加载")
+
         logger.info(f"[INIT] {self.name} v{self.version} initialized")
         logger.info(f"[INIT] 支持5类专利异常特征识别")
+
+        if not SHARED_OPERATORS_AVAILABLE:
+            logger.warning("[INIT] 全局算子库不可用，将使用本地实现")
 
     def recognize_patterns(self, data: pd.DataFrame,
                           anomaly_scores: Dict[str, Any],
@@ -280,6 +298,29 @@ class PatternRecognizer:
             return "medium"
         else:
             return "low"
+
+    def detect_change_points_with_shared_operator(self, series: pd.Series) -> tuple:
+        """
+        使用全局算子库检测变点
+
+        调用 shared/operators/specialized/change_point_detector.py
+        满足"三库一体"架构原则
+
+        Args:
+            series: 输入数据序列
+
+        Returns:
+            (anomaly_mask, details): 异常掩码和详细信息
+        """
+        if self.change_point_detector is None:
+            logger.warning("[PATTERN] ChangePointDetector 不可用")
+            return np.zeros(len(series)), {"error": "全局算子库不可用"}
+
+        try:
+            return self.change_point_detector.detect(series)
+        except Exception as e:
+            logger.error(f"[PATTERN] 全局算子调用失败: {e}")
+            return np.zeros(len(series)), {"error": str(e)}
 
     def _is_periodic_pattern(self, series: pd.Series, index: int,
                              window: int = None) -> bool:

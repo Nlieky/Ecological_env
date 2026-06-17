@@ -72,6 +72,48 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 导入全局算子库（三库一体架构）
+# 算子库位于 shared/operators/，子智能体必须调用全局算子，禁止重复实现
+SHARED_OPERATORS_AVAILABLE = False
+shared_detectors = {}
+try:
+    from shared.operators.machine_learning.isolation_forest import IsolationForestDetector
+    from shared.operators.machine_learning.one_class_svm import OneClassSVMDetector
+    from shared.operators.machine_learning.lof import LOFDetector
+    from shared.operators.machine_learning.hbos import HBOSDetector
+    from shared.operators.specialized.constant_detector import ConstantDetector
+    from shared.operators.specialized.change_point_detector import ChangePointDetector
+    from shared.operators.specialized.smoothness_detector import SmoothnessDetector
+    from shared.operators.specialized.forgery_detector import ForgeryDetector
+
+    # 创建共享算子实例（延迟初始化）
+    def _get_shared_detector(operator_type: str):
+        """获取共享算子实例（延迟初始化）"""
+        if operator_type not in shared_detectors:
+            if operator_type == 'isolation_forest':
+                shared_detectors[operator_type] = IsolationForestDetector()
+            elif operator_type == 'one_class_svm':
+                shared_detectors[operator_type] = OneClassSVMDetector()
+            elif operator_type == 'lof':
+                shared_detectors[operator_type] = LOFDetector()
+            elif operator_type == 'hbos':
+                shared_detectors[operator_type] = HBOSDetector()
+            elif operator_type == 'constant':
+                shared_detectors[operator_type] = ConstantDetector()
+            elif operator_type == 'change_point':
+                shared_detectors[operator_type] = ChangePointDetector()
+            elif operator_type == 'smoothness':
+                shared_detectors[operator_type] = SmoothnessDetector()
+            elif operator_type == 'forgery':
+                shared_detectors[operator_type] = ForgeryDetector()
+        return shared_detectors[operator_type]
+
+    SHARED_OPERATORS_AVAILABLE = True
+    logger.info("[INIT] 全局算子库 (shared/operators/) 已加载")
+except ImportError as e:
+    logger.warning(f"[INIT] 全局算子库导入失败: {e}，将使用本地实现")
+    SHARED_OPERATORS_AVAILABLE = False
+
 
 class OperatorAdapter:
     """
@@ -159,6 +201,12 @@ class OperatorAdapter:
 
         logger.info(f"[INIT] {self.name} v{self.version} initialized")
         logger.info(f"[INIT] 已注册算子: {list(self.operators.keys())}")
+
+        # 记录全局算子库状态
+        if SHARED_OPERATORS_AVAILABLE:
+            logger.info("[INIT] 全局算子库可用，将优先使用 shared/operators/ 中的算子")
+        else:
+            logger.warning("[INIT] 全局算子库不可用，使用本地实现")
 
         # 初始化意图映射器（如果启用）
         self.intent_mapper = None
@@ -587,59 +635,97 @@ class OperatorAdapter:
 
         return scores, anomaly_mask.values
 
+    # ========== 接口适配器（全局算子库） ==========
+
+    def _adapt_shared_operator(self, series: pd.Series, operator_type: str) -> tuple:
+        """
+        接口适配器：将全局算子库的返回值转换为 operator_adapter 格式
+
+        全局算子库返回: (anomaly_mask, details)
+        operator_adapter 期望: (scores, anomaly_mask)
+
+        Args:
+            series: 输入数据序列
+            operator_type: 算子类型
+
+        Returns:
+            (scores, anomaly_mask): 异常分数和异常掩码
+        """
+        if not SHARED_OPERATORS_AVAILABLE:
+            raise RuntimeError(f"全局算子库不可用，无法调用 {operator_type}")
+
+        detector = _get_shared_detector(operator_type)
+        anomaly_mask, details = detector.detect(series)
+
+        # 从 details 中提取或构造 scores
+        if 'anomaly_score' in details:
+            scores = details['anomaly_score']
+        elif 'scores' in details:
+            scores = details['scores']
+        else:
+            # 如果没有分数，使用 mask 的浮点表示
+            scores = anomaly_mask.astype(float)
+
+        return scores, anomaly_mask
+
     # ========== 机器学习类算子 ==========
 
     def _isolation_forest_anomaly(self, series: pd.Series,
                                   contamination: float = 0.1) -> tuple:
-        """孤立森林异常检测"""
+        """孤立森林异常检测
+
+        调用全局算子库 (shared/operators/machine_learning/isolation_forest.py)
+        满足"三库一体"架构原则
+        """
+        if SHARED_OPERATORS_AVAILABLE:
+            try:
+                return self._adapt_shared_operator(series, 'isolation_forest')
+            except Exception as e:
+                logger.warning(f"[ADAPTER] 全局算子调用失败: {e}，使用本地实现")
+
         if not ML_AVAILABLE:
             logger.warning("[ADAPTER] sklearn不可用，使用统计方法替代")
             return self._zscore_anomaly(series)
 
-        # 重塑数据
+        # 本地实现（备用）
         X = series.values.reshape(-1, 1)
-
-        # 训练模型
         iso_forest = IsolationForest(
             contamination=contamination,
             random_state=42,
             n_estimators=100
         )
         iso_forest.fit(X)
-
-        # 预测（-1表示异常）
         predictions = iso_forest.predict(X)
         anomaly_mask = predictions == -1
-
-        # 计算异常分数
-        scores = iso_forest.score_samples(X)
-        scores = -scores  # 转换为正数（越高越异常）
+        scores = -iso_forest.score_samples(X)  # 转换为正数
 
         return scores, anomaly_mask
 
     def _one_class_svm_anomaly(self, series: pd.Series,
                                nu: float = 0.1) -> tuple:
-        """One-Class SVM异常检测"""
+        """One-Class SVM异常检测
+
+        调用全局算子库 (shared/operators/machine_learning/one_class_svm.py)
+        满足"三库一体"架构原则
+        """
+        if SHARED_OPERATORS_AVAILABLE:
+            try:
+                return self._adapt_shared_operator(series, 'one_class_svm')
+            except Exception as e:
+                logger.warning(f"[ADAPTER] 全局算子调用失败: {e}，使用本地实现")
+
         if not ML_AVAILABLE:
             logger.warning("[ADAPTER] sklearn不可用，使用统计方法替代")
             return self._zscore_anomaly(series)
 
-        # 重塑数据
+        # 本地实现（备用）
         X = series.values.reshape(-1, 1)
-
-        # 标准化
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
-
-        # 训练模型
         svm = OneClassSVM(nu=nu, kernel="rbf")
         svm.fit(X_scaled)
-
-        # 预测（-1表示异常）
         predictions = svm.predict(X_scaled)
         anomaly_mask = predictions == -1
-
-        # 计算到决策边界的距离
         scores = -svm.decision_function(X_scaled)
         scores = (scores - scores.min()) / (scores.max() - scores.min() + 1e-8)
 
@@ -652,6 +738,9 @@ class OperatorAdapter:
                       contamination: float = 0.1) -> tuple:
         """HBOS (Histogram-based Outlier Score) 异常检测
 
+        调用全局算子库 (shared/operators/machine_learning/hbos.py)
+        满足"三库一体"架构原则
+
         Args:
             series: 输入数据序列
             n_bins: 直方图箱数
@@ -660,20 +749,24 @@ class OperatorAdapter:
         Returns:
             (scores, anomaly_mask): 异常分数和异常掩码
         """
+        if SHARED_OPERATORS_AVAILABLE:
+            try:
+                return self._adapt_shared_operator(series, 'hbos')
+            except Exception as e:
+                logger.warning(f"[ADAPTER] 全局算子调用失败: {e}，使用本地实现")
+
         if not PYOD_AVAILABLE:
             logger.warning("[ADAPTER] PyOD 不可用，使用 zscore 替代")
             return self._zscore_anomaly(series)
 
-        # 数据预处理
+        # 本地实现（备用）
         X = series.values.reshape(-1, 1)
         n_samples = len(X)
 
-        # 边界检查
         if n_samples < 2:
             logger.warning("[ADAPTER] 数据量不足，返回全零分数")
             return np.zeros(n_samples), np.zeros(n_samples, dtype=bool)
 
-        # 移除 NaN
         valid_mask = ~np.isnan(X.flatten())
         if valid_mask.sum() < 2:
             logger.warning("[ADAPTER] 有效数据不足，返回全零分数")
@@ -682,15 +775,11 @@ class OperatorAdapter:
         X_valid = X[valid_mask].reshape(-1, 1)
 
         try:
-            # 创建并训练 HBOS 模型
             detector = HBOS(n_bins=n_bins, contamination=contamination)
             detector.fit(X_valid)
-
-            # 预测
             scores = detector.decision_function(X_valid)
             predictions = detector.predict(X_valid)
 
-            # 构建完整结果（包含 NaN 位置）
             full_scores = np.zeros(n_samples)
             full_mask = np.zeros(n_samples, dtype=bool)
 
@@ -818,6 +907,9 @@ class OperatorAdapter:
                      contamination: float = 0.1) -> tuple:
         """LOF (Local Outlier Factor) 异常检测
 
+        调用全局算子库 (shared/operators/machine_learning/lof.py)
+        满足"三库一体"架构原则
+
         Args:
             series: 输入数据序列
             n_neighbors: 近邻数量
@@ -826,20 +918,24 @@ class OperatorAdapter:
         Returns:
             (scores, anomaly_mask): 异常分数和异常掩码
         """
+        if SHARED_OPERATORS_AVAILABLE:
+            try:
+                return self._adapt_shared_operator(series, 'lof')
+            except Exception as e:
+                logger.warning(f"[ADAPTER] 全局算子调用失败: {e}，使用本地实现")
+
         if not PYOD_AVAILABLE:
             logger.warning("[ADAPTER] PyOD 不可用，使用 zscore 替代")
             return self._zscore_anomaly(series)
 
-        # 数据预处理
+        # 本地实现（备用）
         X = series.values.reshape(-1, 1)
         n_samples = len(X)
 
-        # 边界检查
         if n_samples < n_neighbors + 1:
             logger.warning(f"[ADAPTER] 数据量不足（需要至少 {n_neighbors+1} 个样本），返回全零分数")
             return np.zeros(n_samples), np.zeros(n_samples, dtype=bool)
 
-        # 移除 NaN
         valid_mask = ~np.isnan(X.flatten())
         if valid_mask.sum() < n_neighbors + 1:
             logger.warning(f"[ADAPTER] 有效数据不足（需要至少 {n_neighbors+1} 个样本），返回全零分数")
@@ -848,15 +944,11 @@ class OperatorAdapter:
         X_valid = X[valid_mask].reshape(-1, 1)
 
         try:
-            # 创建并训练 LOF 模型
             detector = LOF(n_neighbors=n_neighbors, contamination=contamination)
             detector.fit(X_valid)
-
-            # 预测
             scores = detector.decision_function(X_valid)
             predictions = detector.predict(X_valid)
 
-            # 构建完整结果（包含 NaN 位置）
             full_scores = np.zeros(n_samples)
             full_mask = np.zeros(n_samples, dtype=bool)
 

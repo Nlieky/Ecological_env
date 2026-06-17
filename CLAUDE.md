@@ -8,6 +8,80 @@ Wastewater false discharge monitoring system based on a patent architecture usin
 
 **最新功能**: Web智能查询界面，支持自然语言查询、图表可视化、异常点标注。
 
+---
+
+## 核心架构原则（必须遵守）
+
+### 原则1: 三库一体 - 全局资源共享
+
+**数据库、算子库、知识库必须放在全局 `shared/` 目录，供所有子智能体调用**。
+
+**三库结构**：
+- **时序监测数据库** (`shared/data/`, `shared/knowledge/`):
+  - 实时数据存储
+  - 历史数据归档
+  - 数据质量管控
+
+- **异常检测模型算子库** (`shared/operators/`):
+  - `machine_learning/`: 孤立森林、One-Class SVM、LOF、HBOS
+  - `specialized/`: 恒定检测、变点检测、平滑度检测、伪造检测
+  - `deep_learning/`: LSTM自编码器、变分自编码器
+
+- **废水排放知识库** (`shared/knowledge/`):
+  - `regulations/`: 法规库
+  - `process_knowledge/`: 工艺知识库
+  - `violation_patterns/`: 违规模式库
+  - `expert_experience/`: 专家经验库
+
+**重要约束**：
+- ❌ **禁止**在子智能体内部 (`subagents/*/scripts/`) 重复实现算子逻辑
+- ✅ 子智能体**必须**通过接口调用 `shared/operators/` 中的算子
+- ✅ 新增算子**必须**添加到 `shared/operators/` 对应分类目录
+
+**理由**：
+1. 满足专利文档中的"三库一体"架构策略
+2. 避免代码重复（DRY原则），便于维护
+3. 提高可扩展性，新子智能体可直接调用全局算子库
+
+### 原则2: LLM驱动主智能体 - 智能调度框架
+
+**主智能体必须使用 LLM 进行意图识别、逻辑推理，然后合理调用子智能体**。
+
+**标准调用流程**：
+```
+1. 主智能体加载身份文件 (IDENTITY.md, AGENTS.md, SOUL.md, MEMORY.md)
+      ↓
+2. LLM 意图识别：理解用户查询或数据信号的真实意图
+      ↓
+3. LLM 逻辑推理：基于意图规划执行策略
+      ↓
+4. 主智能体调用子智能体（按需选择）：
+   - 多维数据感知子智能体 (multi-dimensional-data-perception-agent)
+   - 异常检测子智能体 (anomaly-detection-agent)
+   - 规则推理子智能体 (rule-reasoning-agent)
+   - 研判预警与处置执行子智能体 (disposition-execution-agent)
+      ↓
+5. 子智能体调用全局资源：
+   - 从 shared/operators/ 调用算子
+   - 从 shared/knowledge/ 调用知识
+   - 从 shared/data/ 获取数据
+      ↓
+6. 主智能体汇总结果，生成自然语言报告
+```
+
+**重要约束**：
+- ❌ **禁止**为了告警目的随便调用脚本，跳过 LLM 推理
+- ❌ **禁止**在子智能体内部重复实现全局资源
+- ✅ **必须**使用 LLM 进行意图识别和子智能体调度
+- ✅ LLM 调用失败时**必须**有明确的错误提示，而不是静默回退
+
+**当前状态**：
+- ✅ 框架设计完整（`execution_control.py` 实现了两层LLM驱动）
+- ⚠️ 实际执行中存在回退到规则模式的问题（待修复）
+- ⚠️ 多套调度系统并存（`execution_control.py` + `dynamic_orchestrator.py`，待统一）
+
+---
+
 ## Common Commands
 
 ### Web智能查询界面（推荐）

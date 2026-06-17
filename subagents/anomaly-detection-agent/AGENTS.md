@@ -37,6 +37,65 @@ Feature Vector → Operator Selection → Anomaly Detection → Anomaly Scoring 
 - **Multi-operator verification** - Don't rely on single operator; use multiple for robustness
 - **Confidence transparency** - Always provide confidence scores with detections
 - **Separate anomaly from violation** - You detect data anomalies; rule-reasoning-agent determines violations
+- **⭐ Global operator library** - MUST call operators from shared/operators/, NEVER implement locally
+
+## 算子调用规范（核心架构约束）
+
+**必须调用全局算子库** (`shared/operators/`)，禁止内部实现。
+
+### ✅ 正确做法
+
+```python
+# 从全局算子库导入
+from shared.operators.machine_learning.isolation_forest import IsolationForestDetector
+from shared.operators.specialized.change_point_detector import ChangePointDetector
+
+# 创建并使用算子
+detector = IsolationForestDetector()
+anomaly_mask, details = detector.detect(data)
+```
+
+### ❌ 错误做法
+
+```python
+# 禁止在子智能体内部重新实现算子逻辑
+def _isolation_forest_anomaly(self, data):
+    from sklearn.ensemble import IsolationForest
+    # ... 实现代码 ...
+    # ❌ 这违反了"三库一体"架构原则
+```
+
+### 理由
+
+1. **满足"三库一体"架构原则**：算子库是全局共享资源，所有子智能体必须调用
+2. **避免代码重复**：相同算子只在一处维护（DRY原则）
+3. **便于统一管理**：算子优化和升级只需修改 `shared/operators/` 中的实现
+4. **提高可扩展性**：新子智能体可直接复用全局算子库
+
+### 全局算子库结构
+
+```
+shared/operators/
+├── machine_learning/     # 机器学习类算子
+│   ├── isolation_forest.py
+│   ├── one_class_svm.py
+│   ├── lof.py
+│   └── hbos.py
+├── specialized/          # 专用检测算子
+│   ├── constant_detector.py
+│   ├── change_point_detector.py
+│   ├── smoothness_detector.py
+│   └── forgery_detector.py
+└── deep_learning/        # 深度学习类算子
+    ├── lstm_autoencoder.py
+    └── variational_autoencoder.py
+```
+
+### 当前实现状态
+
+- ✅ `operator_adapter.py` 已重构，优先调用全局算子库
+- ✅ `pattern_recognizer.py` 已支持全局算子库
+- ✅ 本地实现作为备用（当全局算子不可用时）
 
 ## Tools
 
