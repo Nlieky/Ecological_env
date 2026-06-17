@@ -72,13 +72,31 @@ Wastewater false discharge monitoring system based on a patent architecture usin
 **重要约束**：
 - ❌ **禁止**为了告警目的随便调用脚本，跳过 LLM 推理
 - ❌ **禁止**在子智能体内部重复实现全局资源
+- ❌ **禁止** LLM 调用失败时静默回退到规则模式
 - ✅ **必须**使用 LLM 进行意图识别和子智能体调度
-- ✅ LLM 调用失败时**必须**有明确的错误提示，而不是静默回退
+- ✅ LLM 调用失败**必须**抛出明确的错误提示
+- ✅ 实现智能重试（最多3次，指数退避）
+- ✅ 错误分类：超时、配额、服务、配置、内容
+
+**错误处理机制**：
+- ✅ 必须使用 LLM 进行意图识别和子智能体调度
+- ✅ LLM 调用失败**必须**抛出明确的错误提示
+- ✅ 实现智能重试（最多3次，指数退避）
+- ✅ 错误分类：超时、配额、服务、配置、内容
+
+**错误类型**：
+- `LLMTimeoutError`: LLM 响应超时
+- `LLMQuotaError`: API 调用频率超限
+- `LLMServiceError`: LLM 服务不可用
+- `LLMConfigError`: API Key 等配置错误
+- `LLMContentError`: 响应格式错误
 
 **当前状态**：
 - ✅ 框架设计完整（`execution_control.py` 实现了两层LLM驱动）
-- ⚠️ 实际执行中存在回退到规则模式的问题（待修复）
-- ⚠️ 多套调度系统并存（`execution_control.py` + `dynamic_orchestrator.py`，待统一）
+- ✅ 错误分类体系已建立（`shared/configs/llm_errors.py`）
+- ✅ 智能重试机制已实现（指数退避，最多3次）
+- ✅ 静默回退机制已移除
+- ✅ 调度系统职责已明确（`dynamic_orchestrator.py` 负责规划，`execution_control.py` 负责执行）
 
 ---
 
@@ -258,6 +276,26 @@ Key implementation: `workspace/skills/orchestrator-core/scripts/execution_contro
 - 3 First-layer calls: Process outputs between sub-agents
 - **Total: ~12 LLM API calls per complete workflow**
 - Generates natural language reports
+
+### LLM 调用监控
+
+**Prometheus 指标**：
+- `llm_requests_total`: LLM 请求总数（按 model_type, status 分类）
+- `llm_request_duration_seconds`: LLM 请求耗时
+- `llm_tokens_total`: Token 使用总数（按 model_type, token_type 分类）
+
+**查看指标**：
+```bash
+curl http://localhost:5000/metrics | grep llm_
+```
+
+**告警阈值**：
+- 错误率超过 5% 时告警
+- 延迟超过 10 秒时告警
+
+**监控配置**：
+- 文件：`shared/configs/llm_config.yaml`
+- 环境变量：`ENABLE_LLM_REALTIME_ANALYSIS=true` 启用实时分析
 
 ### Identity Files
 
