@@ -41,6 +41,39 @@ from shared.configs.llm_errors import (
     LLMServiceError, LLMConfigError, LLMContentError
 )
 
+# Prometheus 指标（可选，如果 prometheus_client 不可用则跳过）
+try:
+    from prometheus_client import Counter, Histogram
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    Counter = None
+    Histogram = None
+
+# 定义 Prometheus 指标
+if PROMETHEUS_AVAILABLE:
+    llm_requests_total = Counter(
+        'llm_requests_total',
+        'LLM 请求总数',
+        ['model_type', 'status']
+    )
+
+    llm_request_duration = Histogram(
+        'llm_request_duration_seconds',
+        'LLM 请求耗时',
+        ['model_type']
+    )
+
+    llm_tokens_total = Counter(
+        'llm_tokens_total',
+        'LLM Token 使用总数',
+        ['model_type', 'token_type']  # token_type: input/output
+    )
+else:
+    llm_requests_total = None
+    llm_request_duration = None
+    llm_tokens_total = None
+
 # 不配置logging，由主应用统一配置
 logger = logging.getLogger(__name__)
 
@@ -157,6 +190,9 @@ class LLMClient:
         if temperature is None:
             temperature = self.config.temperature
 
+        # 记录开始时间
+        start_time = time.time()
+
         # 重试循环
         max_retries = self.config.max_retries
         for attempt in range(max_retries):
@@ -173,12 +209,33 @@ class LLMClient:
                 # 检查响应内容
                 if not response.content or len(response.content) == 0:
                     logger.warning(f"[LLM] Empty response from model: {model}")
+                    if PROMETHEUS_AVAILABLE and llm_requests_total:
+                        llm_requests_total.labels(model_type=model_type, status='empty').inc()
                     return ""
 
                 result = response.content[0].text
                 if not result:
                     logger.warning(f"[LLM] Empty text content from model: {model}")
+                    if PROMETHEUS_AVAILABLE and llm_requests_total:
+                        llm_requests_total.labels(model_type=model_type, status='empty').inc()
                     return ""
+
+                # 记录成功指标
+                if PROMETHEUS_AVAILABLE:
+                    if llm_requests_total:
+                        llm_requests_total.labels(model_type=model_type, status='success').inc()
+                    if llm_request_duration:
+                        llm_request_duration.labels(model_type=model_type).observe(time.time() - start_time)
+                    # 记录 Token 使用
+                    if llm_tokens_total and hasattr(response, 'usage'):
+                        llm_tokens_total.labels(
+                            model_type=model_type,
+                            token_type='input'
+                        ).inc(response.usage.input_tokens)
+                        llm_tokens_total.labels(
+                            model_type=model_type,
+                            token_type='output'
+                        ).inc(response.usage.output_tokens)
 
                 logger.info(f"[LLM] Request completed, model: {model}, tokens: {response.usage.output_tokens}")
                 return result
@@ -189,6 +246,9 @@ class LLMClient:
 
                 # 如果是最后一次尝试，或者不可重试的错误，直接抛出
                 if attempt == max_retries - 1 or not self._is_retryable_error(error):
+                    # 记录失败指标
+                    if PROMETHEUS_AVAILABLE and llm_requests_total:
+                        llm_requests_total.labels(model_type=model_type, status='error').inc()
                     raise error
 
                 # 可重试的错误，等待后重试
@@ -198,6 +258,8 @@ class LLMClient:
                     time.sleep(wait_time)
                 else:
                     # 不可重试的错误直接抛出
+                    if PROMETHEUS_AVAILABLE and llm_requests_total:
+                        llm_requests_total.labels(model_type=model_type, status='error').inc()
                     raise error
 
         # 理论上不会到这里，但作为保险

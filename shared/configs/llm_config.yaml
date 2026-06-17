@@ -169,6 +169,11 @@ monitoring:
     enabled: true
     metric_prefix: "llm"
 
+  # 告警阈值
+  alerts:
+    error_rate_threshold: 0.05  # 错误率超过5%告警
+    latency_threshold: 10  # 延迟超过10秒告警
+
 # ==================== 子智能体特定配置 ====================
 subagent_configs:
   # 多维数据感知子智能体
