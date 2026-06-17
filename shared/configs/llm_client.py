@@ -19,6 +19,7 @@ LLM客户端模块 - 废水虚假排放智能监测系统
 import os
 import yaml
 import logging
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
@@ -26,11 +27,19 @@ from dotenv import load_dotenv
 
 try:
     from anthropic import Anthropic
+    from anthropic import errors as anthropic_errors
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
+    anthropic_errors = None
     import warnings
     warnings.warn("Anthropic SDK not installed. Install with: pip install anthropic")
+
+# 导入错误类
+from shared.configs.llm_errors import (
+    LLMError, LLMTimeoutError, LLMQuotaError,
+    LLMServiceError, LLMConfigError, LLMContentError
+)
 
 # 不配置logging，由主应用统一配置
 logger = logging.getLogger(__name__)
@@ -109,7 +118,7 @@ class LLMClient:
         **kwargs
     ) -> str:
         """
-        发送聊天请求
+        发送聊天请求（带重试和错误分类）
 
         Args:
             message: 用户消息
@@ -121,6 +130,14 @@ class LLMClient:
 
         Returns:
             str: LLM响应
+
+        Raises:
+            LLMTimeoutError: LLM响应超时
+            LLMQuotaError: API调用频率超限
+            LLMServiceError: LLM服务不可用
+            LLMConfigError: API配置错误
+            LLMContentError: 响应格式错误
+            LLMError: 其他LLM错误
         """
         # 选择模型
         model_map = {
@@ -140,32 +157,110 @@ class LLMClient:
         if temperature is None:
             temperature = self.config.temperature
 
-        try:
-            response = self.client.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-                messages=[{"role": "user", "content": message}],
-                **kwargs
-            )
+        # 重试循环
+        max_retries = self.config.max_retries
+        for attempt in range(max_retries):
+            try:
+                response = self.client.messages.create(
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": message}],
+                    **kwargs
+                )
 
-            # 检查响应内容
-            if not response.content or len(response.content) == 0:
-                print(f"[LLM_CLIENT] Empty response from model: {model}")
-                return ""
+                # 检查响应内容
+                if not response.content or len(response.content) == 0:
+                    logger.warning(f"[LLM] Empty response from model: {model}")
+                    return ""
 
-            result = response.content[0].text
-            if not result:
-                print(f"[LLM_CLIENT] Empty text content from model: {model}")
-                return ""
+                result = response.content[0].text
+                if not result:
+                    logger.warning(f"[LLM] Empty text content from model: {model}")
+                    return ""
 
-            print(f"[LLM_CLIENT] Request completed, model: {model}, tokens: {response.usage.output_tokens}")
-            return result
+                logger.info(f"[LLM] Request completed, model: {model}, tokens: {response.usage.output_tokens}")
+                return result
 
-        except Exception as e:
-            print(f"[LLM_CLIENT] Request failed: {e}")
-            return ""
+            except Exception as e:
+                # 错误分类
+                error = self._classify_error(e, attempt, max_retries, model)
+
+                # 如果是最后一次尝试，或者不可重试的错误，直接抛出
+                if attempt == max_retries - 1 or not self._is_retryable_error(error):
+                    raise error
+
+                # 可重试的错误，等待后重试
+                if isinstance(error, LLMTimeoutError) or isinstance(error, LLMServiceError):
+                    wait_time = 2 ** attempt  # 指数退避: 1, 2, 4秒
+                    logger.warning(f"[LLM] {error.__class__.__name__}, {wait_time}秒后重试 (尝试 {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                else:
+                    # 不可重试的错误直接抛出
+                    raise error
+
+        # 理论上不会到这里，但作为保险
+        raise LLMError("LLM 调用失败：未知原因")
+
+    def _classify_error(self, error: Exception, attempt: int, max_retries: int, model: str) -> LLMError:
+        """
+        分类 Anthropic 错误为自定义 LLM 错误
+
+        Args:
+            error: 原始错误
+            attempt: 当前尝试次数
+            max_retries: 最大重试次数
+            model: 模型名称
+
+        Returns:
+            LLMError: 分类后的错误
+        """
+        if anthropic_errors is None:
+            return LLMError(f"Anthropic SDK 未安装: {error}")
+
+        error_type = type(error)
+        error_msg = str(error)
+
+        # 超时错误
+        if error_type == anthropic_errors.APITimeoutError:
+            return LLMTimeoutError(f"LLM 响应超时（模型: {model}）")
+
+        # 速率限制错误
+        if error_type == anthropic_errors.RateLimitError:
+            return LLMQuotaError(f"LLM API 调用频率超限: {error_msg}")
+
+        # 服务错误（5xx）
+        if error_type == anthropic_errors.APIStatusError:
+            status_code = getattr(error, 'status_code', 0)
+            if status_code >= 500:
+                return LLMServiceError(f"LLM 服务错误 {status_code}（模型: {model}）")
+            elif status_code == 401:
+                return LLMConfigError(f"LLM API Key 无效或已过期")
+            elif status_code == 403:
+                return LLMConfigError(f"LLM API 权限不足")
+            else:
+                return LLMConfigError(f"LLM API 错误 {status_code}: {error_msg}")
+
+        # 内容处理错误
+        if error_type == anthropic_errors.UnprocessableEntityError:
+            return LLMContentError(f"LLM 响应处理错误: {error_msg}")
+
+        # 其他未知错误
+        return LLMError(f"LLM 调用失败: {error_msg}")
+
+    def _is_retryable_error(self, error: LLMError) -> bool:
+        """
+        判断错误是否可重试
+
+        Args:
+            error: LLM错误
+
+        Returns:
+            bool: 是否可重试
+        """
+        # 超时和服务错误可以重试
+        return isinstance(error, (LLMTimeoutError, LLMServiceError))
 
     def chat_stream(
         self,
@@ -185,6 +280,9 @@ class LLMClient:
 
         Yields:
             str: 响应片段
+
+        Raises:
+            LLMError: 流式请求失败
         """
         model_map = {
             "primary": self.config.primary_model,
@@ -209,8 +307,9 @@ class LLMClient:
                     yield text
 
         except Exception as e:
-            print(f"[LLM_CLIENT] Stream failed: {e}")
-            raise
+            error = self._classify_error(e, 0, 1, model)
+            logger.error(f"[LLM] Stream failed: {error.message}")
+            raise error
 
 
 # 全局配置缓存
