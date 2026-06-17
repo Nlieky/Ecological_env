@@ -27,7 +27,9 @@ from dotenv import load_dotenv
 
 try:
     from anthropic import Anthropic
-    from anthropic import errors as anthropic_errors
+    # 在 anthropic 0.72.0 中，错误类直接在 anthropic 模块下
+    import anthropic
+    anthropic_errors = anthropic
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
