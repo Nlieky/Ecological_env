@@ -28,6 +28,9 @@ import os
 import re
 import yaml
 from pathlib import Path
+
+# 导入LLM错误类
+from shared.configs.llm_errors import LLMError, LLMConfigError
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -340,13 +343,15 @@ class LLMAgentCoordinator:
 
         print(f"[COORD] 协调 {identity.agent_name} 执行任务: {task.get('task_id')}")
 
-        # 2. 选择协调模式
-        if self.llm_client is not None:
-            print(f"[COORD] 使用 LLM 协调模式")
-            return self._llm_coordinate_agent(identity, task, previous_results)
-        else:
-            print(f"[COORD] 使用本地规则模式")
-            return self._local_coordinate_agent(identity, task, previous_results)
+        # 2. 选择协调模式（必须使用 LLM）
+        if self.llm_client is None:
+            raise LLMConfigError(
+                "LLM 客户端未初始化，无法协调子智能体执行",
+                details={"agent": identity.agent_name, "task": task.get("task_id")}
+            )
+
+        print(f"[COORD] 使用 LLM 协调模式")
+        return self._llm_coordinate_agent(identity, task, previous_results)
 
     def _load_llm_config(self) -> dict:
         """
@@ -588,13 +593,18 @@ class LLMAgentCoordinator:
 
             return final_result
 
+        except LLMError as e:
+            logger.error(f"[LLM] LLM 协调失败: {e.message}")
+            # 向用户明确提示错误
+            raise LLMError(
+                f"LLM 子智能体协调失败: {e.message}",
+                details={"agent": identity.get("name", identity.get("agent_id", "unknown")), "task": task}
+            ) from e
         except Exception as e:
-            logger.error(f"[LLM] LLM 协调失败: {e}")
+            logger.error(f"[LLM] 未知错误: {e}")
             import traceback
             traceback.print_exc()
-            # 回退到本地模式
-            print(f"[FALLBACK] 回退到本地规则模式")
-            return self._local_coordinate_agent(identity, task, previous_results)
+            raise LLMError(f"LLM 协调失败: {str(e)}")
 
     def _local_coordinate_agent(self, identity: SubAgentIdentity,
                                 task: Dict[str, Any],

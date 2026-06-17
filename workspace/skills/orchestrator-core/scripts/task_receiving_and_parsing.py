@@ -16,6 +16,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+# 导入LLM错误类
+from shared.configs.llm_errors import LLMError, LLMConfigError
+
 # 添加项目路径 - 尝试多种方式找到项目根目录
 possible_roots = [
     Path(__file__).parent.parent.parent.parent.parent.parent,
@@ -195,10 +198,16 @@ class TaskReceivingAndParsingModule:
 
         Returns:
             意图识别结果
+
+        Raises:
+            LLMConfigError: LLM客户端未初始化
+            LLMError: LLM调用失败
         """
         if self.llm_client is None:
-            # 如果没有大模型客户端，使用规则解析
-            return self._parse_intent_by_rules(signal)
+            raise LLMConfigError(
+                "LLM 客户端未初始化，无法解析任务意图",
+                details={"signal_timestamp": str(signal.timestamp)}
+            )
 
         # 加载主智能体身份
         identity_context = self.master_identity.get_identity_summary()
@@ -211,9 +220,15 @@ class TaskReceivingAndParsingModule:
             response = self.llm_client.chat(prompt)
             # 解析大模型响应
             return self._parse_llm_response(response)
+        except LLMError as e:
+            logger.error(f"[LLM] 意图解析失败: {e.message}")
+            raise LLMError(
+                f"LLM 意图识别失败: {e.message}",
+                details={"signal_timestamp": str(signal.timestamp)}
+            ) from e
         except Exception as e:
-            logger.error(f"[LLM] 大模型调用失败: {e}")
-            return self._parse_intent_by_rules(signal)
+            logger.error(f"[LLM] 未知错误: {e}")
+            raise LLMError(f"LLM 意图识别失败: {str(e)}")
 
     def _build_intent_prompt(self, signal: TriggerSignal, identity_context: str) -> str:
         """构建大模型提示词"""
@@ -238,14 +253,26 @@ class TaskReceivingAndParsingModule:
 只返回JSON，不要其他内容。"""
 
     def _parse_llm_response(self, response: str) -> IntentResult:
-        """解析大模型响应"""
+        """
+        解析大模型响应
+
+        Args:
+            response: LLM响应文本
+
+        Returns:
+            IntentResult: 意图识别结果
+
+        Raises:
+            LLMContentError: 响应为空或无法解析
+        """
         import json
+        from shared.configs.llm_errors import LLMContentError
 
         try:
             # 检查响应是否为空
             if not response or not response.strip():
-                logger.warning("[PARSE] 大模型返回空响应，使用规则解析")
-                return self._parse_intent_by_rules(None)
+                logger.error("[PARSE] 大模型返回空响应")
+                raise LLMContentError("LLM 返回空响应，无法解析意图")
 
             # 尝试提取JSON（处理可能的markdown代码块）
             cleaned = response.strip()
@@ -265,11 +292,12 @@ class TaskReceivingAndParsingModule:
                 analysis_scope=data.get("analysis_scope", []),
                 priority=data.get("priority", "medium")
             )
+        except LLMContentError:
+            raise
         except Exception as e:
-            logger.warning(f"[PARSE] 解析大模型响应失败: {e}，使用规则解析")
+            logger.error(f"[PARSE] 解析大模型响应失败: {e}")
             logger.debug(f"[PARSE] 原始响应: {response[:200]}...")
-            # 返回默认意图
-            return self._parse_intent_by_rules(None)
+            raise LLMContentError(f"无法解析 LLM 响应为有效 JSON: {str(e)}")
 
     def _parse_intent_by_rules(self, signal: TriggerSignal = None) -> IntentResult:
         """使用规则解析意图（备用方案）"""
