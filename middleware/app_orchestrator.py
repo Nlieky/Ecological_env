@@ -49,6 +49,16 @@ for key in list(sys.modules.keys()):
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
+# ==================== LLM 实时分析功能开关 ====================
+# 通过环境变量 ENABLE_LLM_REALTIME_ANALYSIS 控制是否启用 LLM 分析
+# 默认关闭，需要时通过环境变量启用
+ENABLE_LLM_REALTIME_ANALYSIS = os.getenv('ENABLE_LLM_REALTIME_ANALYSIS', 'false').lower() == 'true'
+
+if ENABLE_LLM_REALTIME_ANALYSIS:
+    logger.info("[CONFIG] LLM 实时分析功能已启用")
+else:
+    logger.info("[CONFIG] LLM 实时分析功能已禁用（通过设置环境变量 ENABLE_LLM_REALTIME_ANALYSIS=true 启用）")
+
 # 禁用 Flask (werkzeug) 的访问日志
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -155,10 +165,9 @@ request_count = 0
 LOG_EVERY_N_REQUESTS = 50  # 每50条请求打印一次
 
 
-# ========== 实时LLM分析功能已暂时禁用 ==========
-# 后续开发时请取消以下注释
-#
-# def run_llm_analysis():
+# ========== 实时LLM分析功能（受功能开关控制） ==========
+if ENABLE_LLM_REALTIME_ANALYSIS:
+    def run_llm_analysis():
 #     """
 #     执行两层LLM分析
 #
