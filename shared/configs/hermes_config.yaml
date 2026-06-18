@@ -1,0 +1,60 @@
+# Hermes资源配置文件
+
+# 资源路径配置
+resources:
+  operators_path: ./shared/operators
+  data_path: ./shared/data
+  knowledge_path: ./shared/knowledge
+
+# 子智能体访问控制
+access_control:
+  multi_dimensional_data_perception_agent:
+    read:
+      - shared/data/**
+    write:
+      - shared/data/processed/**
+  
+  anomaly_detection_agent:
+    read:
+      - shared/data/**
+      - shared/operators/**
+    write:
+      - shared/cache/anomaly_results/**
+  
+  rule_reasoning_agent:
+    read:
+      - shared/knowledge/**
+      - shared/cache/anomaly_results/**
+    write:
+      - shared/cache/rule_reasoning_results/**
+  
+  disposition_execution_agent:
+    read:
+      - shared/data/**
+      - shared/knowledge/**
+      - shared/cache/**
+    write:
+      - shared/outputs/alerts/**
+      - shared/outputs/reports/**
+
+# 子智能体配置映射
+subagent_mapping:
+  multi_dimensional_data_perception:
+    path: ./subagents/multi-dimensional-data-perception-agent
+    skills:
+      - data-perception-core
+  
+  anomaly_detection:
+    path: ./subagents/anomaly-detection-agent
+    skills:
+      - anomaly-detection-core
+  
+  rule_reasoning:
+    path: ./subagents/rule-reasoning-agent
+    skills:
+      - rule-reasoning-core
+  
+  disposition_execution:
+    path: ./subagents/disposition-execution-agent
+    skills:
+      - disposition-execution-core

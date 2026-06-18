@@ -1,3 +1,34 @@
+# 废水监测系统 - Claude AI助手配置
+
+> **重要架构更新（2026-06-18）**
+> 
+> 本项目已迁移到**Hermes Agent框架**作为底层智能体框架。
+
+## 核心架构原则
+
+### LLM驱动主智能体框架
+
+本项目采用Hermes Agent框架（NousResearch/hermes-agent）实现LLM驱动的智能体架构：
+
+- **主智能体**（workspace/）：使用Hermes AIAgent类，负责意图识别、任务编排、对话管理
+- **4个子智能体**（subagents/）：每个都是独立的Hermes AIAgent实例，通过delegate_tool.py并发调用
+- **三库一体**（shared/）：operators（算子库）、data（数据库）、knowledge（知识库）统一在shared/目录
+
+### 子智能体调用规范
+
+主智能体通过Hermes的delegate_task()函数调用子智能体：
+- **调用方式**：阻塞式+并发（max_concurrent_children: 4）
+- **上下文隔离**：每个子智能体获得独立的对话历史和task_id
+- **结果整合**：主智能体阻塞等待所有子智能体完成后整合结果
+
+### Hermes框架特性
+
+- **记忆机制**：跨会话记忆，让项目越来越清晰
+- **身份文件支持**：SOUL.md（个性）、AGENTS.md（规则）、MEMORY.md（记忆）、USER.md（用户配置）
+- **桌面版支持**：未来可通过Hermes Desktop提供图形界面
+
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

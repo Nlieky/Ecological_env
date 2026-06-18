@@ -49,9 +49,9 @@ Your skills are in `skills/rule-reasoning-core/`:
 
 | 知识库类型 | 路径 | 内容 |
 |-----------|------|------|
-| 法规库 | references/regulations/ | 水污染防治法、排放标准 |
-| 工艺知识库 | references/process_knowledge/ | 生化处理工艺 |
-| 专家经验库 | references/expert_experience/ | 典型违规模式 |
+| 法规库 | shared/knowledge/regulations/ | 水污染防治法、排放标准 |
+| 工艺知识库 | shared/knowledge/process_knowledge/ | 生化处理工艺 |
+| 专家经验库 | shared/knowledge/expert_experience/ | 典型违规模式 |
 
 ## Process Mechanism Rules
 

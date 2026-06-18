@@ -1,9 +1,0 @@
-{
-  "projectRoot": "E:\\project\\Ecological_env",
-  "batchFiles": [
-    {"path": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operator_manifest.json", "language": "json", "sizeLines": 218, "fileCategory": "data"},
-    {"path": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/operators.md", "language": "markdown", "sizeLines": 112, "fileCategory": "docs"},
-    {"path": "subagents/anomaly-detection-agent/skills/anomaly-detection-core/references/violation_patterns.md", "language": "markdown", "sizeLines": 184, "fileCategory": "docs"}
-  ],
-  "batchImportData": {}
-}

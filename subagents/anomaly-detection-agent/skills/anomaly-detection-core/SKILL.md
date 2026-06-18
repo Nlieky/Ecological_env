@@ -116,4 +116,4 @@ result = detect_anomalies(
 
 ## References
 
-For detailed configuration: `references/operators.md`, `references/violation_patterns.md`, patent documentation
+For detailed configuration: `references/operators.md`, `shared/knowledge/violation_patterns/violation_patterns.md`, patent documentation

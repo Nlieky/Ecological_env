@@ -56,10 +56,10 @@ data_layer:
     database: "wastewater_monitoring"
   knowledge_base:
     path: "shared/knowledge"
-    regulations_path: "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/regulations"
-    process_knowledge_path: "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/process_knowledge"
-    expert_experience_path: "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/expert_experience"
-    cases_path: "subagents/rule-reasoning-agent/skills/rule-reasoning-core/references/cases"
+    regulations_path: "shared/knowledge/regulations"
+    process_knowledge_path: "shared/knowledge/process_knowledge"
+    expert_experience_path: "shared/knowledge/expert_experience"
+    cases_path: "shared/knowledge/cases"
   operator_library:
     path: "shared/models"
     statistical_path: "shared/models/statistical"

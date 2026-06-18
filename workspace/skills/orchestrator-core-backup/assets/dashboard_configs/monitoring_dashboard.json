@@ -1,0 +1,92 @@
+{
+  "dashboard_name": "废水监测监控仪表板",
+  "version": "2.1.0",
+  "last_updated": "2026-05-15",
+  "layout": {
+    "type": "grid",
+    "columns": 3,
+    "rows": 4
+  },
+  "panels": [
+    {
+      "id": "status_overview",
+      "title": "系统状态概览",
+      "type": "status",
+      "position": {"row": 1, "col": 1, "row_span": 1, "col_span": 3},
+      "refresh_interval": 60,
+      "data_source": "master_agent",
+      "metrics": [
+        "overall_status",
+        "active_alerts",
+        "health_status"
+      ]
+    },
+    {
+      "id": "realtime_data",
+      "title": "实时监测数据",
+      "type": "table",
+      "position": {"row": 2, "col": 1, "row_span": 1, "col_span": 2},
+      "refresh_interval": 300,
+      "data_source": "data_governance_agent",
+      "indicators": ["pH", "COD", "NH3-N", "TN", "TP"],
+      "monitoring_points": ["进水", "出水"]
+    },
+    {
+      "id": "anomaly_summary",
+      "title": "异常检测摘要",
+      "type": "summary",
+      "position": {"row": 2, "col": 3, "row_span": 1, "col_span": 1},
+      "refresh_interval": 300,
+      "data_source": "anomaly_detection_agent",
+      "metrics": [
+        "total_anomalies",
+        "high_risk_count",
+        "medium_risk_count"
+      ]
+    },
+    {
+      "id": "correlation_chart",
+      "title": "指标相关性分析",
+      "type": "chart",
+      "chart_type": "heatmap",
+      "position": {"row": 3, "col": 1, "row_span": 1, "col_span": 2},
+      "refresh_interval": 600,
+      "data_source": "feature_analysis_agent"
+    },
+    {
+      "id": "violation_list",
+      "title": "违规事件列表",
+      "type": "list",
+      "position": {"row": 3, "col": 3, "row_span": 2, "col_span": 1},
+      "refresh_interval": 300,
+      "data_source": "rule_reasoning_agent",
+      "max_items": 10
+    },
+    {
+      "id": "trend_chart",
+      "title": "趋势分析",
+      "type": "chart",
+      "chart_type": "line",
+      "position": {"row": 4, "col": 1, "row_span": 1, "col_span": 2},
+      "refresh_interval": 600,
+      "data_source": "feature_analysis_agent"
+    }
+  ],
+  "alert_rules": {
+    "high_risk": {
+      "color": "#ff0000",
+      "notification": true,
+      "sound": true
+    },
+    "medium_risk": {
+      "color": "#ff9900",
+      "notification": true,
+      "sound": false
+    },
+    "low_risk": {
+      "color": "#ffff00",
+      "notification": false,
+      "sound": false
+    }
+  }
+}

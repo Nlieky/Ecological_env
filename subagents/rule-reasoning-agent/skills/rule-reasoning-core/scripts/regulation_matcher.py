@@ -32,7 +32,7 @@ class RegulationMatcher:
         self.version = "2.0.0"
 
         # 法规库路径
-        self.regulations_dir = Path("E:/project/Ecological_env/subagents/rule-reasoning-agent/references/regulations")
+        self.regulations_dir = Path("E:/project/Ecological_env/shared/knowledge/regulations")
 
         # 加载法规规则
         self.regulations = self._load_regulations()

@@ -105,4 +105,4 @@ result = run_rule_reasoning(task)
 
 ## References
 
-For detailed configuration: `references/regulations/`, `references/process_knowledge/`, `references/expert_experience/`, patent documentation
+For detailed configuration: `shared/knowledge/regulations/`, `shared/knowledge/process_knowledge/`, `shared/knowledge/expert_experience/`, patent documentation

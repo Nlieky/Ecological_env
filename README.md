@@ -49,6 +49,10 @@ http://localhost:8080
 - "analyze pH COD anomalies in past 24 hours"
 ```
 
+## 技术栈
+
+**底层框架**: [Hermes Agent](https://github.com/NousResearch/hermes-agent) - LLM驱动智能体框架
+
 ## 📁 项目目录结构
 
 ```
