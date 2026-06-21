@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: 当前文件",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "python": "${workspaceFolder}/ecological_env/Scripts/python.exe",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Flask: 中间件",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "app_orchestrator",
+            "python": "${workspaceFolder}/ecological_env/Scripts/python.exe",
+            "cwd": "${workspaceFolder}/middleware",
+            "env": {
+                "FLASK_APP": "app_orchestrator.py",
+                "FLASK_ENV": "development"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

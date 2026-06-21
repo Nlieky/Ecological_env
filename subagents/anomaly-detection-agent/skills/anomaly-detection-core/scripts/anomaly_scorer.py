@@ -125,11 +125,23 @@ class AnomalyScorer:
 
         # 归一化分数
         normalized_scores = []
+        epsilon = 1e-10  # 防止除零
+
         for scores in all_scores:
-            if np.max(scores) > np.min(scores):
-                norm = (scores - np.min(scores)) / (np.max(scores) - np.min(scores))
+            score_min = np.min(scores)
+            score_max = np.max(scores)
+            score_range = score_max - score_min
+
+            if score_range > epsilon:
+                # 正常情况：标准min-max归一化
+                norm = (scores - score_min) / score_range
             else:
-                norm = np.zeros_like(scores)
+                # 所有分数相同的情况：赋予中性值
+                # 当算子返回统一分数时，表示该算子无法区分差异
+                # 赋予0.5作为中性值，让多算子投票机制决定最终结果
+                norm = np.full_like(scores, 0.5, dtype=float)
+                logger.info(f"[SCORER] 指标分数无变化 (统一值={score_max:.3f})，赋予中性值0.5")
+
             normalized_scores.append(norm)
 
         # 综合分数（加权平均）

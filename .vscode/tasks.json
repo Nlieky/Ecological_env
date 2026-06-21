@@ -1,0 +1,55 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Python: 运行当前文件",
+            "type": "shell",
+            "command": "${workspaceFolder}/ecological_env/Scripts/python.exe",
+            "args": [
+                "${file}"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Python: 测试 LLM 连接",
+            "type": "shell",
+            "command": "${workspaceFolder}/ecological_env/Scripts/python.exe",
+            "args": [
+                "-c",
+                "from shared.configs.llm_client import get_llm_client; print('Testing LLM...'); client = get_llm_client(); print(client.chat('你好'))"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "启动 Flask 中间件",
+            "type": "shell",
+            "command": "${workspaceFolder}/ecological_env/Scripts/python.exe",
+            "args": [
+                "middleware/app_orchestrator.py"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/middleware"
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        }
+    ]
+}

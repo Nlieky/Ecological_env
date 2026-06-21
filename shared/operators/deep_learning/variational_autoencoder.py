@@ -135,7 +135,7 @@ class VariationalAutoEncoder:
 
         # 简化版本：使用移动平均作为重构
         reconstructed = data.rolling(window=5, center=True).mean()
-        reconstructed = reconstructed.fillna(method='bfill').fillna(method='ffill')
+        reconstructed = reconstructed.bfill().ffill()
 
         return reconstructed.values
 

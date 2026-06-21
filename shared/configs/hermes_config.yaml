@@ -1,60 +1,74 @@
-# Hermes资源配置文件
+# Hermes 资源和访问控制配置
+# 废水监测系统 - 共享资源配置
 
-# 资源路径配置
-resources:
-  operators_path: ./shared/operators
-  data_path: ./shared/data
-  knowledge_path: ./shared/knowledge
+# 数据源配置
+data_sources:
+  real_time:
+    type: "api"
+    endpoint: "http://localhost:8000/api/data/realtime"
+    refresh_interval: 60  # 秒
+  historical:
+    path: "shared/data/historical/"
+    format: "csv"
 
-# 子智能体访问控制
-access_control:
-  multi_dimensional_data_perception_agent:
-    read:
-      - shared/data/**
-    write:
-      - shared/data/processed/**
-  
-  anomaly_detection_agent:
-    read:
-      - shared/data/**
-      - shared/operators/**
-    write:
-      - shared/cache/anomaly_results/**
-  
-  rule_reasoning_agent:
-    read:
-      - shared/knowledge/**
-      - shared/cache/anomaly_results/**
-    write:
-      - shared/cache/rule_reasoning_results/**
-  
-  disposition_execution_agent:
-    read:
-      - shared/data/**
-      - shared/knowledge/**
-      - shared/cache/**
-    write:
-      - shared/outputs/alerts/**
-      - shared/outputs/reports/**
+# 算子库配置
+operators:
+  statistical:
+    path: "shared/operators/statistical/"
+  ml:
+    path: "shared/operators/ml/"
+  deep_learning:
+    path: "shared/operators/deep_learning/"
+  specialized:
+    path: "shared/operators/specialized/"
 
-# 子智能体配置映射
-subagent_mapping:
+# 知识库配置
+knowledge:
+  regulations:
+    path: "shared/knowledge/regulations/"
+  process_knowledge:
+    path: "shared/knowledge/process_knowledge/"
+  violation_patterns:
+    path: "shared/knowledge/violation_patterns/"
+  expert_experience:
+    path: "shared/knowledge/expert_experience/"
+
+# 输出配置
+outputs:
+  reports:
+    path: "shared/outputs/reports/"
+  alerts:
+    path: "shared/outputs/alerts/"
+  exports:
+    path: "shared/outputs/exports/"
+
+# 缓存配置
+cache:
+  anomaly_results:
+    path: "shared/cache/anomaly_results/"
+    ttl: 3600  # 秒
+  llm_responses:
+    path: "shared/cache/llm_responses/"
+    ttl: 86400  # 秒
+  query_cache:
+    path: "shared/cache/query_cache/"
+    ttl: 1800  # 秒
+
+# 子智能体配置
+subagents:
   multi_dimensional_data_perception:
-    path: ./subagents/multi-dimensional-data-perception-agent
-    skills:
-      - data-perception-core
-  
+    name: "多维数据感知子智能体"
+    workspace: "subagents/multi-dimensional-data-perception-agent/"
+    timeout: 120
   anomaly_detection:
-    path: ./subagents/anomaly-detection-agent
-    skills:
-      - anomaly-detection-core
-  
+    name: "异常检测子智能体"
+    workspace: "subagents/anomaly-detection-agent/"
+    timeout: 180
   rule_reasoning:
-    path: ./subagents/rule-reasoning-agent
-    skills:
-      - rule-reasoning-core
-  
+    name: "规则推理子智能体"
+    workspace: "subagents/rule-reasoning-agent/"
+    timeout: 120
   disposition_execution:
-    path: ./subagents/disposition-execution-agent
-    skills:
-      - disposition-execution-core
+    name: "研判预警与处置执行子智能体"
+    workspace: "subagents/disposition-execution-agent/"
+    timeout: 240

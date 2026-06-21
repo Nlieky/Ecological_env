@@ -1,0 +1,42 @@
+{
+    // Python 解释器配置 - 使用 uv 虚拟环境
+    "python.defaultInterpreterPath": "${workspaceFolder}/ecological_env/Scripts/python.exe",
+
+    // 终端环境变量 - 优先使用 uv 虚拟环境
+    "terminal.integrated.env.windows": {
+        "PATH": "${workspaceFolder}/ecological_env/Scripts;${env:PATH}"
+    },
+
+    // Python 自动完成路径
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/shared",
+        "${workspaceFolder}/subagents",
+        "${workspaceFolder}/workspace"
+    ],
+
+    // 排除不需要索引的目录
+    "python.analysis.exclude": [
+        "**/node_modules",
+        "**/.git",
+        "**/.venv",
+        "**/ecological_env/Lib",
+        "**/__pycache__",
+        "**/.understand-anything"
+    ],
+
+    // 排除目录显示
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true
+    },
+
+    // 格式化配置
+    "editor.formatOnSave": true,
+    "python.formatting.provider": "black",
+
+    // Linting 配置
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true
+}

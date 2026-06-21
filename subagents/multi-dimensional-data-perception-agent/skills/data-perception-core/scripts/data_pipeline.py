@@ -214,7 +214,7 @@ def main(data=None, task=None, **kwargs) -> Dict[str, Any]:
             print(f"[PIPELINE-MAIN] 处理时序数据: {df.shape}, 列: {list(df.columns)}")
 
             # 数据清洗：处理缺失值
-            df_cleaned = df.fillna(method="ffill").fillna(0)
+            df_cleaned = df.ffill().fillna(0)
 
             # 数据分解（如果有多列）
             if len(df_cleaned.columns) > 1:
@@ -222,11 +222,44 @@ def main(data=None, task=None, **kwargs) -> Dict[str, Any]:
                 correlation = df_cleaned.corr()
                 result["metrics"]["correlation"] = correlation.to_dict()
 
+            # 分离进水和出水数据（用于前端图表）
+            influent_cols = [col for col in df_cleaned.columns if col.startswith('influent_')]
+            effluent_cols = [col for col in df_cleaned.columns if col.startswith('effluent_')]
+
+            # 构建进水数据数组
+            influent_data = []
+            if 'timestamp' in df_cleaned.columns:
+                for _, row in df_cleaned.iterrows():
+                    record = {'timestamp': str(row['timestamp'])}
+                    for col in influent_cols:
+                        # 去掉前缀，保留指标名（如 influent_COD -> COD）
+                        indicator = col.replace('influent_', '')
+                        record[indicator] = row[col]
+                    if record:  # 至少有一个数据点
+                        influent_data.append(record)
+
+            # 构建出水数据数组
+            effluent_data = []
+            if 'timestamp' in df_cleaned.columns:
+                for _, row in df_cleaned.iterrows():
+                    record = {'timestamp': str(row['timestamp'])}
+                    for col in effluent_cols:
+                        # 去掉前缀，保留指标名（如 effluent_COD -> COD）
+                        indicator = col.replace('effluent_', '')
+                        record[indicator] = row[col]
+                    if record:  # 至少有一个数据点
+                        effluent_data.append(record)
+
             result["processed_data"] = {
                 "original_shape": df.shape,
                 "cleaned_shape": df_cleaned.shape,
                 "columns": list(df_cleaned.columns),
-                "statistics": df_cleaned.describe().to_dict() if not df_cleaned.empty else {}
+                "statistics": df_cleaned.describe().to_dict() if not df_cleaned.empty else {},
+                # 新增：返回清洗后的时序数据
+                "cleaned_data": {
+                    "influent": influent_data,
+                    "effluent": effluent_data
+                }
             }
             result["summary"] = f"完成数据感知处理：处理{df.shape[0]}条数据，{df.shape[1]}个指标"
             result["metrics"] = {

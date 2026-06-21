@@ -25,8 +25,9 @@ from collections import deque
 script_dir = Path(__file__).parent.resolve()
 project_root = script_dir.parent
 sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "workspace"))
 
-# Orchestrator-Core模块路径
+# Orchestrator-Core模块路径（仅用于其他模块）
 orchestrator_scripts = project_root / "workspace" / "skills" / "orchestrator-core" / "scripts"
 sys.path.insert(0, str(orchestrator_scripts.resolve()))
 
@@ -68,8 +69,11 @@ logger.info(f"[PATH] Orchestrator脚本目录: {orchestrator_scripts}")
 logger.info(f"[PATH] Agent脚本目录: {agent_scripts}")
 
 # 导入orchestrator-core模块
+# 注意：现在使用 Hermes 框架，LLMAgentCoordinator 来自 hermes_agent_wrapper
 from task_receiving_and_parsing import TaskReceivingAndParsingModule
-from execution_control import LLMAgentCoordinator, ExecutionControlModule
+from hermes_agent_wrapper import LLMAgentCoordinator
+# ExecutionControlModule 和 ResultInterpretationModule 暂时保留原样
+from execution_control import ExecutionControlModule
 from result_interpretation import ResultInterpretationModule
 
 # 导入LLM客户端
@@ -168,10 +172,12 @@ LOG_EVERY_N_REQUESTS = 50  # 每50条请求打印一次
 # ========== 实时LLM分析功能（受功能开关控制） ==========
 if ENABLE_LLM_REALTIME_ANALYSIS:
     def run_llm_analysis():
-#     """
-#     执行两层LLM分析
-#
-#     取缓冲区中的最新数据进行分析
+        """
+        执行两层LLM分析
+
+        取缓冲区中的最新数据进行分析
+        """
+        pass  # 功能待实现
 #     """
 #     global last_llm_analysis_time, llm_analysis_in_progress, total_llm_analysis
 #

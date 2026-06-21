@@ -2,28 +2,46 @@
 # 版本: 2.0.0
 # 说明: 主智能体和子智能体共享的LLM配置
 #
-# 敏感信息（API密钥）配置在 middleware/.env 中
+# 敏感信息（API密钥）配置在 middleware/.env 或 .env.llm 中
 # 本文件包含非敏感的模型配置、提示词、工具定义等
 
+# ==================== 自定义 LLM 服务器配置 ====================
+# 使用本地部署的大模型服务器（ctgu-vlm - 三峡大学视觉语言模型）
+custom_llm_server:
+  enabled: true
+  base_url: "http://172.16.12.41:30000/v1"
+  api_key: ""  # 如果服务器需要认证，填写密钥；否则留空
+  model_name: "ctgu-vlm"  # 三峡大学视觉语言模型
+
+  # API 格式类型
+  api_format: "openai_compatible"  # openai_compatible, anthropic_compatible, custom
+
+  # 超时配置
+  timeout:
+    connect: 30  # 连接超时（秒）
+    read: 180   # 读取超时（秒）
+
 # ==================== 模型配置 ====================
+# 注意：当 custom_llm_server.enabled = true 时，使用 LLM_MODEL 环境变量
+# 以下配置仅作为后备默认值
 models:
   # 主模型（用于意图识别、任务分解、调度决策）
   primary:
-    name: "claude-sonnet-4-20250514"
-    max_tokens: 8192
-    temperature: 0.0
+    name: "ctgu-vlm"  # 三峡大学视觉语言模型
+    max_tokens: 4096
+    temperature: 0.7
 
   # 快速模型（用于简单查询）
   fast:
-    name: "claude-haiku-4-20250514"
-    max_tokens: 4096
-    temperature: 0.0
+    name: "ctgu-vlm"  # 与主模型相同
+    max_tokens: 2048
+    temperature: 0.5
 
   # 分析模型（用于复杂分析）
   analysis:
-    name: "claude-opus-4-7"
-    max_tokens: 16384
-    temperature: 0.0
+    name: "ctgu-vlm"  # 与主模型相同
+    max_tokens: 8192
+    temperature: 0.7
 
 # ==================== 提示词配置 ====================
 prompts:

@@ -5,6 +5,8 @@ LLM客户端模块 - 废水虚假排放智能监测系统
 
 提供统一的LLM API接口，主智能体和子智能体共享使用。
 
+支持 OpenAI 兼容的 API 格式（如本地部署的 ctgu-vlm 模型）
+
 配置加载：
 - 敏感信息（API密钥）从 middleware/.env 加载
 - 非敏感配置从 shared/configs/llm_config.yaml 加载
@@ -26,16 +28,12 @@ from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
 try:
-    from anthropic import Anthropic
-    # 在 anthropic 0.72.0 中，错误类直接在 anthropic 模块下
-    import anthropic
-    anthropic_errors = anthropic
-    ANTHROPIC_AVAILABLE = True
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
 except ImportError:
-    ANTHROPIC_AVAILABLE = False
-    anthropic_errors = None
+    OPENAI_AVAILABLE = False
     import warnings
-    warnings.warn("Anthropic SDK not installed. Install with: pip install anthropic")
+    warnings.warn("OpenAI SDK not installed. Install with: pip install openai")
 
 # 导入错误类
 from shared.configs.llm_errors import (
@@ -69,7 +67,7 @@ if PROMETHEUS_AVAILABLE:
     llm_tokens_total = Counter(
         'llm_tokens_total',
         'LLM Token 使用总数',
-        ['model_type', 'token_type']  # token_type: input/output
+        ['model_type', 'token_type']  # token_type: input/output/completion
     )
 else:
     llm_requests_total = None
@@ -84,17 +82,17 @@ logger = logging.getLogger(__name__)
 class LLMConfig:
     """LLM配置"""
     # 模型配置
-    primary_model: str = "claude-sonnet-4-20250514"
-    fast_model: str = "claude-haiku-4-20250514"
-    analysis_model: str = "claude-opus-4-7"
+    primary_model: str = "ctgu-vlm"
+    fast_model: str = "ctgu-vlm"
+    analysis_model: str = "ctgu-vlm"
 
     # 模型参数
-    max_tokens: int = 8192
-    temperature: float = 0.0
+    max_tokens: int = 4096
+    temperature: float = 0.7
 
     # API配置
     api_key: str = ""
-    base_url: str = "https://api.anthropic.com"
+    base_url: str = "http://172.16.12.41:30000/v1"
 
     # 性能配置
     timeout: int = 120
@@ -119,7 +117,7 @@ class LLMConfig:
 
 
 class LLMClient:
-    """LLM客户端"""
+    """LLM客户端（OpenAI 兼容格式）"""
 
     def __init__(self, config: LLMConfig):
         """
@@ -130,11 +128,11 @@ class LLMClient:
         """
         self.config = config
 
-        if not ANTHROPIC_AVAILABLE:
-            raise ImportError("Anthropic SDK not installed")
+        if not OPENAI_AVAILABLE:
+            raise ImportError("OpenAI SDK not installed")
 
-        # 初始化Anthropic客户端
-        self.client = Anthropic(
+        # 初始化OpenAI客户端
+        self.client = OpenAI(
             api_key=config.api_key,
             base_url=config.base_url,
             timeout=config.timeout,
@@ -142,6 +140,7 @@ class LLMClient:
         )
 
         print(f"[LLM_CLIENT] Initialized with model: {config.primary_model}")
+        print(f"[LLM_CLIENT] Base URL: {config.base_url}")
 
     def chat(
         self,
@@ -192,6 +191,11 @@ class LLMClient:
         if temperature is None:
             temperature = self.config.temperature
 
+        # 构建消息列表
+        messages = [{"role": "user", "content": message}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+
         # 记录开始时间
         start_time = time.time()
 
@@ -199,23 +203,22 @@ class LLMClient:
         max_retries = self.config.max_retries
         for attempt in range(max_retries):
             try:
-                response = self.client.messages.create(
+                response = self.client.chat.completions.create(
                     model=model,
                     max_tokens=max_tokens,
                     temperature=temperature,
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": message}],
+                    messages=messages,
                     **kwargs
                 )
 
                 # 检查响应内容
-                if not response.content or len(response.content) == 0:
+                if not response.choices or len(response.choices) == 0:
                     logger.warning(f"[LLM] Empty response from model: {model}")
                     if PROMETHEUS_AVAILABLE and llm_requests_total:
                         llm_requests_total.labels(model_type=model_type, status='empty').inc()
                     return ""
 
-                result = response.content[0].text
+                result = response.choices[0].message.content
                 if not result:
                     logger.warning(f"[LLM] Empty text content from model: {model}")
                     if PROMETHEUS_AVAILABLE and llm_requests_total:
@@ -232,14 +235,14 @@ class LLMClient:
                     if llm_tokens_total and hasattr(response, 'usage'):
                         llm_tokens_total.labels(
                             model_type=model_type,
-                            token_type='input'
-                        ).inc(response.usage.input_tokens)
+                            token_type='prompt'
+                        ).inc(response.usage.prompt_tokens)
                         llm_tokens_total.labels(
                             model_type=model_type,
-                            token_type='output'
-                        ).inc(response.usage.output_tokens)
+                            token_type='completion'
+                        ).inc(response.usage.completion_tokens)
 
-                logger.info(f"[LLM] Request completed, model: {model}, tokens: {response.usage.output_tokens}")
+                logger.info(f"[LLM] Request completed, model: {model}, tokens: {response.usage.completion_tokens if hasattr(response, 'usage') else 'N/A'}")
                 return result
 
             except Exception as e:
@@ -254,7 +257,7 @@ class LLMClient:
                     raise error
 
                 # 可重试的错误，等待后重试
-                if isinstance(error, LLMTimeoutError) or isinstance(error, LLMServiceError):
+                if isinstance(error, (LLMTimeoutError, LLMServiceError)):
                     wait_time = 2 ** attempt  # 指数退避: 1, 2, 4秒
                     logger.warning(f"[LLM] {error.__class__.__name__}, {wait_time}秒后重试 (尝试 {attempt + 1}/{max_retries})")
                     time.sleep(wait_time)
@@ -269,7 +272,7 @@ class LLMClient:
 
     def _classify_error(self, error: Exception, attempt: int, max_retries: int, model: str) -> LLMError:
         """
-        分类 Anthropic 错误为自定义 LLM 错误
+        分类 OpenAI 错误为自定义 LLM 错误
 
         Args:
             error: 原始错误
@@ -280,35 +283,36 @@ class LLMClient:
         Returns:
             LLMError: 分类后的错误
         """
-        if anthropic_errors is None:
-            return LLMError(f"Anthropic SDK 未安装: {error}")
-
-        error_type = type(error)
+        error_type = type(error).__name__
         error_msg = str(error)
 
         # 超时错误
-        if error_type == anthropic_errors.APITimeoutError:
+        if "timeout" in error_msg.lower() or error_type == "TimeoutError":
             return LLMTimeoutError(f"LLM 响应超时（模型: {model}）")
 
         # 速率限制错误
-        if error_type == anthropic_errors.RateLimitError:
+        if "rate" in error_msg.lower() or "429" in error_msg:
             return LLMQuotaError(f"LLM API 调用频率超限: {error_msg}")
 
         # 服务错误（5xx）
-        if error_type == anthropic_errors.APIStatusError:
-            status_code = getattr(error, 'status_code', 0)
-            if status_code >= 500:
-                return LLMServiceError(f"LLM 服务错误 {status_code}（模型: {model}）")
-            elif status_code == 401:
-                return LLMConfigError(f"LLM API Key 无效或已过期")
-            elif status_code == 403:
-                return LLMConfigError(f"LLM API 权限不足")
-            else:
-                return LLMConfigError(f"LLM API 错误 {status_code}: {error_msg}")
+        if "5" in error_msg.split("[")[0] if "[" in error_msg else "":
+            return LLMServiceError(f"LLM 服务错误（模型: {model}）")
+
+        # 认证错误
+        if "401" in error_msg or "unauthorized" in error_msg.lower():
+            return LLMConfigError(f"LLM API Key 无效或已过期")
+
+        # 权限错误
+        if "403" in error_msg:
+            return LLMConfigError(f"LLM API 权限不足")
 
         # 内容处理错误
-        if error_type == anthropic_errors.UnprocessableEntityError:
+        if "unprocessable" in error_msg.lower() or "422" in error_msg:
             return LLMContentError(f"LLM 响应处理错误: {error_msg}")
+
+        # 连接错误
+        if "connection" in error_msg.lower() or "connect" in error_msg.lower():
+            return LLMServiceError(f"LLM 服务连接失败: {error_msg}")
 
         # 其他未知错误
         return LLMError(f"LLM 调用失败: {error_msg}")
@@ -355,20 +359,23 @@ class LLMClient:
         }
         model = model_map.get(model_type, self.config.primary_model)
 
-        if system_prompt is None:
-            system_prompt = self.config.system_prompt
+        # 构建消息列表
+        messages = [{"role": "user", "content": message}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
 
         try:
-            with self.client.messages.stream(
+            stream = self.client.chat.completions.create(
                 model=model,
                 max_tokens=self.config.max_tokens,
                 temperature=self.config.temperature,
-                system=system_prompt,
-                messages=[{"role": "user", "content": message}],
+                messages=messages,
+                stream=True,
                 **kwargs
-            ) as stream:
-                for text in stream.text_stream:
-                    yield text
+            )
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
 
         except Exception as e:
             error = self._classify_error(e, 0, 1, model)
@@ -423,6 +430,22 @@ def load_llm_config(
         print(f"[CONFIG] YAML config not found: {config_path}, using defaults")
         yaml_config = {}
 
+    # 提取自定义 LLM 服务器配置
+    # 环境变量优先级最高（安全考虑：API密钥不应存储在YAML中）
+    base_url = os.getenv("LLM_BASE_URL", "http://172.16.12.41:30000/v1")
+    api_key = os.getenv("LLM_API_KEY", "")
+    model_name = os.getenv("LLM_MODEL", "ctgu-vlm")
+
+    # 如果环境变量未设置，尝试从YAML读取（仅用于非敏感配置）
+    custom_server = yaml_config.get("custom_llm_server", {})
+    if custom_server.get("enabled", False):
+        if not os.getenv("LLM_BASE_URL"):
+            base_url = custom_server.get("base_url", base_url)
+        if not os.getenv("LLM_MODEL"):
+            model_name = custom_server.get("model_name", model_name)
+        # API密钥不从YAML读取（安全考虑）
+        print(f"[CONFIG] Using custom LLM server: {base_url}")
+
     # 提取模型配置
     models = yaml_config.get("models", {})
     primary = models.get("primary", {})
@@ -440,16 +463,14 @@ def load_llm_config(
 
     # 创建配置对象
     _llm_config = LLMConfig(
-        # 优先使用环境变量，然后YAML配置，最后默认值
-        primary_model=os.getenv("ANTHROPIC_MODEL", primary.get("name", "claude-sonnet-4-20250514")),
-        fast_model=os.getenv("ANTHROPIC_MODEL_FAST", fast.get("name", "claude-haiku-4-20250514")),
-        analysis_model=os.getenv("ANTHROPIC_MODEL_ANALYSIS", analysis.get("name", "claude-opus-4-7")),
-        max_tokens=primary.get("max_tokens", 8192),
-        temperature=primary.get("temperature", 0.0),
-        # 支持两种配置：ANTHROPIC_AUTH_TOKEN 或 ANTHROPIC_API_KEY
-        api_key=os.getenv("ANTHROPIC_AUTH_TOKEN") or os.getenv("ANTHROPIC_API_KEY", ""),
-        base_url=os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
-        # 支持两种配置：API_TIMEOUT_MS（毫秒）或 timeout（秒）
+        # 优先使用自定义服务器配置
+        primary_model=model_name,
+        fast_model=model_name,
+        analysis_model=model_name,
+        max_tokens=primary.get("max_tokens", 4096),
+        temperature=primary.get("temperature", 0.7),
+        api_key=api_key,
+        base_url=base_url,
         timeout=int(os.getenv("API_TIMEOUT_MS", timeout * 1000)) // 1000,
         max_retries=max_retries,
         system_prompt=system_prompt
@@ -552,7 +573,7 @@ if __name__ == "__main__":
     # 测试代码
     import sys
 
-    print("=== LLM客户端测试 ===\n")
+    print("=== LLM客户端测试（OpenAI 兼容格式）===\n")
 
     try:
         # 加载配置
@@ -561,18 +582,19 @@ if __name__ == "__main__":
         print(f"  主模型: {config.primary_model}")
         print(f"  快速模型: {config.fast_model}")
         print(f"  分析模型: {config.analysis_model}")
+        print(f"  Base URL: {config.base_url}")
         print(f"  API密钥: {'已设置' if config.api_key else '未设置'}")
         print()
 
         # 测试聊天（如果有API密钥）
-        if config.api_key and config.api_key != "sk-ant-your-actual-api-key-here":
+        if config.api_key and config.api_key != "your-api-key-here":
             print("测试聊天:")
             client = get_llm_client()
             response = client.chat("你好，请用一句话介绍你的角色。")
             print(f"  响应: {response}")
         else:
             print("未设置有效的API密钥，跳过聊天测试")
-            print("请在 middleware/.env 中设置 ANTHROPIC_API_KEY")
+            print("请在 middleware/.env 中设置 LLM_API_KEY")
 
     except Exception as e:
         print(f"错误: {e}")

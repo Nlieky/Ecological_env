@@ -19,12 +19,23 @@ from pathlib import Path
 # 添加项目路径
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "workspace" / "skills" / "orchestrator-core" / "scripts"))
-sys.path.insert(0, str(PROJECT_ROOT / "subagents" / "multi-dimensional-data-perception-agent" / "skills" / "data-perception-core" / "scripts"))
+sys.path.insert(0, str(PROJECT_ROOT / "workspace"))
 sys.path.insert(0, str(PROJECT_ROOT / "shared" / "configs"))
 
 # 导入主智能体LLM协调器
-from execution_control import LLMAgentCoordinator, SubAgentIdentityLoader
+# USE_HERMES 开关：True 使用真正的 Hermes 框架，False 使用 orchestrator-core
+USE_HERMES = True
+
+if USE_HERMES:
+    # 使用真正的 Hermes 框架（通过 run_conversation）
+    from hermes_agent_wrapper import HermesMasterAgent as LLMAgentCoordinator
+    from hermes_agent_wrapper import SubAgentIdentityLoader
+    print("[MIDDLEWARE] 使用真正的 Hermes 框架 (run_conversation + delegate_task)")
+else:
+    # 使用原 orchestrator-core
+    from workspace.skills.orchestrator_core.scripts.execution_control import LLMAgentCoordinator, SubAgentIdentityLoader
+    print("[MIDDLEWARE] 使用 orchestrator-core")
+
 from shared.configs.llm_client import get_llm_client
 
 # 导入数据获取器

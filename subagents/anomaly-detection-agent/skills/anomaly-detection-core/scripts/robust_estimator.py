@@ -8,7 +8,7 @@
 2. 基于数据特征自适应选择方法
 3. 支持多种鲁棒估计方法（MAD、IQR、迭代法）
 
-参考项目：E:\project\PolutionMonitoring\anomaly_detection_analysis.py
+参考项目：E:/project/PolutionMonitoring/anomaly_detection_analysis.py
 """
 
 import logging
