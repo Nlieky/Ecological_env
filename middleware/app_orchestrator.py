@@ -66,10 +66,6 @@ log.setLevel(logging.ERROR)
 logger.info(f"[PATH] 项目根目录: {project_root}")
 logger.info(f"[PATH] Agent脚本目录: {agent_scripts}")
 
-# 导入 Hermes 框架
-# 完全使用 Hermes Agent 框架作为底层 Agent 框架
-from hermes_agent_wrapper import LLMAgentCoordinator
-
 # 导入LLM客户端
 from shared.configs.llm_client import get_llm_client
 
@@ -123,12 +119,13 @@ except Exception as e:
     logger.warning(f"[INIT] LLM客户端初始化失败: {e}，使用本地规则模式")
     llm_client = None
 
-# Hermes 主智能体协调器
-llm_coordinator = LLMAgentCoordinator(llm_client=llm_client)
+# Hermes 框架配置
+# 注意：真正的 Hermes 使用方式是在需要时直接创建 AIAgent 实例
+# 配置应在 .hermes/config.yaml 中设置
 
-logger.info("[INIT] Hermes 框架初始化完成")
-logger.info("[INIT] - AIAgent.run_conversation() 处理查询")
-logger.info("[INIT] - delegate_task 工具调用子智能体")
+logger.info("[INIT] Hermes 框架就绪")
+logger.info("[INIT] - 使用 AIAgent.run_conversation() 处理查询")
+logger.info("[INIT] - LLM 通过 delegate_task 工具调用子智能体")
 
 # ==================== 双流处理架构配置 ====================
 
@@ -669,7 +666,12 @@ def get_analyzer_stats():
     return jsonify({
         'module': 'hermes-agent',
         'framework': 'Hermes Agent Framework (NousResearch/hermes-agent)',
-        'coordinator': llm_coordinator.identity_loader.get_all_agents(),
+        'subagents': {
+            'multi-dimensional-data-perception': '多维数据感知',
+            'anomaly-detection': '异常检测',
+            'rule-reasoning': '规则推理',
+            'disposition-execution': '研判预警与处置执行'
+        },
         'timestamp': datetime.now().isoformat()
     })
 
