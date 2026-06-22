@@ -1,108 +1,111 @@
 ---
 name: rule-reasoning-core
-description: Regulatory compliance and process reasoning for environmental monitoring. Use when validating detected anomalies against regulations, process mechanisms, or expert experience. Supports regulation matching (Water Pollution Prevention Law, GB 18918-2002, HJ 915-2017), process mechanism validation (pH-COD synergy, NH3-N/TN conversion, mass balance), expert reasoning (similarity threshold 0.8), and violation conclusion generation (suspicion level, evidence points). Required after anomaly detection to determine violation nature and risk level.
+description: 违规判定和规则推理，结合知识库验证。**触发条件**：当用户查询提到"违规"、"超标"、"违反标准"、"是否达标"、"瓶装"、"稀释"、"排放异常"时调用。流程：(1)规则引擎基于异常点初步判定违规模式→(2)检索工艺知识库验证是否为正常工艺→(3)检索专家经验库匹配历史案例→(4)综合生成违规结论（可疑度、证据点、法律依据）。需要异常点列表（来自 anomaly-detection）作为输入。
 ---
 
-# Rule Reasoning and Violation Determination
+# 规则推理和违规判定
 
-## Overview
+## 职责范围
 
-Validates detected anomalies against regulatory standards, process mechanisms, and expert experience to determine violation nature and generate compliant conclusions.
+- ✅ 基于异常点判定违规模式（规则引擎）
+- ✅ 检索工艺知识库验证异常是否对应正常工艺
+- ✅ 检索专家经验库匹配历史案例（相似度阈值0.8）
+- ✅ 生成违规结论（可疑度、证据点、法律依据）
 
-## Quick Start
+## 处理流程
 
-```python
-from scripts import run_rule_reasoning
+```
+1. 规则引擎
+   └─ 基于异常特征初步判定违规模式
 
-task = {
-    "task_id": "violation_001",
-    "data": feature_data,
-    "anomalies": anomaly_list,
-    "correlation_results": correlation_data,
-    "trend_results": trend_data,
-    "config": {}
-}
+2. 知识检索
+   ├─ 工艺知识库：验证"异常"是否对应正常工艺
+   ├─ 专家经验库：匹配相似历史案例
+   └─ 法规库：获取相关法律条文
 
-result = run_rule_reasoning(task)
-# Returns: regulation_check, process_validation, expert_reasoning, violation_conclusion
+3. 专家推理
+   ├─ 解决知识冲突（规则判定 vs 工艺解释）
+   ├─ 评估可疑度
+   └─ 生成最终结论
 ```
 
-## Core Modules
+## 知识验证示例
 
-### regulation_matcher.py
-- `match(anomalies, data)`: Check against regulatory standards
-- Supported regulations:
-  - Water Pollution Prevention Law
-  - GB 18918-2002 (Discharge Standard - Class 1A)
-  - HJ 915-2017 (Surface Water Monitoring)
+| 规则引擎判定 | 工艺知识库解释 | 最终结论 |
+|-------------|---------------|---------|
+| pH恒定→插瓶干扰 | 工艺调整期间pH稳定是正常 | 非违规 |
+| pH恒定→插瓶干扰 | 无工艺调整记录 | 可疑 |
+| 多指标同步下降→稀释排放 | 冲击负荷后浓度下降是正常 | 非违规 |
 
-### process_validator.py
-- `validate(anomalies, correlation_results, trend_results, data)`: Process mechanism check
-- Rules:
-  - pH-COD synergy: Acidic conditions → higher COD degradation
-  - NH3-N/TN conversion: NH3-N is TN component
-  - Mass balance: Conservation of matter
+## 调用参数
 
-### expert_reasoner.py
-- `reason(anomalies, regulation_result, process_result)`: Expert experience matching
-- `similarity_threshold=0.8`: Patent-required case similarity
+```json
+{
+  "task_id": "唯一任务ID",
+  "query": "原始用户查询",
+  "data": {
+    "influent": [...],
+    "effluent": [...]
+  },
+  "anomalies": [
+    {
+      "indicator": "COD",
+      "timestamp": "2026-06-22 10:00:00",
+      "type": "constant",
+      "score": 0.85,
+      "value": 45.2
+    }
+  ],
+  "requirements": {
+    "regulation_standard": "GB_18918_2002_1A",
+    "enable_knowledge_validation": true
+  }
+}
+```
 
-### violation_generator.py
-- `generate(...)`: Generate violation conclusion
-  - Suspicion level (high/medium/low)
-  - Evidence points
-  - Legal references
-  - Penalty recommendations
+## 输出格式
 
-## Regulatory Standards (Class 1A)
+```json
+{
+  "status": "success|error",
+  "rule_engine_result": {
+    "detected_patterns": ["bottle_interference"],
+    "confidence": 0.85
+  },
+  "knowledge_validation": {
+    "process_knowledge": {
+      "found": true,
+      "explanation": "工艺调整期间pH稳定是正常现象",
+      "reduces_suspicion": true
+    },
+    "expert_cases": [
+      {
+        "case_id": "case_001",
+        "similarity": 0.82,
+        "conclusion": "插瓶干扰"
+      }
+    ]
+  },
+  "conclusion": {
+    "suspicion_level": "low",
+    "reasoning": "规则判定为插瓶干扰，但工艺知识库表明该时段有工艺调整，降低可疑度",
+    "evidence_points": ["超标3次", "NH3-N/TN转化异常", "稀释排放模式"],
+    "legal_references": ["GB 18918-2002 一级A标准: COD≤50mg/L"]
+  }
+}
+```
 
-| Indicator | Limit | Unit |
-|-----------|-------|------|
-| COD | 50 | mg/L |
-| TN | 15 | mg/L |
-| NH3-N | 5 | mg/L |
-| TP | 0.5 | mg/L |
-| pH | 6-9 | - |
+## 可疑度等级
 
-## Process Mechanism Rules
+| 条件 | 等级 |
+|------|------|
+| 规则判定违规 AND 工艺知识库无解释 AND 专家案例匹配≥0.8 | 高 |
+| 规则判定违规 AND 工艺知识库有解释 OR 专家案例匹配<0.8 | 中 |
+| 规则判定违规但工艺知识库完全解释 | 低 |
 
-| Rule | Validation | Violation Indicator |
-|------|------------|---------------------|
-| pH-COD synergy | Acidic → higher COD efficiency | pH stable, COD fluctuates |
-| NH3-N/TN conversion | NH3-N part of TN | Correlation <0.3 |
-| DO-Pollutant degradation | Aerobic → organic degradation | DO normal, pollutants rise |
-| Mass balance | Conservation of matter | Abnormal removal rate |
+## 知识库文件
 
-## Violation Patterns
-
-- **Bottle Interference**: Constant values near standard limits
-- **Dilution Discharge**: Multi-indicator synchronized drop at low levels
-- **Artificial Fitting**: Over-smoothed data, high R²
-- **Malicious Evasion**: Abnormal missing rate, night-time gaps
-
-## Suspicion Level (Patent Requirements)
-
-| Condition | Level |
-|-----------|-------|
-| ≥2 pattern matches AND process violation | High (critical) |
-| 1 pattern match AND process violation | Medium |
-| Pattern matches only, no process violation | Low |
-
-## Configuration
-
-### Process Validation
-- `nh3_tn_correlation_min=0.3`: Min NH3-N/TN correlation
-- `nh3_tn_ratio_min=0.2`: Min effluent NH3-N/TN ratio
-- `nh3_tn_ratio_max=0.6`: Max effluent NH3-N/TN ratio
-
-### Expert Reasoning
-- `similarity_threshold=0.8`: Patent-required case similarity
-
-### Violation Generation
-- `high_risk_condition`: "patterns>=2 AND process_violation"
-- `medium_risk_condition`: "patterns==1 AND process_violation"
-- `low_risk_condition`: "patterns>0 AND NOT process_violation"
-
-## References
-
-For detailed configuration: `shared/knowledge/regulations/`, `shared/knowledge/process_knowledge/`, `shared/knowledge/expert_experience/`, patent documentation
+- [法规库](../../shared/knowledge/regulations/)
+- [工艺知识库](../../shared/knowledge/process_knowledge/)
+- [违规模式库](../../shared/knowledge/violation_patterns/)
+- [专家经验库](../../shared/knowledge/expert_experience/)
