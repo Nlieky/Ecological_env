@@ -8,7 +8,7 @@ LLM客户端模块 - 废水虚假排放智能监测系统
 支持 OpenAI 兼容的 API 格式（如本地部署的 ctgu-vlm 模型）
 
 配置加载：
-- 敏感信息（API密钥）从 middleware/.env 加载
+- 敏感信息（API密钥）从项目根目录 .env 加载
 - 非敏感配置从 shared/configs/llm_config.yaml 加载
 
 使用方式：
@@ -409,9 +409,9 @@ def load_llm_config(
 
     # 确定默认路径
     if env_path is None:
-        # 从当前文件位置推导
+        # 从当前文件位置推导到项目根目录
         current_dir = Path(__file__).parent
-        env_path = str(current_dir.parent.parent / "middleware" / ".env")
+        env_path = str(current_dir.parent.parent / ".env")
 
     if config_path is None:
         current_dir = Path(__file__).parent
@@ -594,7 +594,7 @@ if __name__ == "__main__":
             print(f"  响应: {response}")
         else:
             print("未设置有效的API密钥，跳过聊天测试")
-            print("请在 middleware/.env 中设置 LLM_API_KEY")
+            print("请在项目根目录 .env 中设置 LLM_API_KEY")
 
     except Exception as e:
         print(f"错误: {e}")
