@@ -46,8 +46,6 @@ memory:
 
 # 技能配置
 skills:
-  enabled:
-    - orchestrator-core
   # 外部技能目录 - 4个子智能体的 skills
   external_dirs:
     - subagents/multi-dimensional-data-perception-agent/skills
