@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Flask中间件 - 基于Orchestrator-Core架构的实时监测
+Flask中间件 - 基于 Hermes Agent 框架的实时监测
 
-双流处理架构：
+架构说明：
 1. 实时流（每秒）：Prometheus指标更新，立即响应
-2. 分析流（每10分钟）：两层LLM完整分析
+2. 底层框架：Hermes Agent (NousResearch/hermes-agent)
+   - AIAgent.run_conversation() 处理查询
+   - delegate_task 工具调用子智能体
+   - LLM 自动解析意图并协调子智能体
 
-数据缓冲 + 定时触发 = 降低LLM调用频率，保持可视化实时性
+数据缓冲 + 实时更新
 """
 
 import logging
@@ -26,10 +29,6 @@ script_dir = Path(__file__).parent.resolve()
 project_root = script_dir.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "workspace"))
-
-# Orchestrator-Core模块路径（仅用于其他模块）
-orchestrator_scripts = project_root / "workspace" / "skills" / "orchestrator-core" / "scripts"
-sys.path.insert(0, str(orchestrator_scripts.resolve()))
 
 # multi-dimensional-data-perception-agent模块路径
 agent_scripts = project_root / "subagents" / "multi-dimensional-data-perception-agent" / "skills" / "data-perception-core" / "scripts"
@@ -65,16 +64,11 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 logger.info(f"[PATH] 项目根目录: {project_root}")
-logger.info(f"[PATH] Orchestrator脚本目录: {orchestrator_scripts}")
 logger.info(f"[PATH] Agent脚本目录: {agent_scripts}")
 
-# 导入orchestrator-core模块
-# 注意：现在使用 Hermes 框架，LLMAgentCoordinator 来自 hermes_agent_wrapper
-from task_receiving_and_parsing import TaskReceivingAndParsingModule
+# 导入 Hermes 框架
+# 完全使用 Hermes Agent 框架作为底层 Agent 框架
 from hermes_agent_wrapper import LLMAgentCoordinator
-# ExecutionControlModule 和 ResultInterpretationModule 暂时保留原样
-from execution_control import ExecutionControlModule
-from result_interpretation import ResultInterpretationModule
 
 # 导入LLM客户端
 from shared.configs.llm_client import get_llm_client
@@ -116,7 +110,7 @@ data_processed = Counter('wastewater_data_processed_total', '数据处理总数'
 anomaly_detected = Counter('wastewater_anomaly_detected_total', '异常检测总数', ['anomaly_type'])
 alert_total = Counter('wastewater_alert_total', '实时告警总数', ['pattern_type', 'level'])
 
-# ==================== Orchestrator-Core模块初始化 ====================
+# ==================== Hermes 框架初始化 ====================
 
 # 获取LLM客户端
 try:
@@ -129,23 +123,12 @@ except Exception as e:
     logger.warning(f"[INIT] LLM客户端初始化失败: {e}，使用本地规则模式")
     llm_client = None
 
-# 任务接收与解析模块
-task_receiving_module = TaskReceivingAndParsingModule(llm_client=llm_client)
-
-# 大模型子智能体协调器
+# Hermes 主智能体协调器
 llm_coordinator = LLMAgentCoordinator(llm_client=llm_client)
 
-# 执行控制模块
-execution_control = ExecutionControlModule(llm_client=llm_client)
-
-# 结果解释模块
-result_interpretation = ResultInterpretationModule(llm_client=llm_client)
-
-logger.info("[INIT] Orchestrator-Core模块初始化完成")
-logger.info("[INIT] - 任务接收与解析模块")
-logger.info("[INIT] - 大模型子智能体协调器")
-logger.info("[INIT] - 执行控制模块")
-logger.info("[INIT] - 结果解释模块")
+logger.info("[INIT] Hermes 框架初始化完成")
+logger.info("[INIT] - AIAgent.run_conversation() 处理查询")
+logger.info("[INIT] - delegate_task 工具调用子智能体")
 
 # ==================== 双流处理架构配置 ====================
 
@@ -422,8 +405,8 @@ def health():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'service': 'wastewater_orchestrator_middleware',
-        'architecture': 'orchestrator-core'
+        'service': 'wastewater_hermes_middleware',
+        'architecture': 'hermes-agent'
     })
 
 
@@ -682,9 +665,10 @@ def get_analysis_results():
 
 @app.route('/api/analyze/stats', methods=['GET'])
 def get_analyzer_stats():
-    """获取Orchestrator-Core统计信息"""
+    """获取 Hermes 框架统计信息"""
     return jsonify({
-        'module': 'orchestrator-core',
+        'module': 'hermes-agent',
+        'framework': 'Hermes Agent Framework (NousResearch/hermes-agent)',
         'coordinator': llm_coordinator.identity_loader.get_all_agents(),
         'timestamp': datetime.now().isoformat()
     })
@@ -692,15 +676,15 @@ def get_analyzer_stats():
 
 @app.route('/api/analyze/reset', methods=['POST'])
 def reset_analyzer():
-    """重置Orchestrator-Core状态"""
+    """重置 Prometheus 指标状态"""
     alert_total.clear()
-    logger.info("[RESET] Orchestrator-Core状态已重置")
-    return jsonify({'status': 'reset', 'message': 'Orchestrator-Core状态已重置'})
+    logger.info("[RESET] Prometheus 指标已重置")
+    return jsonify({'status': 'reset', 'message': 'Prometheus 指标已重置'})
 
 
 if __name__ == '__main__':
     logger.info("=" * 60)
-    logger.info("启动Flask中间件（基于Orchestrator-Core架构）...")
+    logger.info("启动Flask中间件（基于 Hermes Agent 框架）...")
     logger.info("")
     logger.info("端点:")
     logger.info("  - http://localhost:5000/health")
@@ -709,19 +693,10 @@ if __name__ == '__main__':
     logger.info("  - http://localhost:5000/api/analyze/stats")
     logger.info("  - http://localhost:5000/api/analyze/reset")
     logger.info("")
-    logger.info("完整流程:")
-    logger.info("  1. 数据到达 → 任务接收与解析")
-    logger.info("  2. 大模型读取主智能体身份 → 解析意图")
-    logger.info("  3. 大模型协调4个子智能体协同执行")
-    logger.info("     - 多维数据感知子智能体 (multi-dimensional-data-perception-agent)")
-    logger.info("     - 异常检测子智能体 (anomaly-detection-agent (含特征分析))")
-    logger.info("     - 异常检测子智能体 (anomaly-detection-agent)")
-    logger.info("     - 规则推理子智能体 (rule-reasoning-agent)")
-    logger.info("  4. 结果解释输出 → 自然语言报告")
-    logger.info("")
-    logger.info("大模型协调机制:")
-    logger.info("  - 读取子智能体完整身份 (SKILL.md, AGENTS.md, SOUL.md, MEMORY.md)")
-    logger.info("  - 调用已开发脚本 (subagents/*/skills/*/scripts/*.py)")
-    logger.info("  - 传递结果到下一个子智能体")
+    logger.info("底层框架: Hermes Agent (NousResearch/hermes-agent)")
+    logger.info("  - AIAgent.run_conversation() 处理查询")
+    logger.info("  - LLM 通过 delegate_task 工具调用子智能体")
+    logger.info("  - 子智能体: multi-dimensional-data-perception, anomaly-detection,")
+    logger.info("              rule-reasoning, disposition-execution")
     logger.info("=" * 60)
     app.run(host='0.0.0.0', port=5000, debug=False)
