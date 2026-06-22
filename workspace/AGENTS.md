@@ -87,99 +87,20 @@ You wake up fresh each session. These files are your continuity:
 - ✅ 综合决策 - 能基于全局信息做出最佳决策
 - ✅ 用户桥梁 - 是用户与系统的桥梁
 
-### 双驱动运行机制
-
-#### 实时监测模式
-
-```
-监管平台触发信号
-    ↓
-主智能体解析 → 任务分解 → 结果复用判断
-    ↓
-任务编排层生成任务链
-    ↓
-子智能体协同执行：
-  • 📊 多维数据感知子智能体：数据获取、清洗、标准化、特征提取
-  • 🔍 异常检测子智能体：异常识别、模式匹配
-  • ⚖️ 规则推理子智能体：违规判定、嫌疑等级
-  • 🚨 研判预警与处置执行子智能体：预警分析、处置建议
-    ↓
-违规告警输出 → 存入典型案例 → 闭环迭代优化
-```
-
-#### 查询响应模式
-
-```
-用户自然语言查询
-    ↓
-主智能体NLU解析 → 任务分解 → 结果复用判断
-    ↓（三重判断：数据匹配、新鲜度、语义匹配）
-    ├─ 满足条件 → 直接复用历史结果
-    └─ 不满足   → 触发实时计算流程
-                  ↓
-          任务编排层生成任务链
-                  ↓
-          子智能体协同执行：
-            📊 multi-dimensional-data-perception-agent → 🔍 anomaly-detection-agent
-            → ⚖️ rule-reasoning-agent → 🚨 disposition-execution-agent
-                  ↓
-          自然语言结果输出
-```
 
 ## Tools
 
 Skills provide your tools. When you need one, check its `SKILL.md`.
 
-### 核心技能包
-
-- **orchestrator-core** (`workspace/skills/orchestrator-core/`) - 任务编排层
-  - task_structuring.py - 任务结构化
-  - task_flow_generation.py - 任务流生成
-  - resource_matching.py - 资源匹配
-  - execution_control.py - 执行控制
-
 ### 子智能体
 
-- 📊 multi-dimensional-data-perception-agent - 多维数据感知
-- 🔍 anomaly-detection-agent - 异常检测
-- ⚖️ rule-reasoning-agent - 规则推理
-- 🚨 disposition-execution-agent - 研判预警与处置执行
+- 📊 multi-dimensional-data-perception-agent - 多维数据感知（数据获取、清洗、标准化）
+- 🔍 anomaly-detection-agent - 异常检测（异常识别、特征提取）
+- ⚖️ rule-reasoning-agent - 规则推理（违规判定、知识验证）
+- 🚨 disposition-execution-agent - 研判预警与处置执行（预警分级、工单生成）
+
+子智能体由主智能体通过 `delegate_task` 工具调用，LLM 根据用户查询自主决定调用哪些子智能体。
 
 ## Make It Yours
-
-## 子智能体调度规则
-
-### 任务类型与智能体映射
-
-#### 违规检测任务 (violation_detection)
-需要全部4个子智能体协同工作：
-1. 多维数据感知智能体 → 获取标准化数据
-2. 异常检测子智能体 → 识别异常特征
-3. 规则推理子智能体 → 判定违规类型
-4. 研判预警与处置执行智能体 → 生成预警和工单
-
-执行模式: HYBRID（数据感知和异常检测可流水线并行）
-
-#### 分析查询任务 (analysis_query)
-需要2个子智能体：
-1. 多维数据感知智能体 → 获取标准化数据
-2. 异常检测子智能体 → 识别异常特征
-
-执行模式: SEQUENTIAL
-
-#### 历史回溯任务 (historical_review)
-需要2个子智能体：
-1. 多维数据感知智能体 → 获取历史数据
-2. 规则推理子智能体 → 结合历史案例判定
-
-执行模式: SEQUENTIAL
-
-#### 预警响应任务 (alert_response)
-仅需1个子智能体：
-1. 研判预警与处置执行智能体 → 处理工单推送
-
-执行模式: SEQUENTIAL
-
----
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.
