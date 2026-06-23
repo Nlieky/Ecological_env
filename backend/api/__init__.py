@@ -1,0 +1,3 @@
+"""
+Hermes API Client module
+"""
