@@ -6,9 +6,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from prometheus_fastapi_instrumentator import Instrumentator
 from backend.api.routes import health, hermes, query
 from backend.core.config import settings
+from backend.metrics.definitions import (
+    api_requests_total,
+    api_request_duration_seconds
+)
 
 app = FastAPI(
     title="废水监测系统 API",
@@ -47,8 +50,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Prometheus 监控
-Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+# Prometheus 监控 - 自定义指标端点（兼容 Python 3.8）
+from prometheus_client import generate_latest
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus 指标端点"""
+    from prometheus_client import CONTENT_TYPE_LATEST
+    from fastapi.responses import Response
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 # 路由注册
 app.include_router(health.router, prefix="/api")
