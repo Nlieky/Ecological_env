@@ -33,9 +33,16 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     class Config:
-        env_file = ".env"
+        env_file = str(PROJECT_ROOT / ".env")
+        env_file_encoding = "utf-8"
         case_sensitive = True
         extra = "ignore"  # 忽略额外的环境变量
 
 
 settings = Settings()
+
+# 调试：验证配置加载
+import logging
+logger = logging.getLogger(__name__)
+logger.info(f"Loaded HERMES_API_KEY: {settings.HERMES_API_KEY[:2]}***{settings.HERMES_API_KEY[-2:] if len(settings.HERMES_API_KEY) > 4 else '****'}")
+logger.info(f"HERMES_API_URL: {settings.HERMES_API_URL}")

@@ -10,6 +10,33 @@
 - 子智能体3：规则推理子智能体（rule-reasoning-agent）
 - 子智能体4：研判预警与处置执行智能体（disposition-execution-agent）
 
+### 子智能体调用方式（2026-06-24更新：文件状态共享）
+
+主智能体通过 **orchestrator-core 技能** 调用子智能体：
+
+**可用工具**：
+- `create_session()` - 创建会话目录（workspace/state/session_YYYYMMDD_HHMMSS/）
+- `call_subagent(name, task, context)` - 调用子智能体
+- `cleanup_sessions(days)` - 清理旧会话
+
+**调用流程**：
+```
+1. create_session() → 创建会话目录
+2. call_subagent("data-perception", task, context) 
+   → 写入 task.json
+   → 子智能体读取并执行
+   → 子智能体写入 data_result.json
+   → 主智能体读取结果
+3. 继续调用其他子智能体（传递前一步结果作为 context）
+4. 整合所有结果，生成最终回答
+```
+
+**结果文件映射**：
+- data-perception → data_result.json
+- anomaly-detection → anomaly_result.json
+- rule-reasoning → rule_result.json
+- disposition-execution → disposition_result.json
+
 ### 数据类型
 系统支持8类多维时序数据：
 1. 水质数据：pH、COD、TN、TP、氨氮、悬浮物

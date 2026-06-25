@@ -80,9 +80,9 @@ async def startup():
     try:
         client = get_hermes_client()
         await client.health_check()
-        print("✓ Hermes API Server 连接成功")
+        print("[OK] Hermes API Server connected")
     except Exception as e:
-        print(f"✗ Hermes API Server 连接失败: {e}")
+        print(f"[ERROR] Hermes API Server connection failed: {e}")
 
 
 @app.on_event("shutdown")

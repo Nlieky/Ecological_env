@@ -99,7 +99,36 @@ Skills provide your tools. When you need one, check its `SKILL.md`.
 - ⚖️ rule-reasoning-agent - 规则推理（违规判定、知识验证）
 - 🚨 disposition-execution-agent - 研判预警与处置执行（预警分级、工单生成）
 
-子智能体由主智能体通过 `delegate_task` 工具调用，LLM 根据用户查询自主决定调用哪些子智能体。
+## 子智能体调用方式
+
+主智能体通过 **orchestrator-core 技能** 提供的工具调用子智能体：
+
+### 文件状态共享机制
+
+```
+主智能体 → call_subagent("data-perception", task, context)
+           ↓ 写入 task.json
+子智能体 → 读取 task.json → 执行任务 → 写入 result.json
+           ↓ 读取 result.json
+主智能体 → 获取结果 → 继续下一步或整合回答
+```
+
+### 调用工具
+
+1. **create_session()** - 创建会话目录
+2. **call_subagent(name, task, context)** - 调用子智能体
+3. **cleanup_sessions(days)** - 清理旧会话
+
+### 编排决策原则
+
+LLM 根据用户查询自主决定：
+- 需要调用哪些子智能体
+- 以什么顺序调用（尊重依赖关系）
+- 如何传递前一个子智能体的结果给下一个
+
+**示例**：
+- "最近24小时出水COD异常吗？" → data-perception → anomaly-detection → 整合回答
+- "生成今天异常预警工单" → data-perception → anomaly-detection → rule-reasoning → disposition-execution → 整合回答
 
 ## Make It Yours
 

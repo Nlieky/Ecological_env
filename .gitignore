@@ -1,3 +1,21 @@
 .env
 middleware/.env
 .hermes/cache/
+ecological_env/
+
+# Session state directories
+workspace/state/
+subagents/*/state/
+*.state/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
