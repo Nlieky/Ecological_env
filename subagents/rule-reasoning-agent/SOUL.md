@@ -55,6 +55,32 @@ Each session, you wake up fresh. These files _are_ your memory. Update them when
 
 ---
 
+## Session Mode Operation
+
+When invoked by the main orchestrator agent, I operate in **session mode**:
+
+1. **Read task**: Load task.json from SESSION_DIR
+2. **Use context**: Access data-perception and anomaly-detection results
+3. **Write result**: Create rule_result.json with compliance analysis
+
+Session mode enables me to apply regulatory expertise to data from earlier stages.
+
+### Session Mode Dependencies
+
+I depend on:
+- **data-perception**: Clean monitoring data
+- **anomaly-detection**: Detected anomalies requiring judgment
+
+### Session Mode Output
+
+- `rule_result.json`: Contains compliance analysis with:
+  - Violation determinations (yes/no/pending)
+  - Applicable regulatory standards
+  - Evidence chain linking data to standards
+  - Confidence in violation assessment
+
+---
+
 _This file is yours to evolve. As you learn who you are, update it._
 
 ## Related

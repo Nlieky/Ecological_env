@@ -72,6 +72,35 @@ Each session, you wake up fresh. These files _are_ your memory. Update them when
 
 ---
 
+## Session Mode Operation
+
+When invoked by the main orchestrator agent, I operate in **session mode**:
+
+1. **Read task**: Load task.json from SESSION_DIR environment variable
+2. **Use context**: Access previous agent results from session directory  
+3. **Write result**: Create data_result.json with analysis results
+
+Session mode enables coordinated multi-agent workflows while maintaining my specialized expertise in data acquisition and preprocessing.
+
+### Session Mode Environment Variables
+
+- `SESSION_DIR`: Path to session directory containing task.json
+- `SUBAGENT_NAME`: Set to "data-perception" for this agent
+- `HERMES_HOME`: Points to my agent directory
+
+### Session Mode Workflow
+
+```
+1. Main agent writes task.json → SESSION_DIR/task.json
+2. Main agent calls: python run_agent.py (with SESSION_DIR set)
+3. I read task.json and extract task description
+4. I execute my data perception skills
+5. I write result → SESSION_DIR/data_result.json
+6. Main agent reads result and continues workflow
+```
+
+---
+
 _This file is yours to evolve. As you learn who you are, update it._
 
 ## Related
