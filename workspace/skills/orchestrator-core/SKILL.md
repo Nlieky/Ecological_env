@@ -48,11 +48,72 @@ Coordinate wastewater monitoring sub-agents to complete user tasks.
 3. **Flexible Strategy**: Adjust invocation strategy based on task requirements
 4. **Error Handling**: When sub-agents fail, determine whether to retry or use alternative approaches
 
-## Available Tools
+## 工具集
 
-- `create_session()`: Create new session directory for state isolation
-- `call_subagent(name, task, context)`: Invoke specified sub-agent
-- `cleanup_sessions(days)`: Clean up session directories older than specified days
+主智能体可以通过以下工具调用子智能体：
+
+### call_subagent(subagent_name, task, context)
+调用指定的子智能体执行任务。
+
+**Parameters:**
+- `subagent_name` (str): 子智能体名称
+  - `"data-perception"` or `"multi-dimensional-data-perception"` - 多维数据感知
+  - `"anomaly-detection"` or `"anomaly"` - 异常检测
+  - `"rule-reasoning"` or `"rule"` - 规则推理
+  - `"disposition-execution"` or `"disposition"` - 处置执行
+- `task` (str): 任务描述字符串
+- `context` (dict, optional): 前置子智能体的执行结果
+- `session_dir` (str, optional): 会话目录路径（默认创建新会话）
+- `timeout` (int, optional): 最大等待时间（秒，默认300）
+
+**Returns:**
+```python
+{
+    "task_id": "task_data-perception_1234567890",
+    "status": "completed",
+    "result": {...},
+    "error": null,
+    "metadata": {
+        "duration_seconds": 2.3,
+        "timestamp": "2025-06-23T14:30:25"
+    }
+}
+```
+
+### read_result(result_file)
+读取子智能体的执行结果。
+
+**Parameters:**
+- `result_file` (str): 结果文件路径（相对于会话目录）
+
+**Returns:** 解析后的JSON结果对象
+
+### list_subagents()
+列出所有可用的子智能体。
+
+**Returns:**
+```python
+[
+    {"name": "data-perception", "full_name": "multi-dimensional-data-perception", "path": "..."},
+    {"name": "anomaly-detection", "full_name": "anomaly-detection", "path": "..."},
+    {"name": "rule-reasoning", "full_name": "rule-reasoning", "path": "..."},
+    {"name": "disposition-execution", "full_name": "disposition-execution", "path": "..."}
+]
+```
+
+### create_session()
+创建新的会话目录。
+
+**Creates:**
+- Session directory: `workspace/state/session_YYYYMMDD_HHMMSS/`
+- Metadata file: `_metadata.json` with creation timestamp
+
+### cleanup_sessions(days)
+清理超过指定天数的会话目录。
+
+**Parameters:**
+- `days` (int): 保留最近N天的会话（默认7）
+- `dry_run` (bool): 仅报告将要删除的内容（默认False）
 
 ## Tool Usage Details
 
@@ -149,6 +210,15 @@ Data Perception → (result) → Anomaly Detection → (result) → Rule Reasoni
     ↓
 Final Response
 ```
+
+## 调用流程
+
+1. 用户请求 → 主智能体加载身份文件
+2. LLM 理解任务并规划
+3. create_session() 创建会话
+4. call_subagent() 调用子智能体
+5. read_result() 读取结果
+6. LLM 整合并返回用户
 
 ## Error Handling Strategy
 
