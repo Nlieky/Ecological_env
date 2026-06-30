@@ -18,6 +18,24 @@ import json
 import time
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load .env from project root
+PROJECT_ROOT = Path(__file__).parent.parent
+ENV_FILE = PROJECT_ROOT / '.env'
+if ENV_FILE.exists():
+    load_dotenv(ENV_FILE)
+    print(f"[INFO] Loaded .env from {ENV_FILE}", file=sys.stderr, flush=True)
+else:
+    print(f"[WARNING] .env not found at {ENV_FILE}", file=sys.stderr, flush=True)
+
+# Add Hermes framework to path
+HERMES_PATH = os.environ.get('HERMES_PATH', 'D:/Hermes/hermes-agent')
+if HERMES_PATH and Path(HERMES_PATH).exists():
+    sys.path.insert(0, HERMES_PATH)
+    print(f"[INFO] Added Hermes to path: {HERMES_PATH}", file=sys.stderr, flush=True)
+else:
+    print(f"[WARNING] Hermes path not found: {HERMES_PATH}", file=sys.stderr, flush=True)
 
 # Add parent directory to import shared utilities
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -70,10 +88,39 @@ def run_session_task(AIAgent, task, context, session_dir):
     try:
         # Initialize agent
         # Note: You may need to adjust these parameters based on your Hermes setup
+
+        # === DEBUG: 打印环境信息 ===
+        import sys
+        print(f"[DEBUG] Current working directory: {os.getcwd()}", file=sys.stderr, flush=True)
+        print(f"[DEBUG] HERMES_HOME: {os.environ.get('HERMES_HOME', 'not set')}", file=sys.stderr, flush=True)
+        print(f"[DEBUG] SESSION_DIR: {session_dir}", file=sys.stderr, flush=True)
+
         agent = AIAgent(
-            model=os.environ.get("MODEL", "claude-sonnet-4-20250514"),
-            base_url=os.environ.get("BASE_URL", "http://localhost:11434/v1")
+            provider="custom",  # 使用自定义 LLM provider
+            model=os.environ.get("LLM_MODEL", os.environ.get("MODEL", "ctgu-vlm")),
+            base_url=os.environ.get("LLM_BASE_URL", os.environ.get("BASE_URL", "http://172.16.12.41:30000/v1")),
+            api_key=os.environ.get("LLM_API_KEY", os.environ.get("API_KEY", "dummy")),  # 使用 .env 中的 LLM_API_KEY
+            skip_context_files=False,  # 确保加载上下文文件
+            load_soul_identity=True,     # 加载 SOUL.md
+            skip_memory=False            # 加载 MEMORY.md
         )
+
+        # === DEBUG: 检查上下文文件是否存在 ===
+        cwd = Path(os.getcwd())
+        context_files = {
+            "HERMES.md": cwd / "HERMES.md",
+            "AGENTS.md": cwd / "AGENTS.md",
+            "SOUL.md": cwd / "SOUL.md",
+            "MEMORY.md": cwd / "MEMORY.md"
+        }
+        for name, path in context_files.items():
+            exists = "OK" if path.exists() else "FAIL"
+            print(f"[DEBUG] {exists} {name}: {path}", file=sys.stderr, flush=True)
+
+        # === DEBUG: 检查 agent 配置 ===
+        print(f"[DEBUG] agent.skip_context_files: {getattr(agent, 'skip_context_files', 'N/A')}", file=sys.stderr, flush=True)
+        print(f"[DEBUG] agent.load_soul_identity: {getattr(agent, 'load_soul_identity', 'N/A')}", file=sys.stderr, flush=True)
+        print(f"[DEBUG] agent.skip_memory: {getattr(agent, 'skip_memory', 'N/A')}", file=sys.stderr, flush=True)
 
         # Build messages from task
         task_description = task.get("task", "")
@@ -91,7 +138,36 @@ def run_session_task(AIAgent, task, context, session_dir):
         start_time = time.time()
 
         print(f"[Session Mode] Calling Hermes agent...")
+
+        # === DEBUG: 尝试获取系统提示词（如果存在） ===
+        try:
+            if hasattr(agent, '_cached_system_prompt'):
+                sys_prompt = agent._cached_system_prompt
+                print(f"[DEBUG] System prompt length: {len(sys_prompt) if sys_prompt else 0}", file=sys.stderr, flush=True)
+                print(f"[DEBUG] Contains 'Anomaly Detection': {'Anomaly Detection' in sys_prompt if sys_prompt else False}", file=sys.stderr, flush=True)
+                print(f"[DEBUG] Contains 'AGENTS.md': {'AGENTS.md' in sys_prompt if sys_prompt else False}", file=sys.stderr, flush=True)
+                print(f"[DEBUG] Contains '异常检测': {'异常检测' in sys_prompt if sys_prompt else False}", file=sys.stderr, flush=True)
+            else:
+                print(f"[DEBUG] Agent has no _cached_system_prompt attribute", file=sys.stderr, flush=True)
+                # 打印可用属性
+                attrs = [attr for attr in dir(agent) if not attr.startswith('__')]
+                print(f"[DEBUG] Agent attributes: {attrs[:20]}", file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"[DEBUG] Error checking system prompt: {e}", file=sys.stderr, flush=True)
+
         response = agent.run_conversation(messages)
+
+        # === DEBUG: 在运行后检查系统提示词 ===
+        if hasattr(agent, '_cached_system_prompt'):
+            sys_prompt = agent._cached_system_prompt
+            print(f"[DEBUG] After run - System prompt length: {len(sys_prompt) if sys_prompt else 0}", file=sys.stderr, flush=True)
+            if sys_prompt and len(sys_prompt) > 100:
+                print(f"[DEBUG] Contains '异常检测': {'异常检测' in sys_prompt}", file=sys.stderr, flush=True)
+                print(f"[DEBUG] Contains 'anomaly': {'anomaly' in sys_prompt.lower()}", file=sys.stderr, flush=True)
+                # 打印前200字符看看内容
+                print(f"[DEBUG] System prompt preview: {sys_prompt[:200]}...", file=sys.stderr, flush=True)
+        else:
+            print(f"[DEBUG] No _cached_system_prompt found after run", file=sys.stderr, flush=True)
 
         duration = time.time() - start_time
 
@@ -110,10 +186,10 @@ def run_session_task(AIAgent, task, context, session_dir):
         )
 
         # Update duration
-        with open(result_file, "r") as f:
+        with open(result_file, "r", encoding='utf-8') as f:
             result_obj = json.load(f)
         result_obj["metadata"]["duration_seconds"] = round(duration, 2)
-        with open(result_file, "w") as f:
+        with open(result_file, "w", encoding='utf-8') as f:
             json.dump(result_obj, f, indent=2, ensure_ascii=False)
 
         print(f"[Session Mode] Task completed in {duration:.2f}s")
