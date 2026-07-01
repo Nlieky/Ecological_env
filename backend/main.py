@@ -12,6 +12,7 @@ from backend.metrics.definitions import (
     api_requests_total,
     api_request_duration_seconds
 )
+from backend.middleware import LoggingMiddleware
 
 app = FastAPI(
     title="废水监测系统 API",
@@ -49,6 +50,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 日志中间件
+app.add_middleware(LoggingMiddleware)
 
 # Prometheus 监控 - 自定义指标端点（兼容 Python 3.8）
 from prometheus_client import generate_latest
