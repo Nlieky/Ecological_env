@@ -6,7 +6,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from backend.api.routes import health, hermes, query
+from backend.api.routes import health, hermes, query, logs
 from backend.core.config import settings
 from backend.metrics.definitions import (
     api_requests_total,
@@ -68,6 +68,7 @@ async def metrics():
 app.include_router(health.router, prefix="/api")
 app.include_router(hermes.router, prefix="/api")
 app.include_router(query.router, prefix="/api")
+app.include_router(logs.router, prefix="/api")
 
 
 @app.get("/", tags=["根路径"])
