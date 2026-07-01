@@ -6,7 +6,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
-from backend.api.routes import health, hermes, query, logs
+from backend.api.routes import health, hermes, query, logs, realtime
 from backend.core.config import settings
 from backend.metrics.definitions import (
     api_requests_total,
@@ -70,6 +70,7 @@ app.include_router(health.router, prefix="/api")
 app.include_router(hermes.router, prefix="/api")
 app.include_router(query.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
+app.include_router(realtime.router, prefix="/api")
 
 
 # 全局异常处理器
