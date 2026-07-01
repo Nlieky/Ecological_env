@@ -193,7 +193,7 @@ FASTAPI_PORT=8001
 
 ### 启动服务
 
-**方式 1: FastAPI Backend（推荐）**
+**后端：**
 
 ```bash
 # Windows
@@ -202,11 +202,21 @@ scripts\start_backend.bat
 # Linux/Mac
 bash scripts/start_backend.sh
 
-# 或手动启动（确保使用虚拟环境的 Python 3.12.12）
+# 或手动启动
 ecological_env\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-访问 API 文档：`http://localhost:8001/docs`
+**前端：**
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+访问：
+- 后端 API 文档：`http://localhost:8001/docs`
+- 前端界面：`http://localhost:3000`
 
 **方式 2: Simple HTTP Wrapper**
 
