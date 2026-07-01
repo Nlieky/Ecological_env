@@ -3,9 +3,9 @@
 
 为已完成的 Hermes 智能体系统提供 HTTP 接口
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from backend.api.routes import health, hermes, query, logs
 from backend.core.config import settings
 from backend.metrics.definitions import (
@@ -13,6 +13,7 @@ from backend.metrics.definitions import (
     api_request_duration_seconds
 )
 from backend.middleware import LoggingMiddleware
+from backend.utils.loggers import log_system_error
 
 app = FastAPI(
     title="废水监测系统 API",
@@ -69,6 +70,32 @@ app.include_router(health.router, prefix="/api")
 app.include_router(hermes.router, prefix="/api")
 app.include_router(query.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
+
+
+# 全局异常处理器
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """全局异常处理，记录到系统错误日志"""
+    import traceback
+
+    # 记录错误日志
+    try:
+        log_system_error(
+            level="ERROR",
+            module="backend",
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            stack_trace=traceback.format_exc(),
+            context={"path": request.url.path, "method": request.method}
+        )
+    except Exception as log_error:
+        print(f"Failed to log system error: {log_error}")
+
+    # 返回错误响应
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error"}
+    )
 
 
 @app.get("/", tags=["根路径"])
