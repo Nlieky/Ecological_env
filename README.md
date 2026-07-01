@@ -2,200 +2,36 @@
 
 > 一种多智能体协同的废水虚假排放智能监测方法及系统
 
-## 📖 专利概述
+##  📖 专利概述
 
-本系统基于发明专利《一种多智能体协同的废水虚假排放智能监测方法及系统》实现，采用**六层标准化架构**构建覆盖多源数据接入、标准化治理、多维特征挖掘、时序异常识别、工艺机理校验、法规规则推理、专家经验复审、自然语言交互应答的全链条、一体化废水虚假排放智能监测体系。
+本系统基于发明专利《一种多智能体协同的废水虚假排放智能监测方法及系统》实现，采用**六层标准化架构**构建覆盖多源数据接入、标准化治理、多维特征挖掘、时序异常识别、工艺机理校验、法规规则推理、专家经验复审的全链条、一体化废水虚假排放智能监测体系。
 
 ### 核心能力
 
 - 🎯 **精准识别**：插瓶干扰、暗管偷排、清水稀释排放、数据篡改定值、虚假停产、工况造假等违规行为
 - 🤖 **智能协同**：主智能体全局调度 + 任务编排层统一约束 + 四大子智能体专业执行
 - 💬 **自然交互**：支持自然语言发起复杂分析查询，系统自动完成任务解析、算子调度、指标关系分析
-- 📊 **可视化分析**：Web界面展示时序图表、异常点标注、Grafana监控仪表板
 - 🔄 **闭环优化**：基于监管反馈持续更新知识库、算法策略与判定规则
-
-## 🌟 最新功能（v2.2.0）
-
-### Web智能查询界面 ⭐
-
-**自然语言查询**
-- 支持中英文自然语言输入
-- 自动解析查询意图和时间范围
-- LLM驱动的主智能体和子智能体协同分析
-- 自动生成自然语言监测报告
-
-**可视化图表**
-- 多指标时序图表（pH、COD、TN、NH3-N、TP）
-- 异常点自动红色标注
-- 交互式tooltip显示异常详情
-- 图例点击切换指标显示
-
-**Grafana集成**
-- 实时监控面板嵌入Grafana仪表板
-- 一键跳转到完整仪表板
-- 支持进水/出水指标实时对比
-
-**快速开始**
-```bash
-# 启动查询接口
-cd middleware
-python query_interface.py
-
-# 访问Web界面
-http://localhost:8080
-
-# 示例查询
-- "检测最近一周数据异常情况"
-- "analyze pH COD anomalies in past 24 hours"
-```
 
 ## 技术栈
 
-**底层框架**: [Hermes Agent](https://github.com/NousResearch/hermes-agent) - LLM驱动智能体框架
+| 组件 | 技术 |
+|------|------|
+| **底层框架** | [Hermes Agent](https://github.com/NousResearch/hermes-agent) - LLM驱动智能体框架 |
+| **后端** | FastAPI + Uvicorn |
+| **Python** | 3.12.12 (uv 虚拟环境 `ecological_env`) |
+| **LLM** | ctgu-vlm (OpenAI 兼容 API) |
+| **监控** | Prometheus + Grafana |
 
-## 📁 项目目录结构
-
-```
-Ecological_env/                    # 📁 项目主目录
-│
-├── middleware/                     # 📁【Flask中间件 & Web界面】⭐
-│   ├── query_interface.py          # 🌐 Web查询接口（LLM驱动）⭐
-│   ├── app_orchestrator.py         # 🚀 实时监控服务
-│   ├── historical_data_fetcher.py # 📊 历史数据获取器 ⭐
-│   ├── static/                     # 📁 Web前端资源 ⭐
-│   │   ├── index.html              # 📄 主页面（查询、监控、分析）
-│   │   ├── css/                     # 📁 样式文件
-│   │   ├── js/                      # 📁 JavaScript模块
-│   │   │   ├── app.js              # 📄 应用逻辑
-│   │   │   ├── charts.js           # 📄 Chart.js图表 ⭐
-│   │   │   └── monitoring.js       # 📄 监控面板
-│   │   └── monitoring/             # 📁 监控相关资源
-│   ├── .env                        # 🔑 LLM API配置
-│   └── .env.example                # 📄 环境变量模板
-│
-├── workspace/                     # 📁【主智能体配置区】
-│   ├── AGENTS.md                  # 📄 工作区规范
-│   ├── SOUL.md                    # 📄 主智能体个性和语气
-│   ├── MEMORY.md                  # 📄 主智能体全局长期记忆
-│   ├── IDENTITY.md                # 📄 主智能体身份卡片
-│   ├── USER.md                    # 📄 用户信息
-│   ├── TOOLS.md                   # 📄 工具配置笔记
-│   └── skills/                     # 📁【主智能体核心技能包】
-│       └── orchestrator-core/      # 📦 编排器核心 ⭐
-│           ├── SKILL.md
-│           └── scripts/            # 📁 任务编排脚本
-│               ├── dynamic_orchestrator.py  # 🔄 动态编排器
-│               ├── execution_control.py      # ⚙️ 执行控制（LLM驱动）
-│               └── execution_engine.py      # 🚀 执行引擎
-│
-├── subagents/                     # 📁【子智能体独立工作区】
-│   ├── multi-dimensional-data-perception-agent/  # 📦 多维数据感知 📊
-│   │   ├── AGENTS.md               # 📄 专属任务指令
-│   │   ├── SOUL.md                 # 📄 角色个性
-│   │   ├── MEMORY.md               # 📄 专业记忆
-│   │   └── skills/
-│   │       └── data-perception-core/scripts/
-│   │           ├── data_acquisition.py    # 多源数据获取
-│   │           ├── data_cleaning.py        # 数据清洗
-│   │           ├── time_alignment.py       # 时序对齐
-│   │           ├── standardization.py      # 标准化
-│   │           └── data_decomposition.py    # 数据分解
-│   │
-│   ├── anomaly-detection-agent/    # 📦 异常检测 🔍
-│   │   ├── AGENTS.md
-│   │   ├── SOUL.md
-│   │   ├── MEMORY.md
-│   │   └── skills/
-│   │       └── anomaly-detection-core/scripts/
-│   │           ├── operator_adapter.py     # 算子适配
-│   │           ├── anomaly_scorer.py       # 异常评分
-│   │           ├── pattern_recognizer.py     # 5类异常识别 ⭐
-│   │           ├── violation_detector.py    # 4类违规检测 ⭐
-│   │           └── confidence_evaluator.py  # 置信度评估
-│   │
-│   ├── rule-reasoning-agent/       # 📦 规则推理 ⚖️
-│   │   ├── AGENTS.md
-│   │   ├── SOUL.md
-│   │   ├── MEMORY.md
-│   │   └── skills/
-│   │       └── rule-reasoning-core/scripts/
-│   │           ├── regulation_matcher.py    # 法规匹配
-│   │           ├── process_validator.py     # 工艺校验
-│   │           └── expert_reasoner.py       # 专家推理
-│   │
-│   └── disposition-execution-agent/  # 📦 研判预警与处置 🚨
-│       ├── AGENTS.md
-│       ├── SOUL.md
-│       ├── MEMORY.md
-│       └── skills/
-│           └── disposition-execution-core/scripts/
-│               ├── alert_classifier.py        # 告警分类
-│               ├── consensus_engine.py         # 融合共识 ⭐
-│               └── work_order_generator.py    # 工单生成
-│
-├── shared/                         # 📁【全局共享资源】
-│   ├── configs/                    # ⚙️ 配置层
-│   │   ├── llm_config.yaml         # LLM配置
-│   │   ├── llm_client.py           # LLM客户端
-│   │   ├── agent_registry.yaml     # 智能体注册表
-│   │   ├── consensus_config.yaml   # 共识引擎配置 ⭐
-│   │   └── rule_config.yaml        # 违规检测配置 ⭐
-│   ├── knowledge/                  # 📚 知识库层
-│   │   ├── regulations/            # 法规库
-│   │   ├── process_knowledge/      # 工艺知识库
-│   │   ├── violation_patterns/     # 违规模式库
-│   │   └── expert_experience/      # 专家经验库
-│   ├── operators/                  # 🔧 算子库
-│   │   ├── statistical/            # 统计算子
-│   │   ├── ml/                     # 机器学习算子
-│   │   └── deep_learning/          # 深度学习算子
-│   └── data/                       # 📊 数据层
-│       └── real-time/              # 实时数据
-│
-├── stream/                         # 📁【数据流发送器】
-│   └── dual_data_stream.py         # 🌊 双数据流发送器
-│
-├── grafana/                        # 📁【Grafana配置】
-│   ├── dashboards/
-│   │   └── stream_01.json          # 📊 监控仪表板 ⭐
-│   └── prometheus.yml              # ⚙️ Prometheus配置
-│
-├── data/                           # 📁【原始数据】
-│   ├── pollution_water_in.csv      # 进水数据
-│   └── pollution_water_out.csv     # 出水数据
-│
-├── tests/                          # 📁【测试目录】
-│   ├── test_four_layer_architecture.py  # 架构测试
-│   ├── test_master_agent.py             # 主智能体测试
-│   ├── integration/                     # 集成测试
-│   ├── realtime/                       # 实时测试
-│   └── unit/                           # 单元测试
-│
-├── docs/                           # 📁【项目文档】
-│   ├── user-guide/                 # 📖 用户指南
-│   ├── 专利.txt                    # 📄 专利全文
-│   └── 任务目标.md                 # 📋 项目目标
-│
-├── logs/                           # 📁【日志系统】
-│   └── middleware.log              # 📝 中间件日志
-│
-├── CHANGELOG.md                    # 📝 变更日志
-├── CLAUDE.md                       # 📄 Claude配置文档
-├── README.md                       # 📖 项目说明
-└── requirements.txt                # 📦 Python依赖
-```
-
-## 🏗️ 系统架构
-
-### 专利六层架构
+##  架构
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  ① 人机交互层                                                    │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  Web查询界面 │  │  API接口     │  │  Grafana看板 │             │
-│  │  自然语言交互 │  │  实时数据流   │  │  可视化监控  │            │
-│  └──────────────┘  └──────────────┘  └──────────────┘           │
+│  ┌──────────────┐  ┌──────────────┐                             │
+│  │  API接口     │  │  Grafana看板 │             │
+│  │  实时数据流   │  │  可视化监控  │            │
+│  └──────────────┘  └──────────────┘                             │
 └──────────────────────────────┬──────────────────────────────────┘
                                ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -209,7 +45,7 @@ Ecological_env/                    # 📁 项目主目录
 │  ③ 主智能体层（全局决策中枢）                                     │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
 │  │ NLU意图  │ │ 任务分解 │ │结果复用  │ │ LLM调度  │              │
-│  │  识别    │ │   DAG    │ │三重判决⭐│ │          │             │
+│  │  识别    │ │   DAG    │ │三重判决  │ │          │             │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │
 └──────────────────────────────┬──────────────────────────────────┘
                                ↓
@@ -224,7 +60,7 @@ Ecological_env/                    # 📁 项目主目录
 │  ⑤ 子智能体层（能力执行单元）                                     │
 │  ┌──────────────────┐ ┌──────────────────┐                      │
 │  │多维数据感知子智能体│ │异常检测子智能体  │                       │
-│  │多源数据/时序对齐 │ │5类异常/4类违规⭐ │                        │
+│  │多源数据/时序对齐 │ │5类异常/4类违规  │                        │
 │  ├──────────────────┤ ├──────────────────┤                      │
 │  │规则推理子智能体  │ │研判预警与处置执行  │                       │
 │  │工艺机理/法规匹配│ │预警生成/处置协调  │                         │
@@ -239,199 +75,283 @@ Ecological_env/                    # 📁 项目主目录
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 快速开始
+##  目录结构
 
-### Web智能查询（推荐）
-
-```bash
-# 1. 配置LLM API
-cd middleware
-cp .env.example .env
-# 编辑 .env 文件，添加 ANTHROPIC_API_KEY
-
-# 2. 启动查询接口
-python query_interface.py
-
-# 3. 访问Web界面
-http://localhost:8080
-
-# 4. 输入自然语言查询
-- "检测最近一周数据异常情况"
-- "analyze pH COD anomalies in past 24 hours"
-- "查看昨天总氮和总磷的趋势"
+```
+Ecological_env/                    # 项目主目录
+│
+├── backend/                       # FastAPI 后端
+│   ├── main.py                    # 主应用（端口 8000）
+│   ├── api/
+│   │   ├── client.py              # Hermes API 客户端
+│   │   └── routes/                # API 路由
+│   │       ├── health.py          # 健康检查
+│   │       ├── hermes.py          # Hermes 系统信息
+│   │       └── query.py           # 查询接口
+│   ├── core/
+│   │   └── config.py              # 配置加载
+│   └── metrics/
+│       └── definitions.py         # Prometheus 指标
+│
+├── simple_http_wrapper.py         # 简单 HTTP 包装器（端口 5000）
+│
+├── workspace/                     # 主智能体工作区
+│   ├── SOUL.md                    # 主智能体个性和决策树
+│   ├── AGENTS.md                  # 工作区规范
+│   ├── MEMORY.md                  # 全局长期记忆
+│   └── skills/
+│       └── orchestrator-core/     # 编排器核心技能
+│           ├── scripts/
+│           │   ├── dynamic_orchestrator.py
+│           │   ├── call_subagent.py
+│           │   ├── subagent_tools.py
+│           │   ├── create_session.py
+│           │   └── cleanup_sessions.py
+│
+├── subagents/                     # 四个子智能体
+│   ├── multi-dimensional-data-perception-agent/  # 多维数据感知
+│   ├── anomaly-detection-agent/    # 异常检测
+│   ├── rule-reasoning-agent/       # 规则推理
+│   └── disposition-execution-agent/ # 研判预警与处置
+│
+├── shared/                        # 全局共享资源
+│   ├── configs/                   # 配置
+│   │   ├── llm_client.py          # LLM 客户端
+│   │   └── llm_config.yaml        # LLM 配置
+│   ├── knowledge/                 # 知识库
+│   │   ├── regulations/            # 法规库
+│   │   ├── process_knowledge/     # 工艺知识库
+│   │   ├── violation_patterns/    # 违规模式库
+│   │   └── expert_experience/      # 专家经验库
+│   ├── operators/                 # 算子库
+│   │   ├── statistical/           # 统计算子
+│   │   ├── ml/                    # 机器学习算子
+│   │   └── deep_learning/         # 深度学习算子
+│   └── data/                      # 数据
+│
+├── stream/                        # 数据流发送器
+│   └── dual_data_stream.py        # 双数据流发送器
+│
+├── grafana/                       # Grafana 配置
+│   └── dashboards/
+│
+├── prometheus/                    # Prometheus 配置
+│
+├── data/                          # 原始数据
+│   ├── pollution_water_in.csv     # 进水数据
+│   └── pollution_water_out.csv    # 出水数据
+│
+├── tests/                         # 测试
+│   ├── integration/               # 集成测试
+│   └── unit/                      # 单元测试
+│
+├── scripts/                       # 工具脚本
+│   ├── start_backend.bat          # Windows 启动脚本
+│   ├── start_backend.sh           # Linux 启动脚本
+│   └── verify_all_subagents.py    # 验证脚本
+│
+├── .env                           # 环境变量配置
+├── .hermes/                       # Hermes 框架配置
+│   └── config.yaml
+├── requirements.txt                # Python 依赖
+├── CLAUDE.md                      # 项目技术文档
+├── CHANGELOG.md                   # 变更日志
+└── README.md                      # 项目说明
 ```
 
-### 实时监控模式
+##  快速开始
+
+### 环境配置
 
 ```bash
-# Terminal 1: 启动监控服务
-cd middleware
-python app_orchestrator.py
+# 确保使用 Python 3.12
+python --version  # 3.12.12
 
-# Terminal 2: 启动数据流
-python stream/dual_data_stream.py
+# 创建虚拟环境（如果尚未创建）
+uv venv ecological_env
+source ecological_env/Scripts/activate  # Windows
+# 或 source ecological_env/bin/activate  # Linux/Mac
 
-# Terminal 3: 访问监控面板
-http://localhost:8080
-# 点击"实时监控"标签查看Grafana仪表板
+# 安装依赖
+pip install -r requirements.txt
 ```
 
-### 系统组件
+### 配置 LLM API
 
-| 组件 | 文件 | 端口 | 说明 |
-|------|------|------|------|
-| Web查询接口 | middleware/query_interface.py | 5001 | 自然语言查询服务 |
-| 监控服务 | middleware/app_orchestrator.py | 5000 | 实时监控服务 |
-| 数据流发送器 | stream/dual_data_stream.py | - | 发送进水+出水数据 |
-| Prometheus | grafana/prometheus.yml | 9090 | 指标采集 |
-| Grafana | grafana/dashboards/ | 3000 | 数据可视化 |
+编辑 `.env` 文件，配置 LLM 服务：
 
-## 🧠 LLM驱动策略
+```bash
+# LLM API 配置
+LLM_BASE_URL=http://172.16.12.41:30000/v1
+LLM_API_KEY=your-api-key-here
+LLM_MODEL=ctgu-vlm
 
-### 双层LLM驱动架构
+# FastAPI 配置
+FASTAPI_HOST=0.0.0.0
+FASTAPI_PORT=8001
+```
 
-**主智能体层（第一层）**
-- 意图识别：理解用户查询的真实意图
-- 任务分解：将复杂查询分解为可执行的子任务序列
-- 调度决策：决定哪些子智能体参与及执行顺序
-- 结果聚合：汇总分析结果，生成综合响应
+### 启动服务
 
-**子智能体层（第二层）**
-- 脚本选择：根据任务选择合适的处理脚本
-- 结果分析：解释脚本执行结果并生成结构化报告
+**方式 1: FastAPI Backend（推荐）**
 
-### LLM模型选择
+```bash
+# Windows
+scripts\start_backend.bat
 
-| 模型 | 用途 | 速度 |
+# Linux/Mac
+bash scripts/start_backend.sh
+
+# 或手动启动（确保使用虚拟环境的 Python 3.12.12）
+ecological_env\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+访问 API 文档：`http://localhost:8001/docs`
+
+**方式 2: Simple HTTP Wrapper**
+
+```bash
+python simple_http_wrapper.py
+```
+
+访问：`http://localhost:5000`
+
+### 可用的 API 端点
+
+| 端点 | 方法 | 说明 |
 |------|------|------|
-| **Haiku** | 意图解析、数据处理 | 快速 |
-| **Sonnet** | 推理、判定、报告生成 | 标准 |
-| **Opus** | 异常检测、复杂计算 | 深度分析 |
+| `/api/health` | GET | 健康检查 |
+| `/api/hermes/system` | GET | Hermes 系统信息 |
+| `/api/hermes/skills` | GET | 加载的技能列表 |
+| `/api/query` | POST | 自然语言查询 |
+| `/metrics` | GET | Prometheus 指标 |
 
-### Web查询的LLM调用流程
+### 示例查询
 
-```
-用户输入："检测最近一周数据异常情况"
-    ↓
-【Haiku】解析意图：提取时间范围、分析类型、监测指标
-    ↓
-获取历史数据（288条进水+出水数据）
-    ↓
-【Sonnet】协调子智能体：
-  1. multi-dimensional-data-perception-agent → 数据预处理
-  2. anomaly-detection-agent → 异常检测
-    ↓
-【Sonnet】生成自然语言报告
-    ↓
-返回：时序数据 + 异常详情 + 分析报告
+```bash
+curl -X POST http://localhost:8001/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "检测最近一周数据异常情况"}'
 ```
 
-## 📊 Web界面功能
+##  子智能体
 
-### 查询面板
-- 📝 自然语言输入框
-- 📊 实时状态显示和进度提示
-- 📋 结果摘要（数据概况、异常情况）
-- 📈 时序图表可视化
+### 1. 多维数据感知子智能体
+- 多源数据获取（CSV、API、数据库）
+- 时序对齐处理
+- 数据质量控制
+- 字段标准化
 
-### 监控面板
-- 📺 Grafana仪表板嵌入
-- 🔄 实时数据展示
-- 📊 进水/出水指标对比
-- 🔗 备选跳转按钮
+### 2. 异常检测子智能体
+- 5类异常识别：平稳、突变、趋势、周期、高频波动
+- 4类违规检测：插瓶干扰、人工拟合、稀释排放、恶意逃避
+- 置信度评估
 
-### 分析报告面板
-- 📉 多指标时序图表（Chart.js）
-- 📍 异常点红色标注
-- 💡 交互式tooltip详情
-- 🎨 图例点击切换显示
+### 3. 规则推理子智能体
+- 法规规则匹配
+- 工艺机理校验
+- 专家推理
 
-## 📊 Prometheus指标
+### 4. 研判预警与处置执行子智能体
+- 融合共识算法
+- 三级预警分类
+- 工单生成
 
-### 进水指标
-```
-wastewater_influent_ph              # 进水pH值
-wastewater_influent_cod             # 进水化学需氧量(mg/L)
-wastewater_influent_tn              # 进水总氮(mg/L)
-wastewater_influent_an              # 进水氨氮(mg/L)
-wastewater_influent_tp              # 进水总磷(mg/L)
-wastewater_influent_flow_rate       # 进水流量(升/秒)
-```
+##  监控
 
-### 出水指标
-```
-wastewater_effluent_ph              # 出水pH值
-wastewater_effluent_cod             # 出水化学需氧量(mg/L)
-wastewater_effluent_tn              # 出水总氮(mg/L)
-wastewater_effluent_an              # 出水氨氮(mg/L)
-wastewater_effluent_tp              # 出水总磷(mg/L)
-wastewater_effluent_flow_rate       # 出水流量(升/秒)
+### Prometheus 指标
+
+```bash
+# 访问 Prometheus 指标
+curl http://localhost:8001/metrics
 ```
 
-### 计数器
-```
-wastewater_data_processed_total     # 数据处理总数
-wastewater_anomaly_detected_total   # 异常检测总数
+### Grafana 仪表板
+
+```bash
+# 启动 Grafana（需单独安装）
+# 导入 grafana/dashboards/ 中的仪表板配置
 ```
 
-## 🎯 专利核心特性
+##  日志系统
 
-### 1. 分析结果复用机制 ⭐
-- 数据匹配判决（Jaccard相似系数 M ≥ 0.7）
+系统会自动记录以下类型的日志：
+
+- **API 调用日志**: 记录所有 API 请求
+- **主智能体决策日志**: 记录意图识别、子智能体调用链
+- **子智能体执行日志**: 记录子智能体的输入输出
+- **算子调用日志**: 记录算子调用的参数和结果
+- **LLM 调用日志**: 记录 LLM 调用的 Token 消耗
+- **系统错误日志**: 记录系统异常
+
+### 查询日志
+
+```bash
+# API 接口
+curl "http://localhost:8001/api/logs?log_type=api&page=1&page_size=50"
+```
+
+### 会话证据链
+
+通过 session_id 可以查询完整会话的证据链：
+
+```bash
+curl "http://localhost:8001/api/logs/trace/{session_id}"
+```
+
+### 数据库维护
+
+```bash
+# 查看日志统计
+ecological_env\Scripts\python.exe -m backend.database.maintain_db stats
+
+# 清理旧日志（90 天前）
+ecological_env\Scripts\python.exe -m backend.database.maintain_db clean --days 90
+```
+
+##  专利核心特性
+
+### 1. 分析结果复用机制
+- 数据匹配判决（Jaccard 相似系数 M ≥ 0.7）
 - 新鲜度判决（Δt ≤ W_task）
 - 语义匹配判决（编辑距离 S ≥ 0.8）
 
 ### 2. 双驱动运行模式
 - **主动监测模式**：按周期自动识别违规
-- **查询响应模式**：响应灵活查询需求 ⭐
+- **查询响应模式**：响应灵活查询需求
 
 ### 3. 违规判定双层逻辑
 **数据层**：平稳、突变、趋势、周期、高频波动
 **业务层**：插瓶干扰、人工拟合、稀释排放、恶意逃避
 
 ### 4. 工艺机理校验
-- pH-COD协同规则
+- pH-COD 协同规则
 - 质量平衡规则
 - 氨氮-总氮转化规则
 
-## 📖 相关文档
+##  相关文档
 
 - [变更日志](CHANGELOG.md) - 版本更新记录
-- [Claude配置](CLAUDE.md) - 项目技术文档
-- [用户指南](docs/user-guide/) - 详细使用说明
+- [Claude 配置](CLAUDE.md) - 项目技术文档
 - [专利全文](docs/专利.txt) - 发明内容
 
-## 🎯 专利实现完成度
+##  项目完成度
 
-### 已实现功能（95%）
+| 模块 | 状态 |
+|------|------|
+| 主智能体 | ✅ 100% |
+| 四个子智能体 | ✅ 95% |
+| FastAPI 后端 | ✅ 100% |
+| shared/ 资源库 | ✅ 100% |
+| 数据流发送器 | ✅ 100% |
+| 测试套件 | ✅ 80% |
+| **前端界面** | ⏳ **未实现** |
 
-#### Web智能查询系统 ⭐（v2.2.0新增）
-- ✅ 自然语言查询接口
-- ✅ LLM驱动的意图解析和任务协调
-- ✅ 历史数据获取器
-- ✅ 多指标时序图表可视化
-- ✅ 异常点自动标注
-- ✅ Grafana仪表板集成
-
-#### 主智能体层
-- ✅ 双层LLM驱动协调
-- ✅ 结果复用三重判决
-
-#### 异常检测子智能体
-- ✅ 5类异常特征检测
-- ✅ 4类违规模式检测
-
-#### 规则推理子智能体
-- ✅ 工艺机理校验
-- ✅ 法规规则匹配
-
-### 待实现功能（5%）
-- ⏳ 专家经验库扩充
-- ⏳ 迭代更新接口
+**整体完成度：~70%**（前端界面尚未开发）
 
 ---
 
-**版本**：v2.2.0（Web智能查询版）
-**最后更新**：2026-06-05
-**状态**：✅ 核心专利功能已实现 + ✅ Web智能查询系统
-**项目完成度**：95%
+**版本**：v2.1.0
+**最后更新**：2026-06-30
+**Python**：3.12.12
+**LLM**：ctgu-vlm (OpenAI 兼容 API)
