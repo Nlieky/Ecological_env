@@ -1,3 +1,8 @@
+# ==================== 框架依赖 ====================
+# Hermes Agent 框架已本地化到 shared/framework/hermes_agent/
+# 不再需要外部 hermes-agent 依赖
+
+# ==================== FastAPI 后端 ====================
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.5.0
@@ -6,3 +11,6 @@ prometheus-fastapi-instrumentator>=7.0.0
 python-dotenv>=1.0.0
 httpx>=0.26.0
 sqlalchemy>=2.0.0
+
+# ==================== 前端构建 ====================
+# 前端依赖见 frontend/package.json
