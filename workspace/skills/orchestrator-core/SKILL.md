@@ -1,227 +1,232 @@
 ---
 name: orchestrator-core
-description: "Multi-agent orchestration skill for wastewater monitoring system. Coordinates 4 specialized sub-agents: data-perception (acquisition and preprocessing), anomaly-detection (pattern recognition and violation detection), rule-reasoning (regulatory compliance analysis), and disposition-execution (alert classification and work order generation). Use when user queries involve wastewater monitoring data analysis, anomaly detection, compliance assessment, or处置方案 generation. The LLM dynamically decides which sub-agents to call and in what sequence based on task requirements."
+description: "Multi-agent orchestration for wastewater monitoring. Coordinates 4 sub-agents: data-perception, anomaly-detection, rule-reasoning, disposition-execution."
 ---
 
-# Orchestrator Core
+# 编排器核心技能
 
-Coordinate wastewater monitoring sub-agents to complete user tasks.
+## 技能描述
 
-## Available Sub-Agents
+本技能是主智能体的核心编排能力，负责管理和调用4个子智能体完成复杂的废水监测任务。通过LLM决策和自然语言描述引导，实现智能的任务分发和结果聚合。
 
-### Data Perception Agent
-- **Name**: `multi-dimensional-data-perception`
-- **Location**: `../subagents/multi-dimensional-data-perception-agent`
-- **Capability**: Acquire, clean, and standardize multi-dimensional time-series data
-- **Trigger**: Query involves data acquisition, indicator queries, influent/effluent analysis
-- **Input**: Time range, indicator list
-- **Output**: Preprocessed data (influent and effluent indicators)
+## 子智能体职责
 
-### Anomaly Detection Agent
-- **Name**: `anomaly-detection`
-- **Location**: `../subagents/anomaly-detection-agent`
-- **Capability**: Detect time-series anomalies and violation patterns
-- **Trigger**: Query involves anomaly detection, spike analysis, trend assessment
-- **Dependency**: Requires data perception agent output
-- **Output**: Anomaly point list, violation events
+### multi-dimensional-data-perception-agent（多维数据感知子智能体）
 
-### Rule Reasoning Agent
-- **Name**: `rule-reasoning`
-- **Location**: `../subagents/rule-reasoning-agent`
-- **Capability**: Regulatory compliance determination based on standards
-- **Trigger**: Query involves compliance assessment, exceedance analysis, violation causation
-- **Dependency**: Requires anomaly detection agent output
-- **Output**: Compliance conclusion, violation basis
+**职责范围：**
+- 多源数据获取（CSV、API、数据库）
+- 数据质量检查和清洗
+- 时序数据对齐处理
+- 字段标准化处理
+- 数据完整性验证
 
-### Disposition Execution Agent
-- **Name**: `disposition-execution`
-- **Location**: `../subagents/disposition-execution-agent`
-- **Capability**: Generate alert classification and work orders
-- **Trigger**: Query involves work order generation, disposal recommendations, alert notification
-- **Dependency**: Requires rule reasoning agent output
-- **Output**: Work order details, disposal recommendations
+**典型任务：**
+- "获取最近24小时的监测数据"
+- "检查数据质量并标记异常值"
+- "对齐多个传感器的时间序列数据"
 
-## Orchestration Principles
+### anomaly-detection-agent（异常检测子智能体）
 
-1. **Dynamic Decision-Making**: Not all tasks require calling every sub-agent
-2. **Respect Dependencies**: Invocation sequence must respect inter-agent dependencies
-3. **Flexible Strategy**: Adjust invocation strategy based on task requirements
-4. **Error Handling**: When sub-agents fail, determine whether to retry or use alternative approaches
+**职责范围：**
+- 5类异常识别：平稳、突变、趋势、周期、高频波动
+- 4类违规检测：插瓶干扰、人工拟合、稀释排放、恶意逃避
+- 置信度评估和异常评分
+- 异常模式聚类分析
 
-## 工具集
+**典型任务：**
+- "检测数据中的异常模式"
+- "识别可能的插瓶干扰行为"
+- "评估异常的置信度"
 
-主智能体可以通过以下工具调用子智能体：
+### rule-reasoning-agent（规则推理子智能体）
 
-### call_subagent(subagent_name, task, context)
+**职责范围：**
+- 法规规则匹配和验证
+- 工艺机理校验
+- 专家推理和经验应用
+- 违规性质判定
+
+**典型任务：**
+- "验证检测结果是否符合排放标准"
+- "根据工艺知识判断数据合理性"
+- "应用专家经验分析异常"
+
+### disposition-execution-agent（研判预警与处置执行子智能体）
+
+**职责范围：**
+- 融合共识算法
+- 三级预警分类（高、中、低）
+- 工单生成和分发
+- 处置建议生成
+
+**典型任务：**
+- "综合分析结果并生成预警"
+- "创建处置工单"
+- "生成处置建议方案"
+
+## 调用原则
+
+### 1. 单一职责优先
+- 优先调用最相关的子智能体，而非同时调用多个
+- 每个子智能体专注于特定领域，避免职责重叠
+
+### 2. 协作按需
+- 当任务需要多领域协作时，可以按顺序调用多个子智能体
+- 前一个子智能体的结果可以作为后一个子智能体的输入
+
+### 3. 结果传递
+- 将前序子智能体的关键结果传递给后续子智能体
+- 保持上下文的连贯性
+
+### 4. 避免重复
+- 不要为同一任务重复调用同一个子智能体
+- 已有结果可以直接使用时，避免重复计算
+
+## 典型工作流
+
+### 数据异常检测完整流程
+
+```
+用户查询 → 主智能体分析 → 调用子智能体 → 结果聚合 → 响应用户
+
+详细步骤：
+1. 调用 multi-dimensional-data-perception-agent 获取数据
+2. 调用 anomaly-detection-agent 检测异常
+3. 调用 rule-reasoning-agent 进行规则验证
+4. 调用 disposition-execution-agent 生成预警
+5. 主智能体汇总结果并生成自然语言响应
+```
+
+### 简化数据查询流程
+
+```
+用户查询 → 主智能体分析 → 调用单个子智能体 → 响应用户
+
+示例：
+用户: "获取最新的监测数据"
+1. 调用 multi-dimensional-data-perception-agent 获取数据
+2. 直接响应用户
+```
+
+## 工具说明
+
+### call_subagent
+
 调用指定的子智能体执行任务。
 
-**Parameters:**
-- `subagent_name` (str): 子智能体名称
-  - `"data-perception"` or `"multi-dimensional-data-perception"` - 多维数据感知
-  - `"anomaly-detection"` or `"anomaly"` - 异常检测
-  - `"rule-reasoning"` or `"rule"` - 规则推理
-  - `"disposition-execution"` or `"disposition"` - 处置执行
-- `task` (str): 任务描述字符串
-- `context` (dict, optional): 前置子智能体的执行结果
-- `session_dir` (str, optional): 会话目录路径（默认创建新会话）
-- `timeout` (int, optional): 最大等待时间（秒，默认300）
+**参数：**
+- `subagent_name` (str): 子智能体名称，必须是以下之一：
+  - "multi-dimensional-data-perception-agent"
+  - "anomaly-detection-agent"
+  - "rule-reasoning-agent"
+  - "disposition-execution-agent"
+- `task` (str): 需要子智能体执行的任务描述
+- `context` (dict, 可选): 附加的上下文信息
 
-**Returns:**
-```python
-{
-    "task_id": "task_data-perception_1234567890",
-    "status": "completed",
-    "result": {...},
-    "error": null,
-    "metadata": {
-        "duration_seconds": 2.3,
-        "timestamp": "2025-06-23T14:30:25"
-    }
-}
+**返回：**
+- `success` (bool): 是否成功
+- `result` (str): 执行结果
+- `error` (str): 错误信息（如果有）
+
+**使用示例：**
+```
+调用 anomaly-detection-agent 检测异常
+subagent_name: "anomaly-detection-agent"
+task: "检测以下数据中的异常模式：[数据]"
 ```
 
-### read_result(result_file)
-读取子智能体的执行结果。
+### initialize_subagents
 
-**Parameters:**
-- `result_file` (str): 结果文件路径（相对于会话目录）
+初始化所有子智能体实例。
 
-**Returns:** 解析后的JSON结果对象
+**参数：**
+- `model` (str, 可选): LLM模型名称
+- `base_url` (str, 可选): API基础URL
+- `api_key` (str, 可选): API密钥
 
-### list_subagents()
+**返回：**
+- `success` (bool): 是否成功
+- `count` (int): 创建的子智能体数量
+- `subagents` (list): 子智能体名称列表
+
+**注意：** 通常在系统启动时自动调用，无需手动调用。
+
+### list_available_subagents
+
 列出所有可用的子智能体。
 
-**Returns:**
-```python
-[
-    {"name": "data-perception", "full_name": "multi-dimensional-data-perception", "path": "..."},
-    {"name": "anomaly-detection", "full_name": "anomaly-detection", "path": "..."},
-    {"name": "rule-reasoning", "full_name": "rule-reasoning", "path": "..."},
-    {"name": "disposition-execution", "full_name": "disposition-execution", "path": "..."}
-]
-```
+**返回：**
+- `success` (bool): 是否成功
+- `subagents` (list): 子智能体名称列表
 
-### create_session()
-创建新的会话目录。
+## 决策指南
 
-**Creates:**
-- Session directory: `workspace/state/session_YYYYMMDD_HHMMSS/`
-- Metadata file: `_metadata.json` with creation timestamp
+### 何时调用子智能体
 
-### cleanup_sessions(days)
-清理超过指定天数的会话目录。
+**应该调用：**
+- 需要专业领域知识（数据感知、异常检测、规则推理、处置执行）
+- 需要执行复杂计算或分析
+- 需要访问特定数据源或知识库
 
-**Parameters:**
-- `days` (int): 保留最近N天的会话（默认7）
-- `dry_run` (bool): 仅报告将要删除的内容（默认False）
+**不应该调用：**
+- 简单的信息查询（可以直接回答）
+- 已有结果的重复请求
+- 超出子智能体职责范围的任务
 
-## Tool Usage Details
+### 选择哪个子智能体
 
-### create_session()
+| 用户需求 | 调用的子智能体 |
+|---------|--------------|
+| 获取/处理数据 | multi-dimensional-data-perception-agent |
+| 检测异常/违规 | anomaly-detection-agent |
+| 规则匹配/工艺校验 | rule-reasoning-agent |
+| 生成预警/工单 | disposition-execution-agent |
 
-Creates a new session directory for state isolation.
+## 错误处理
 
-**Creates:**
-- Session directory: `workspace/state/session_YYYYMMDD_HHMMSS/`
-- Metadata file: `_metadata.json` with creation timestamp
+### 子智能体调用失败
+如果子智能体调用失败（`success: false`），应该：
+1. 检查错误信息
+2. 如果是临时性问题，可以重试
+3. 如果是配置问题，提示用户检查系统配置
+4. 向用户清晰解释错误原因
 
-**Session directory contents (during execution):**
-```
-session_YYYYMMDD_HHMMSS/
-├── _metadata.json          # Session metadata
-├── task.json                # Current task (written by main agent)
-├── data_result.json         # Data perception result
-├── anomaly_result.json      # Anomaly detection result
-├── rule_result.json         # Rule reasoning result
-├── disposition_result.json  # Disposition execution result
-└── final_response.json      # Aggregated final response
-```
+### 子智能体不存在
+如果调用的子智能体不存在：
+1. 检查子智能体名称是否正确
+2. 使用 `list_available_subagents` 查看可用子智能体
+3. 提示用户正确的子智能体名称
 
-### call_subagent(subagent_name, task, context, session_dir, timeout)
+## 技能约束
 
-Invokes a sub-agent to execute a task.
+本技能有以下约束：
+- 只能调用预定义的4个子智能体
+- 子智能体之间不能直接通信，必须通过主智能体中转
+- 子智能体的执行结果需要主智能体进行汇总和解释
+- 一次只能调用一个子智能体（串行调用）
 
-**Parameters:**
-- `subagent_name` (str): Name of sub-agent
-  - `"data-perception"` or `"multi-dimensional-data-perception"` - Multi-dimensional data perception
-  - `"anomaly-detection"` or `"anomaly"` - Anomaly detection
-  - `"rule-reasoning"` or `"rule"` - Rule reasoning
-  - `"disposition-execution"` or `"disposition"` - Disposition execution
-- `task` (str): Task description string
-- `context` (dict, optional): Previous sub-agent results
-- `session_dir` (str, optional): Session directory path (creates new if None)
-- `timeout` (int, optional): Maximum wait time in seconds (default: 300)
+## 技能进化
 
-**Returns:**
-```python
+本技能会根据使用情况不断优化：
+- 记录常见的调用模式
+- 优化工作流路径
+- 改进错误处理
+- 增强调试信息
+
+## 图表输出
+
+对于数据可视化，在响应中包含 ECharts 配置：
+
+```json
 {
-    "task_id": "task_data-perception_1234567890",
-    "status": "completed",  # or "failed", "error"
-    "result": {...},        # Task result data
-    "error": null,          # Error message if failed
-    "metadata": {
-        "duration_seconds": 2.3,
-        "timestamp": "2025-06-23T14:30:25"
-    }
+  "content": "数据说明...",
+  "chart": {
+    "title": {"text": "标题"},
+    "xAxis": {"type": "category", "data": ["时间1", "时间2"]},
+    "yAxis": {"type": "value"},
+    "series": [{"name": "指标名", "data": [值1, 值2], "type": "line"}]
+  }
 }
 ```
 
-**Error Handling:**
-- `ValueError` - Invalid sub-agent name
-- `TimeoutError` - Sub-agent execution exceeds timeout
-
-**Result File Format:**
-Each sub-agent writes a `{subagent_name}_result.json` file to the session directory.
-```
-"data-perception" → data_result.json
-"anomaly-detection" → anomaly_result.json
-"rule-reasoning" → rule_result.json
-"disposition-execution" → disposition_result.json
-```
-
-### cleanup_sessions(days, dry_run)
-
-Removes old session directories to manage disk space.
-
-**Parameters:**
-- `days` (int): Keep sessions from last N days (default: 7)
-- `dry_run` (bool): If True, only report what would be deleted
-
-**Returns:**
-```python
-{
-    "count": 5,
-    "size_bytes": 5242880,
-    "size_mb": 5.0,
-    "deleted": [...],
-    "kept": [...],
-    "dry_run": False
-}
-```
-
-## Task Context Flow
-
-When a task requires multiple sub-agents, pass previous results as context:
-
-```
-User Query → LLM Analysis → Sub-agent Selection
-    ↓
-Data Perception → (result) → Anomaly Detection → (result) → Rule Reasoning → (result) → Disposition
-    ↓
-Final Response
-```
-
-## 调用流程
-
-1. 用户请求 → 主智能体加载身份文件
-2. LLM 理解任务并规划
-3. create_session() 创建会话
-4. call_subagent() 调用子智能体
-5. read_result() 读取结果
-6. LLM 整合并返回用户
-
-## Error Handling Strategy
-
-- **Retryable errors**: Network timeout, API rate limit, database connection issues
-- **Non-retryable errors**: Invalid parameters, permission denied, data not found
-- **Decision**: Analyze error type and context before deciding retry or alternative approach
+当用户要求图表或可视化时，生成有效的 ECharts option JSON。
