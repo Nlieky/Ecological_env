@@ -1,0 +1,46 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="water-drop" x1="32" y1="26" x2="96" y2="98" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67b7ab"/>
+      <stop offset="0.58" stop-color="#5586b6"/>
+      <stop offset="1" stop-color="#49639a"/>
+    </linearGradient>
+    <linearGradient id="core" x1="55" y1="55" x2="73" y2="73" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67CDBF"/>
+      <stop offset="1" stop-color="#4770D6"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="42" y1="42" x2="86" y2="86" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10b981"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(64 64) rotate(90) scale(30)">
+      <stop stop-color="#6FD1C7" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#7CF7E7" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow" x="14" y="14" width="100" height="100" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="6.5" result="effect1_foregroundBlur"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#softGlow)" opacity="0.1">
+    <path d="M64 28C75 28 82 36 82 45C78 44 74 46 70 50" stroke="url(#water-drop)" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M80 65C74 75 63 79 54 74C57 70 58 67 58 62" stroke="url(#water-drop)" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M48 65C42 55 44 42 53 36C54 40 57 43 61 45" stroke="url(#water-drop)" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <circle cx="64" cy="64" r="17" fill="url(#coreGlow)"/>
+
+  <path d="M64 28C75 28 82 36 82 45C78 44 74 46 70 50" stroke="url(#water-drop)" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M80 65C74 75 63 79 54 74C57 70 58 67 58 62" stroke="url(#water-drop)" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48 65C42 55 44 42 53 36C54 40 57 43 61 45" stroke="url(#water-drop)" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Water drop shape -->
+  <path d="M64 42C64 42 49 58 49 68C49 76.3 55.7 83 64 83C72.3 83 79 76.3 79 68C79 58 64 42 64 42Z" fill="url(#core)" opacity="0.9"/>
+
+  <!-- Leaf accent -->
+  <path d="M70 55C70 55 78 50 82 54C86 58 82 66 76 70C70 74 66 66 70 55Z" fill="url(#leaf)" opacity="0.8"/>
+
+  <circle cx="64" cy="64" r="2.8" fill="#F5FCFB" opacity="0.6"/>
+</svg>

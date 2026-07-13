@@ -6,12 +6,12 @@
 # 本文件包含非敏感的模型配置、提示词、工具定义等
 
 # ==================== 自定义 LLM 服务器配置 ====================
-# 使用本地部署的大模型服务器（ctgu-vlm - 三峡大学视觉语言模型）
+# 使用美团 LongCat 模型 API
 custom_llm_server:
   enabled: true
-  base_url: "http://172.16.12.41:30000/v1"
-  api_key: ""  # 如果服务器需要认证，填写密钥；否则留空
-  model_name: "ctgu-vlm"  # 三峡大学视觉语言模型
+  base_url: "https://api.longcat.chat/openai/v1"
+  api_key: ""  # 从环境变量 LLM_API_KEY 读取
+  model_name: "LongCat-2.0"  # 美团 LongCat 模型
 
   # API 格式类型
   api_format: "openai_compatible"  # openai_compatible, anthropic_compatible, custom
@@ -27,19 +27,19 @@ custom_llm_server:
 models:
   # 主模型（用于意图识别、任务分解、调度决策）
   primary:
-    name: "ctgu-vlm"  # 三峡大学视觉语言模型
+    name: "LongCat-2.0"  # 美团 LongCat 模型
     max_tokens: 4096
     temperature: 0.7
 
   # 快速模型（用于简单查询）
   fast:
-    name: "ctgu-vlm"  # 与主模型相同
+    name: "LongCat-2.0"  # 与主模型相同
     max_tokens: 2048
     temperature: 0.5
 
   # 分析模型（用于复杂分析）
   analysis:
-    name: "ctgu-vlm"  # 与主模型相同
+    name: "LongCat-2.0"  # 与主模型相同
     max_tokens: 8192
     temperature: 0.7
 

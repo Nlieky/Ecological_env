@@ -8,6 +8,19 @@ workspace/state/
 subagents/*/state/
 *.state/
 
+# Hermes 智能体自动生成的运行时目录
+workspace/cron/
+workspace/logs/
+workspace/memories/
+workspace/memory/
+workspace/sessions/
+workspace/cron/output/
+workspace/logs/curator/
+subagents/*/sessions/
+subagents/*/logs/
+subagents/*/auth.lock
+subagents/*/.usage.json.lock
+
 # Python cache
 __pycache__/
 *.pyc

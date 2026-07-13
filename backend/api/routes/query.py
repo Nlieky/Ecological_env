@@ -2,6 +2,8 @@
 查询接口 - Hermes 智能体核心接口
 
 直接调用 Hermes AIAgent，无需额外的 HTTP API Server
+
+注意：hermes-agent 已安装在项目虚拟环境中，无需额外路径配置
 """
 import os
 import sys
@@ -12,13 +14,15 @@ from fastapi import APIRouter, HTTPException
 from backend.models.query import QueryRequest, QueryResponse
 from backend.utils.loggers import generate_session_id, log_master_decision
 
-# 添加 Hermes 到路径
-HERMES_PATH = Path("D:/Hermes/hermes-agent")
-if str(HERMES_PATH) not in sys.path:
-    sys.path.insert(0, str(HERMES_PATH))
-
-# 导入 AIAgent
-from run_agent import AIAgent
+# 导入 AIAgent（hermes-agent 已安装在虚拟环境中）
+try:
+    from run_agent import AIAgent
+except ImportError:
+    # 如果导入失败，提供明确的错误信息
+    raise ImportError(
+        "无法导入 run_agent。请确保 hermes-agent 已安装在虚拟环境中：\n"
+        "  pip install hermes-agent"
+    )
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,6 +32,18 @@ PROJECT_DIR = Path("E:/project/Ecological_env").resolve()
 
 # 缓存 agent 实例
 _agent_cache = {}
+
+# 导入编排器工具以注册到 Hermes 工具集
+# 这必须在 AIAgent 创建之前完成，以便工具可用
+# 导入时会自动调用 register_orchestrator_tools()
+try:
+    # 强制重新加载模块以获取最新更改
+    if 'workspace.tools.orchestrator_tools' in sys.modules:
+        del sys.modules['workspace.tools.orchestrator_tools']
+    import workspace.tools.orchestrator_tools  # noqa: F401
+    logger.info("Orchestrator tools registered with Hermes")
+except Exception as e:
+    logger.warning(f"Failed to register orchestrator tools: {e}")
 
 
 def get_agent(session_id: str = None) -> AIAgent:
@@ -63,8 +79,9 @@ def get_agent(session_id: str = None) -> AIAgent:
         provider=provider,
         load_soul_identity=True,      # 加载 workspace/SOUL.md
         skip_context_files=False,     # 加载 AGENTS.md、MEMORY.md
-        max_iterations=10,
-        quiet_mode=True,
+        enabled_toolsets=["orchestrator", "skills", "terminal"],  # 启用编排器、技能和终端工具集
+        max_iterations=10,             # 限制迭代次数避免超时
+        quiet_mode=False,              # 启用日志以便调试
         session_id=session_id,
     )
 
@@ -168,8 +185,14 @@ async def execute_query(request: QueryRequest):
             conversation_history=None,  # 可选：实现历史记录管理
         )
 
-        # AIAgent 返回字符串响应
-        content = str(response) if response else ""
+        # AIAgent 返回字典，提取 final_response 和 chart
+        chart_data = None
+        if isinstance(response, dict):
+            content = response.get('final_response', str(response))
+            # 尝试提取 chart 字段（如果 LLM 生成了图表配置）
+            chart_data = response.get('chart')
+        else:
+            content = str(response) if response else ""
 
         # 解析决策路径
         decision_path = parse_decision_path(content)
@@ -203,6 +226,7 @@ async def execute_query(request: QueryRequest):
             content=content,
             session_id=session_id,
             timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            chartData=chart_data,
             decision_path=decision_path,
             sub_agent_calls=[],  # TODO: 从 AIAgent 响应元数据提取
             data_sources=[],      # TODO: 从 AIAgent 响应元数据提取

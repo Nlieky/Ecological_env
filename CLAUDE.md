@@ -27,7 +27,7 @@
 
 - **记忆机制**：跨会话记忆，让项目越来越清晰
 - **身份文件支持**：SOUL.md（个性）、AGENTS.md（规则）、MEMORY.md（记忆）、USER.md（用户配置）
-- **OpenAI 兼容接口**：支持 ctgu-vlm 模型
+- **OpenAI 兼容接口**：支持 LongCat-2.0 模型（美团）
 
 ---
 
@@ -218,12 +218,12 @@ curl http://localhost:8000/api/health
 
 ```bash
 # .env 文件配置
-LLM_BASE_URL=http://172.16.12.41:30000/v1
-LLM_API_KEY=sk-4e9a2c7d5f1b8e3c6d0a9b2f4d7e1c3a6b5f8e2d9c7a1b0f
-LLM_MODEL=ctgu-vlm
+LLM_BASE_URL=https://api.longcat.chat/openai/v1
+LLM_API_KEY=ak_xxx  # 从美团获取
+LLM_MODEL=LongCat-2.0
 ```
 
-**注意**：ctgu-vlm 是 OpenAI 兼容 API，不是 Anthropic Claude API。
+**注意**：LongCat-2.0 是 OpenAI 兼容 API，不是 Anthropic Claude API。
 
 ### Identity Files
 
@@ -311,7 +311,7 @@ The system detects 4 types of violations:
 
 - **Python**: 3.12.12
 - **虚拟环境**: `ecological_env` (通过 uv 创建)
-- **LLM**: ctgu-vlm (OpenAI 兼容 API)
+- **LLM**: LongCat-2.0 (美团，OpenAI 兼容 API)
 - **后端端口**: 8000 (FastAPI), 5000 (简单包装器)
 - **Hermes API**: 8642
 

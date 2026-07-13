@@ -1,0 +1,22 @@
+{
+  "task_id": "anomaly_20260707_144952",
+  "status": "completed",
+  "result": {
+    "anomalies": [],
+    "summary": {
+      "total_anomalies": 0,
+      "by_data_type": {},
+      "by_indicator": {},
+      "by_type": {}
+    }
+  },
+  "metadata": {
+    "subagent": "anomaly-detection-agent",
+    "timestamp": "2026-07-07T14:49:52.921147",
+    "time_range": "24h",
+    "data_points": {
+      "influent": 24,
+      "effluent": 24
+    }
+  }
+}

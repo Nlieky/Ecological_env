@@ -13,7 +13,11 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Import SubagentManager at module level for access to SUBAGENT_CONFIGS
-from subagent_manager import SubagentManager
+try:
+    from .subagent_manager import SubagentManager
+except ImportError:
+    # Fallback for when running as a module
+    from workspace.skills.orchestrator_core.scripts.subagent_manager import SubagentManager
 
 # 全局子智能体管理器实例
 _subagent_manager = None

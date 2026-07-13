@@ -9,14 +9,14 @@
 # 模型配置
 # =============================================================================
 model:
-  base_url: "http://172.16.12.41:30000/v1"
-  default: "ctgu-vlm"
+  base_url: "https://api.longcat.chat/openai/v1"
+  default: "LongCat-2.0"
   provider: "openai-api"
 
 providers:
   openai-api:
-    api_key: "sk-4e9a2c7d5f1b8e3c6d0a9b2f4d7e1c3a6b5f8e2d9c7a1b0f"
-    base_url: "http://172.16.12.41:30000/v1"
+    api_key: ""  # 从环境变量 LLM_API_KEY 读取
+    base_url: "https://api.longcat.chat/openai/v1"
 
 fallback_providers: []
 

@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.get("/logs", response_model=LogListResponse)
 async def query_logs(
-    log_type: str = Query(..., regex="^(api|master|subagent|operator|llm|error)$"),
+    log_type: str = Query(..., pattern="^(api|master|subagent|operator|llm|error)$"),
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     page: int = Query(1, ge=1),
@@ -107,10 +107,10 @@ async def get_session_trace(session_id: str, db: Session = Depends(get_db)):
 
 @router.get("/logs/export")
 async def export_logs(
-    log_type: str = Query(..., regex="^(api|master|subagent|operator|llm|error)$"),
+    log_type: str = Query(..., pattern="^(api|master|subagent|operator|llm|error)$"),
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
-    format: str = Query("json", regex="^(json|xlsx)$"),
+    format: str = Query("json", pattern="^(json|xlsx)$"),
     db: Session = Depends(get_db)
 ):
     """导出日志"""

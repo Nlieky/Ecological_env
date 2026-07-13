@@ -2,9 +2,15 @@
 
 ## 系统定位
 
-**本后端通过 Hermes API Server 调用已完成的 Hermes 智能体系统**
+**本后端直接调用 Hermes AIAgent，无需额外的 HTTP API Server**
 
 Hermes 智能体系统是核心创新（位于 `workspace/` 和 `subagents/`），后端只是为它提供 HTTP 访问能力。
+
+## 实现方式
+
+- **Direct AIAgent Call** - 直接实例化 Hermes AIAgent
+- **身份文件自动加载** - SOUL.md, AGENTS.md, MEMORY.md
+- **无需 Hermes API Server** - 简化部署，提高稳定性
 
 ## 核心接口
 
@@ -33,36 +39,36 @@ Hermes 智能体系统是核心创新（位于 `workspace/` 和 `subagents/`）�
 
 ### 前置条件
 
-1. Hermes API Server 运行在 `http://localhost:8642`
-2. 项目根目录 `.env` 文件已配置
+1. Python 3.12.12（使用项目的 uv 虚拟环境 `ecological_env`）
+2. 项目根目录 `.env` 文件已配置 LLM 参数
 
 ### 安装依赖
 
 ```bash
-pip install -e .
+# 使用虚拟环境
+pip install -r requirements.txt
 ```
 
 ### 启动服务
 
 ```bash
-# 方式1: 直接启动
-python -m uvicorn backend.main:app --reload
+# 方式1: 使用启动脚本（推荐）
+scripts\start_backend.bat  # Windows
 
-# 方式2: 使用启动脚本
-./scripts/start_backend.sh  # Linux/Mac
-scripts\\start_backend.bat   # Windows
+# 方式2: 手动启动（确保使用虚拟环境）
+ecological_env\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ### 访问文档
 
 ```
-http://localhost:8000/docs
+http://localhost:8001/docs
 ```
 
 ## 架构
 
 ```
-前端 → FastAPI (8000) → Hermes API Server (8642) → 主智能体 → 4 个子智能体
+前端 → FastAPI (8001) → AIAgent (直接调用) → 主智能体 → 4 个子智能体
 ```
 
 ## 主智能体决策树
@@ -76,14 +82,14 @@ http://localhost:8000/docs
 ## 示例查询
 
 ```bash
-curl -X POST http://localhost:8000/api/query \
+curl -X POST http://localhost:8001/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "最近24小时出水COD异常吗？"}'
 ```
 
 ## Prometheus 指标
 
-访问 `http://localhost:8000/metrics` 查看指标：
+访问 `http://localhost:8001/metrics` 查看指标：
 
 - `hermes_query_total` - Hermes 查询总数
 - `decision_tree_branch_taken_total` - 决策树分支执行次数

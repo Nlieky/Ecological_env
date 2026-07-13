@@ -15,19 +15,19 @@ def create_session() -> str:
 
     Returns:
         str: 会话目录的绝对路径
-        格式: workspace/state/session_YYYYMMDD_HHMMSS/
+        格式: sessions/session_YYYYMMDD_HHMMSS/
     """
-    # 获取 workspace 根目录
-    current_dir = Path(__file__).parent.parent.parent.parent
-    state_dir = current_dir / "state"
+    # 获取项目根目录
+    current_dir = Path(__file__).parent.parent.parent.parent.parent
+    sessions_dir = current_dir / "sessions"
 
-    # 确保状态目录存在
-    state_dir.mkdir(parents=True, exist_ok=True)
+    # 确保会话目录存在
+    sessions_dir.mkdir(parents=True, exist_ok=True)
 
     # 生成会话目录名
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_name = f"session_{timestamp}"
-    session_path = state_dir / session_name
+    session_path = sessions_dir / session_name
 
     # 创建会话目录
     session_path.mkdir(exist_ok=True)

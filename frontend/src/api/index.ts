@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 30000
+  timeout: 300000  // 5分钟超时，数据查询可能需要更长时间
 })
 
 api.interceptors.request.use(

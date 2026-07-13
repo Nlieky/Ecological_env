@@ -51,6 +51,7 @@ class QueryResponse(BaseModel):
     content: str = Field(..., description="LLM 生成的最终回答")
     session_id: str = Field(..., description="会话ID")
     timestamp: str = Field(..., description="响应时间戳")
+    chartData: Optional[Dict[str, Any]] = Field(None, description="图表数据（ECharts配置）")
 
     # 决策树路径（展示主智能体走了哪些分支）
     decision_path: List[DecisionPath] = Field(

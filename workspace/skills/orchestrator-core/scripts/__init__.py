@@ -6,14 +6,16 @@ Orchestrator Core Scripts
 
 from .subagent_tools import (
     call_subagent,
-    read_result,
-    list_subagents,
-    create_session
+    initialize_subagents,
+    list_available_subagents,
+    get_subagent_info,
+    shutdown_subagents
 )
 
 __all__ = [
     "call_subagent",
-    "read_result",
-    "list_subagents",
-    "create_session"
+    "initialize_subagents",
+    "list_available_subagents",
+    "get_subagent_info",
+    "shutdown_subagents"
 ]

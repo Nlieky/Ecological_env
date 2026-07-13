@@ -1,0 +1,7 @@
+{
+  "task_id": "task_20260707182940_5ab39653",
+  "task": "获取最近24小时进水和出水数据",
+  "context": {},
+  "output_format": "json",
+  "timeout": 300
+}

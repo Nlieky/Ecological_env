@@ -112,7 +112,7 @@ async def update_event_status(event_id: str, update: EventStatusUpdate):
 
 @router.get("/events/export")
 async def export_events(
-    format: str = Query("json", regex="^(json|xlsx|pdf)$"),
+    format: str = Query("json", pattern="^(json|xlsx|pdf)$"),
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     type: Optional[str] = None

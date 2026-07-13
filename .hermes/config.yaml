@@ -11,8 +11,8 @@ model:
   api_key_env: LLM_API_KEY     # 从环境变量读取 API 密钥
   model_env: LLM_MODEL         # 从环境变量读取模型名称
   # 默认值（如果环境变量未设置）
-  base_url: "http://172.16.12.41:30000/v1"
-  model: "ctgu-vlm"  # 三峡大学视觉语言模型
+  base_url: "https://api.longcat.chat/openai/v1"
+  model: "LongCat-2.0"  # 美团 LongCat 模型
   temperature: 0.7
   max_tokens: 4096
 

@@ -1,0 +1,59 @@
+{
+  "data_source": "pollution_water_out.csv",
+  "time_range": {
+    "start": "2024-12-30 01",
+    "end": "2024-12-31 00"
+  },
+  "record_count": 24,
+  "indicators": {
+    "pH": {
+      "mean": 7.0138,
+      "max": 7.156,
+      "min": 6.951,
+      "std": 0.0413,
+      "missing_count": 0
+    },
+    "COD": {
+      "mean": 35.6566,
+      "max": 50.345,
+      "min": 21.854,
+      "std": 6.756,
+      "missing_count": 0
+    },
+    "TN": {
+      "mean": 8.1474,
+      "max": 8.881,
+      "min": 6.673,
+      "std": 0.6207,
+      "missing_count": 0
+    },
+    "NH3-N": {
+      "mean": 2.1092,
+      "max": 3.336,
+      "min": 0.167,
+      "std": 1.0652,
+      "missing_count": 0
+    },
+    "TP": {
+      "mean": 0.1113,
+      "max": 0.208,
+      "min": 0.016,
+      "std": 0.0642,
+      "missing_count": 0
+    },
+    "SS": {
+      "mean": 1.5754,
+      "max": 7.688,
+      "min": 0.282,
+      "std": 1.5801,
+      "missing_count": 0
+    },
+    "Flow": {
+      "mean": 255.3643,
+      "max": 360.333,
+      "min": 56.655,
+      "std": 93.6014,
+      "missing_count": 0
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "created_at": "2026-07-06",
+    "description": "废水监测系统 - 历史违规案例库",
+    "last_updated": "2026-07-06T19:11:46.190316"
+  },
+  "cases": [
+    {
+      "case_id": "case_20260706_190628",
+      "task_id": "test_rule_reasoning_001",
+      "timestamp": "2026-07-06T19:06:28.774216",
+      "violations": [
+        {
+          "type": "dilution_discharge",
+          "confidence": 0.85,
+          "evidence": [
+            "流量突增",
+            "COD浓度成比例下降"
+          ],
+          "timestamp": "2026-07-06 14:30:00"
+        }
+      ],
+      "reasoning": "检测到流量突增且COD浓度成比例下降，符合稀释排放特征",
+      "confidence": "high",
+      "metadata": {
+        "subagent": "rule-reasoning",
+        "timestamp": "2026-07-06T14:30:00"
+      }
+    },
+    {
+      "case_id": "case_20260706_191146",
+      "task_id": "test_001",
+      "timestamp": "2026-07-06T19:11:46.190316",
+      "violations": [
+        {
+          "type": "dilution_discharge"
+        }
+      ],
+      "reasoning": "",
+      "confidence": "high",
+      "metadata": {}
+    }
+  ],
+  "statistics": {
+    "total_cases": 2,
+    "by_type": {
+      "bottle_interference": 0,
+      "artificial_fitting": 0,
+      "dilution_discharge": 2,
+      "malicious_evasion": 0
+    },
+    "by_confidence": {
+      "high": 2,
+      "medium": 0,
+      "low": 0
+    }
+  }
+}

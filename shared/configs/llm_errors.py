@@ -1,46 +1,65 @@
 """
 LLM 错误类定义
-建立明确的错误分类体系，替代通用的 Exception 捕获
+
+定义了LLM调用过程中可能出现的各种错误类型。
 """
 
 
 class LLMError(Exception):
-    """LLM 错误基类"""
+    """LLM错误基类"""
+
     def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
         self.message = message
         self.details = details or {}
+        super().__init__(message)
 
 
 class LLMTimeoutError(LLMError):
-    """LLM 响应超时"""
+    """LLM调用超时错误"""
+
     pass
 
 
 class LLMQuotaError(LLMError):
-    """LLM 配额用尽（如 API 速率限制）"""
+    """LLM配额用尽错误"""
+
     pass
 
 
 class LLMServiceError(LLMError):
-    """LLM 服务不可用（如 500 错误）"""
+    """LLM服务错误"""
+
     pass
 
 
 class LLMConfigError(LLMError):
-    """LLM 配置错误（如 API Key 无效）"""
+    """LLM配置错误"""
+
     pass
 
 
 class LLMContentError(LLMError):
-    """LLM 内容处理错误（如响应格式错误）"""
+    """LLM内容错误"""
+
     pass
 
 
+# 错误消息映射
 ERROR_MESSAGES = {
-    LLMTimeoutError: "LLM 服务响应超时，请检查网络连接或稍后重试",
-    LLMQuotaError: "LLM API 调用频率超限，请稍后重试",
-    LLMServiceError: "LLM 服务暂时不可用，请联系管理员",
-    LLMConfigError: "LLM 配置错误，请检查 API Key 设置",
-    LLMContentError: "LLM 响应格式错误，系统正在处理"
+    LLMTimeoutError: "请求超时，请检查网络连接或稍后重试",
+    LLMQuotaError: "API配额已用尽，请充值或等待配额刷新",
+    LLMServiceError: "LLM服务暂时不可用，请稍后重试",
+    LLMConfigError: "LLM配置错误，请检查API密钥和模型设置",
+    LLMContentError: "请求内容不符合要求，请检查输入内容"
 }
+
+
+__all__ = [
+    "LLMError",
+    "LLMTimeoutError",
+    "LLMQuotaError",
+    "LLMServiceError",
+    "LLMConfigError",
+    "LLMContentError",
+    "ERROR_MESSAGES"
+]

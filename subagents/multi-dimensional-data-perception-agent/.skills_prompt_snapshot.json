@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "manifest": {
+    "data-perception-core\\SKILL.md": [
+      1783413029909655700,
+      2214
+    ]
+  },
+  "skills": [
+    {
+      "skill_name": "data-perception-core",
+      "category": "data-perception-core",
+      "frontmatter_name": "data-perception-core",
+      "description": "获取监测数据。**触发条件**：用户提到\"数据\"、\"进水\"、\"出水\"、\"指标\"或时间范围时调用。",
+      "platforms": [],
+      "conditions": {
+        "fallback_for_toolsets": [],
+        "requires_toolsets": [],
+        "fallback_for_tools": [],
+        "requires_tools": []
+      }
+    }
+  ],
+  "category_descriptions": {}
+}
