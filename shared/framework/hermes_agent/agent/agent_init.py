@@ -79,6 +79,7 @@ def init_agent(
     checkpoint_max_total_size_mb: int = 500,
     checkpoint_max_file_size_mb: int = 10,
     pass_session_id: bool = False,
+    identity_path: str | Path = None,
     **kwargs  # Accept any additional parameters without error
 ):
     """Initialize AIAgent with simplified configuration.
@@ -173,7 +174,28 @@ def init_agent(
     # Initialize Hermes home directory
     agent.hermes_home = get_hermes_home()
 
-    logger.debug(f"Agent initialized: session_id={agent.session_id}, model={agent.model}")
+    # Process identity_path parameter
+    from pathlib import Path
+    try:
+        from agent.identity_loader import resolve_identity_path
+    except ImportError:
+        # Fallback for when running as a module
+        from shared.framework.hermes_agent.agent.identity_loader import resolve_identity_path
+
+    # Determine project root
+    if hasattr(agent, '_project_root'):
+        project_root = Path(agent._project_root)
+    else:
+        # Default to current working directory's parent
+        project_root = Path.cwd()
+
+    # Resolve identity_path to absolute path
+    if identity_path:
+        agent._identity_path = resolve_identity_path(identity_path, project_root)
+    else:
+        agent._identity_path = None
+
+    logger.debug(f"Agent initialized: session_id={agent.session_id}, model={agent.model}, identity_path={agent._identity_path}")
 
 
 __all__ = ["init_agent"]

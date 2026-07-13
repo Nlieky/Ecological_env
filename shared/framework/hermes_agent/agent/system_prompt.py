@@ -90,8 +90,19 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     # cwd project instructions disabled.
     _soul_loaded = False
     if agent.load_soul_identity or not agent.skip_context_files:
-        # 优先加载完整的身份文件集合
-        _identity_content = _r.load_identity_files()
+        # 优先使用自定义身份文件路径
+        _identity_content = None
+        if hasattr(agent, '_identity_path') and agent._identity_path:
+            try:
+                from agent.identity_loader import load_identity_files_from_path
+            except ImportError:
+                from shared.framework.hermes_agent.agent.identity_loader import load_identity_files_from_path
+            _identity_content = load_identity_files_from_path(agent._identity_path)
+
+        # 如果自定义路径没有加载到内容，回退到HERMES_HOME的完整集合
+        if not _identity_content:
+            _identity_content = _r.load_identity_files()
+
         if _identity_content:
             stable_parts.append(_identity_content)
             _soul_loaded = True
