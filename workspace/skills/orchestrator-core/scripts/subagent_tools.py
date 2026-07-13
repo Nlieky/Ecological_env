@@ -16,8 +16,16 @@ logger = logging.getLogger(__name__)
 try:
     from .subagent_manager import SubagentManager
 except ImportError:
-    # Fallback for when running as a module
-    from workspace.skills.orchestrator_core.scripts.subagent_manager import SubagentManager
+    try:
+        from workspace.skills.orchestrator_core.scripts.subagent_manager import SubagentManager
+    except ImportError:
+        # Fallback for test execution - import using sys.path
+        import sys
+        from pathlib import Path
+        scripts_dir = Path(__file__).parent
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        from subagent_manager import SubagentManager
 
 # 全局子智能体管理器实例
 _subagent_manager = None
