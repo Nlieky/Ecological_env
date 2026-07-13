@@ -6,40 +6,13 @@
 
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, create_autospec
+from unittest.mock import Mock, patch, MagicMock
 import sys
 import os
 
 # 添加scripts目录到路径
 scripts_dir = Path(__file__).parents[2] / "workspace" / "skills" / "orchestrator-core" / "scripts"
 sys.path.insert(0, str(scripts_dir))
-
-# 在导入前设置mock
-def mock_aiagent_factory(**kwargs):
-    """工厂函数创建模拟AIAgent"""
-    # 接受所有 kwargs 但忽略它们（因为这是 mock）
-    mock = MagicMock()
-    mock.run_conversation = MagicMock(return_value={
-        "final_response": "Test subagent response"
-    })
-    return mock
-
-# 伪造的 run_agent 模块
-class FakeAIAgent:
-    """伪造的AIAgent类"""
-    def __init__(self, **kwargs):
-        # 接受所有参数但什么都不做
-        pass
-
-    def run_conversation(self, prompt):
-        return {"final_response": "Test subagent response"}
-
-    def shutdown(self):
-        pass
-
-# 创建伪造的 run_agent 模块
-fake_run_agent = MagicMock()
-fake_run_agent.AIAgent = FakeAIAgent
 
 
 @pytest.fixture
@@ -77,67 +50,52 @@ def temp_project_structure(tmp_path):
 
 
 @pytest.mark.integration
-def test_full_integration_flow(temp_project_structure):
+def test_full_integration_flow(temp_project_structure, mock_subagent):
     """测试完整的集成流程"""
-    # 使用 sys.modules 注入来 mock run_agent 模块
-    import sys
-    original_run_agent = sys.modules.get('run_agent')
+    # Patch run_agent.AIAgent where it's imported in subagent_manager
+    with patch('run_agent.AIAgent', return_value=mock_subagent, create=True):
+        # 导入模块（使用临时项目结构）
+        import subagent_tools
 
-    try:
-        # 注入伪造的 run_agent 模块
-        sys.modules['run_agent'] = fake_run_agent
+        # Reset global manager
+        subagent_tools._subagent_manager = None
+        subagent_tools.get_subagent_manager().project_root = temp_project_structure
 
-        # 导入模块（现在会使用伪造的模块）
-        import subagent_manager as subagent_manager_module
+        # 1. 初始化子智能体
+        init_result = subagent_tools.initialize_subagents()
+        assert init_result["success"] is True
+        assert init_result["count"] == 4
 
-        # 1. 创建SubagentManager实例
-        manager = subagent_manager_module.SubagentManager(project_root=temp_project_structure)
+        # 2. 查看可用子智能体
+        list_result = subagent_tools.list_available_subagents()
+        assert list_result["success"] is True
+        assert len(list_result["subagents"]) == 4
 
-        # 2. 初始化子智能体
-        manager.create_subagents()
-        assert len(manager.subagents) == 4
+        # 3. 调用子智能体
+        call_result = subagent_tools.call_subagent(
+            subagent_name="anomaly-detection-agent",
+            task="检测异常"
+        )
+        assert call_result["success"] is True
+        assert "result" in call_result
 
-        # 3. 验证子智能体可用
-        subagent_names = manager.list_subagents()
-        assert len(subagent_names) == 4
-
-        # 4. 获取子智能体实例
-        subagent = manager.get_subagent("anomaly-detection-agent")
-        assert subagent is not None
-
-        # 5. 调用子智能体
-        result = subagent.run_conversation("检测异常")
-        assert result["final_response"] == "Test subagent response"
-
-        # 6. 关闭子智能体
-        manager.shutdown()
-        assert len(manager.subagents) == 0
-    finally:
-        # 恢复原始模块
-        if original_run_agent is not None:
-            sys.modules['run_agent'] = original_run_agent
-        elif 'run_agent' in sys.modules:
-            del sys.modules['run_agent']
+        # 4. 关闭子智能体
+        shutdown_result = subagent_tools.shutdown_subagents()
+        assert shutdown_result["success"] is True
 
 
 @pytest.mark.integration
-def test_multi_subagent_call_sequence(temp_project_structure):
+def test_multi_subagent_call_sequence(temp_project_structure, mock_subagent):
     """测试顺序调用多个子智能体"""
-    import sys
-    original_run_agent = sys.modules.get('run_agent')
+    with patch('run_agent.AIAgent', return_value=mock_subagent, create=True):
+        import subagent_tools
 
-    try:
-        # 注入伪造的 run_agent 模块
-        sys.modules['run_agent'] = fake_run_agent
-
-        # 重新导入模块
-        import subagent_manager as subagent_manager_module
-
-        # 创建SubagentManager实例
-        manager = subagent_manager_module.SubagentManager(project_root=temp_project_structure)
+        # Reset global manager
+        subagent_tools._subagent_manager = None
+        subagent_tools.get_subagent_manager().project_root = temp_project_structure
 
         # 初始化
-        manager.create_subagents()
+        subagent_tools.initialize_subagents()
 
         # 按顺序调用多个子智能体
         sequence = [
@@ -147,59 +105,33 @@ def test_multi_subagent_call_sequence(temp_project_structure):
         ]
 
         for name, task in sequence:
-            subagent = manager.get_subagent(name)
-            assert subagent is not None
-            result = subagent.run_conversation(task)
-            assert result["final_response"] == "Test subagent response"
-            print(f"{name}: {result['final_response']}")
-    finally:
-        # 恢复原始模块
-        if original_run_agent is not None:
-            sys.modules['run_agent'] = original_run_agent
-        elif 'run_agent' in sys.modules:
-            del sys.modules['run_agent']
+            result = subagent_tools.call_subagent(name, task)
+            assert result["success"] is True
+            print(f"{name}: {result['result']}")
 
 
 @pytest.mark.integration
 def test_subagent_error_handling(temp_project_structure):
     """测试子智能体错误处理"""
-    import sys
-    original_run_agent = sys.modules.get('run_agent')
+    # Create a mock subagent that raises an error
+    mock_failing_subagent = MagicMock()
+    mock_failing_subagent.run_conversation = MagicMock(side_effect=Exception("Test error"))
 
-    try:
-        # 创建会抛出异常的伪造 AIAgent
-        class FailingAIAgent:
-            def __init__(self, **kwargs):
-                pass
+    with patch('run_agent.AIAgent', return_value=mock_failing_subagent, create=True):
+        import subagent_tools
 
-            def run_conversation(self, prompt):
-                raise Exception("Test error")
-
-        failing_run_agent = MagicMock()
-        failing_run_agent.AIAgent = FailingAIAgent
-
-        # 注入伪造的 run_agent 模块
-        sys.modules['run_agent'] = failing_run_agent
-
-        # 重新导入模块
-        import subagent_manager as subagent_manager_module
-
-        # 创建SubagentManager实例
-        manager = subagent_manager_module.SubagentManager(project_root=temp_project_structure)
+        # Reset global manager
+        subagent_tools._subagent_manager = None
+        subagent_tools.get_subagent_manager().project_root = temp_project_structure
 
         # 初始化
-        manager.create_subagents()
+        subagent_tools.initialize_subagents()
 
-        # 获取子智能体
-        subagent = manager.get_subagent("anomaly-detection-agent")
-        assert subagent is not None
+        # 调用失败的子智能体
+        result = subagent_tools.call_subagent(
+            subagent_name="anomaly-detection-agent",
+            task="检测异常"
+        )
 
-        # 调用会抛出异常
-        with pytest.raises(Exception, match="Test error"):
-            subagent.run_conversation("检测异常")
-    finally:
-        # 恢复原始模块
-        if original_run_agent is not None:
-            sys.modules['run_agent'] = original_run_agent
-        elif 'run_agent' in sys.modules:
-            del sys.modules['run_agent']
+        assert result["success"] is False
+        assert "error" in result
