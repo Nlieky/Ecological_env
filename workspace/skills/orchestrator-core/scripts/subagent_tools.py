@@ -1,10 +1,64 @@
-"""
-主智能体工具集 - 子智能体调用工具
+# workspace/skills/orchestrator-core/scripts/subagent_tools.py
+"""子智能体调用工具
 
-供主智能体通过 LLM 调用，实现动态子智能体编排。
+提供主智能体调用子智能体的工具函数
 """
 
-from typing import Dict, Any, List, Optional
+from __future__ import annotations
+
+import logging
+from typing import Dict, Any, Optional
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Import SubagentManager at module level for access to SUBAGENT_CONFIGS
+from subagent_manager import SubagentManager
+
+# 全局子智能体管理器实例
+_subagent_manager = None
+
+
+def get_subagent_manager():
+    """获取全局子智能体管理器实例"""
+    global _subagent_manager
+    if _subagent_manager is None:
+        # 使用项目根目录初始化
+        project_root = Path(__file__).parents[4]  # 回到项目根目录
+        _subagent_manager = SubagentManager(project_root=project_root)
+    return _subagent_manager
+
+
+def initialize_subagents(model: str = None, base_url: str = None, api_key: str = None) -> Dict[str, Any]:
+    """初始化所有子智能体
+
+    Args:
+        model: LLM模型名称
+        base_url: API基础URL
+        api_key: API密钥
+
+    Returns:
+        初始化结果，包含:
+        - success: bool - 是否成功
+        - count: int - 创建的子智能体数量
+        - subagents: list - 子智能体名称列表
+        - error: str - 错误信息（如果有）
+    """
+    try:
+        manager = get_subagent_manager()
+        manager.create_subagents(model=model, base_url=base_url, api_key=api_key)
+
+        return {
+            "success": True,
+            "count": len(manager.subagents),
+            "subagents": manager.list_subagents()
+        }
+    except Exception as e:
+        logger.error(f"Failed to initialize subagents: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
 def call_subagent(
@@ -12,90 +66,147 @@ def call_subagent(
     task: str,
     context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """
-    调用子智能体执行任务
+    """调用子智能体执行任务
 
     Args:
-        subagent_name: 子智能体名称 (如 "anomaly-detection")
-        task: 任务描述
-        context: 上一个子智能体的结果（可选）
+        subagent_name: 子智能体名称
+        task: 需要子智能体执行的任务描述
+        context: 可选的上下文信息
 
     Returns:
-        {
-            "task_id": str,
-            "status": "completed" | "failed",
-            "result": dict | None,
-            "error": str | None,
-            "metadata": {
-                "duration_seconds": float,
-                "timestamp": str,
-                "subagent_name": str
+        子智能体的执行结果，包含:
+        - success: bool - 是否成功
+        - result: str - 执行结果
+        - error: str - 错误信息（如果有）
+    """
+    try:
+        manager = get_subagent_manager()
+
+        # 检查子智能体是否可用
+        if not manager.is_subagent_available(subagent_name):
+            return {
+                "success": False,
+                "error": f"子智能体 '{subagent_name}' 不存在或未初始化"
             }
+
+        # 获取子智能体实例
+        subagent = manager.get_subagent(subagent_name)
+        if not subagent:
+            return {
+                "success": False,
+                "error": f"无法获取子智能体 '{subagent_name}'"
+            }
+
+        # 构建完整的任务描述（包含上下文）
+        full_task = task
+        if context:
+            context_str = "\n".join([f"{k}: {v}" for k, v in context.items()])
+            full_task = f"上下文信息：\n{context_str}\n\n任务：\n{task}"
+
+        # 调用子智能体执行任务
+        logger.info(f"Calling subagent '{subagent_name}' with task: {task[:100]}...")
+
+        result = subagent.run_conversation(full_task)
+
+        # 提取最终响应
+        if isinstance(result, dict):
+            final_response = result.get("final_response", "")
+        else:
+            final_response = str(result)
+
+        logger.info(f"Subagent '{subagent_name}' completed successfully")
+
+        return {
+            "success": True,
+            "result": final_response
         }
 
-    Raises:
-        ValueError: 未知子智能体名称
-        IOError: 会话目录创建失败
-    """
-    from .call_subagent import call_subagent as _call_subagent
-    return _call_subagent(subagent_name, task, context)
+    except Exception as e:
+        logger.error(f"Error calling subagent '{subagent_name}': {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
-def read_result(result_file: str) -> Dict[str, Any]:
+def list_available_subagents() -> Dict[str, Any]:
+    """列出所有可用的子智能体
+
+    Returns:
+        可用子智能体列表，包含:
+        - success: bool - 是否成功
+        - subagents: list - 子智能体名称列表
+        - error: str - 错误信息（如果有）
     """
-    读取子智能体结果文件
+    try:
+        manager = get_subagent_manager()
+        subagent_names = manager.list_subagents()
+
+        return {
+            "success": True,
+            "subagents": subagent_names
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+def get_subagent_info(subagent_name: str) -> Dict[str, Any]:
+    """获取子智能体信息
 
     Args:
-        result_file: 结果文件路径（相对于 sessions/{session_id}/）
+        subagent_name: 子智能体名称
 
     Returns:
-        结果数据字典
+        子智能体信息，包含:
+        - success: bool - 是否成功
+        - available: bool - 是否可用
+        - description: str - 描述
+        - error: str - 错误信息（如果有）
     """
-    import json
-    from pathlib import Path
-    from .create_session import get_session_dir
+    try:
+        manager = get_subagent_manager()
 
-    session_dir = get_session_dir()
-    result_path = Path(session_dir) / result_file
+        if subagent_name not in SubagentManager.SUBAGENT_CONFIGS:
+            return {
+                "success": False,
+                "error": f"未知的子智能体: '{subagent_name}'"
+            }
 
-    if not result_path.exists():
-        return {"error": f"Result file not found: {result_file}"}
+        config = SubagentManager.SUBAGENT_CONFIGS[subagent_name]
+        available = manager.is_subagent_available(subagent_name)
 
-    with open(result_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        return {
+            "success": True,
+            "available": available,
+            "description": config["description"]
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
-def list_subagents() -> List[Dict[str, str]]:
-    """
-    列出所有可用的子智能体
+def shutdown_subagents() -> Dict[str, Any]:
+    """关闭所有子智能体
 
     Returns:
-        [
-            {"id": "anomaly-detection", "name": "异常检测子智能体", "path": "..."},
-            {"id": "rule-reasoning", "name": "规则推理子智能体", "path": "..."},
-            ...
-        ]
+        关闭结果，包含:
+        - success: bool - 是否成功
+        - error: str - 错误信息（如果有）
     """
-    from .call_subagent import SUBAGENT_PATHS
+    try:
+        manager = get_subagent_manager()
+        manager.shutdown()
 
-    agents = []
-    for agent_id, path in SUBAGENT_PATHS.items():
-        # 只返回完整名称的子智能体（包含 - 的）
-        if "-" in agent_id:
-            agents.append({
-                "id": agent_id,
-                "name": agent_id.replace("-", " ").replace("_", " ").title(),
-                "path": path
-            })
-    return agents
-
-
-def create_session() -> str:
-    """
-    创建新的会话目录
-
-    Returns:
-        session_id: 会话ID（用于通信）
-    """
-    from .create_session import create_session as _create_session
-    return _create_session()
+        return {
+            "success": True
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
