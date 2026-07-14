@@ -413,7 +413,7 @@ class AIAgent:
         identity_path: str | Path = None,
     ):
         """Forwarder — see ``agent.agent_init.init_agent``."""
-        from agent.agent_init import init_agent
+        from shared.framework.hermes_agent.agent.agent_init import init_agent
         init_agent(
             self,
             base_url=base_url,
