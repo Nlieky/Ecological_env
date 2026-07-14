@@ -2,6 +2,75 @@
 
 All notable changes to the wastewater monitoring system will be documented in this file.
 
+## [2.2.0] - 2026-07-14
+
+### 身份文件完善
+
+**主智能体**
+- ✅ 重构 SOUL.md（简化核心原则和工作哲学）
+- ✅ 重构 AGENTS.md（只保留工作区规范）
+- ✅ 创建 SKILL.md（集成所有业务逻辑）
+- ✅ 完善 MEMORY.md（只保留领域知识）
+- ✅ 删除冗余内容，提高文件专注度
+
+**子智能体**
+- ✅ 完善 disposition-execution-agent 身份文件
+- ✅ 扩充 SOUL.md（添加核心原则、角色定义、工作哲学）
+- ✅ 扩充 AGENTS.md（完整工作流程、预警分级、工单模板）
+- ✅ 扩充 MEMORY.md（预警标准、融合算法、API规范、历史案例）
+
+### 目录结构优化
+
+**子智能体目录简化**
+- ✅ 删除缓存文件（__pycache__、*.pyc、cache/）
+- ✅ 删除 Hermes 框架临时目录（cron/、hooks/、pairing/）
+- ✅ 删除不必要的身份文件（IDENTITY.md、TOOLS.md、USER.md）
+- ✅ 删除运行文件（run_agent.py、entry.py、*_agent.py）
+- ✅ 删除临时文件（*_result.json、sessions/、logs/）
+- ✅ 删除配置文件（config.yaml、config.json）
+- ✅ 删除 83 个文件，23 个目录
+
+**最终子智能体结构**
+```
+subagents/{agent-name}/
+├── SOUL.md          # 身份/个性
+├── AGENTS.md        # 使用说明
+├── MEMORY.md        # 专业记忆
+└── skills/          # 技能包
+```
+
+### 测试验证
+
+**新增测试脚本**
+- ✅ test_identity_content.py - 主智能体身份文件验证（16/16 通过）
+- ✅ test_master_conversation.py - 主智能体对话测试（测试通过）
+- ✅ test_subagent_identity_content.py - 子智能体身份文件验证（56/56 通过）
+- ✅ test_master_calls_subagent.py - 主智能体调用子智能体测试（3/3 通过）
+
+**验证功能**
+- ✅ 4 个子智能体正确初始化
+- ✅ 主智能体成功调用子智能体
+- ✅ 子智能体正确响应任务
+- ✅ 主智能体汇总子智能体结果
+
+### 项目完成度
+
+| 模块 | 完成度 |
+|------|-------|
+| Hermes 框架集成 | 100% |
+| 主智能体 | 100% |
+| 4 个子智能体 | 100% |
+| 子智能体调用 | 100% |
+| FastAPI 后端 | 100% |
+| shared/ 资源库 | 100% |
+| 数据流发送器 | 100% |
+| 监控配置 | 100% |
+| 前端界面 | 待开发 |
+
+**整体完成度：~85%**
+
+---
+
 ## [2.1.1] - 2026-07-08
 
 ### 目录结构优化

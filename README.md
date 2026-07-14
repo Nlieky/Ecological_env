@@ -120,16 +120,31 @@ Ecological_env/                    # 项目主目录
 │           ├── references/        # 参考文档
 │           └── assets/            # 资源文件
 │
-├── subagents/                     # 4 个子智能体
+├── subagents/                     # 4 个子智能体（简洁结构）
 │   ├── multi-dimensional-data-perception-agent/  # 多维数据感知
-│   │   ├── SOUL.md               # 子智能体身份
+│   │   ├── SOUL.md               # 子智能体身份和个性
 │   │   ├── AGENTS.md             # 子智能体规范
-│   │   ├── MEMORY.md             # 子智能体记忆
-│   │   ├── skills/               # 子智能体技能
-│   │   └── run_agent_wrapper.py  # 运行包装器
+│   │   ├── MEMORY.md             # 子智能体专业记忆
+│   │   └── skills/               # 子智能体技能包
+│   │       └── data-perception-core/
 │   ├── anomaly-detection-agent/   # 异常检测
+│   │   ├── SOUL.md
+│   │   ├── AGENTS.md
+│   │   ├── MEMORY.md
+│   │   └── skills/
+│   │       └── anomaly-detection-core/
 │   ├── rule-reasoning-agent/      # 规则推理
+│   │   ├── SOUL.md
+│   │   ├── AGENTS.md
+│   │   ├── MEMORY.md
+│   │   └── skills/
+│   │       └── rule-reasoning-core/
 │   └── disposition-execution-agent/ # 研判预警与处置
+│       ├── SOUL.md
+│       ├── AGENTS.md
+│       ├── MEMORY.md
+│       └── skills/
+│           └── disposition-execution-core/
 │
 ├── shared/                        # 全局共享资源（三库一体）
 │   ├── operators/                 # 算子库
@@ -158,17 +173,15 @@ Ecological_env/                    # 项目主目录
 │   └── health_check_api.md       # 健康检查接口
 │
 ├── scripts/                      # 全局工具脚本
-│   ├── start_hermes_server.bat   # Hermes 服务器启动（Windows）
-│   ├── start_hermes_server.sh    # Hermes 服务器启动（Linux/Mac）
 │   ├── start_backend.bat         # 后端启动（Windows）
 │   ├── start_backend.sh          # 后端启动（Linux/Mac）
-│   ├── spawn_subagent.py         # 启动子智能体
-│   ├── register_subagent.py      # 注册子智能体
-│   ├── sync_memory.py            # 同步记忆
-│   ├── health_monitor.py         # 健康监控
-│   ├── cache_manager.py          # 缓存管理
-│   ├── data_validator.py         # 数据验证
-│   └── backup_restore.sh         # 备份恢复
+│   ├── test_*.py                 # 测试脚本
+│   │   ├── test_identity_content.py      # 主智能体身份文件测试
+│   │   ├── test_master_conversation.py   # 主智能体对话测试
+│   │   ├── test_subagent_identity_content.py  # 子智能体身份文件测试
+│   │   └── test_master_calls_subagent.py  # 主智能体调用子智能体测试
+│   ├── verify_*.py                # 验证脚本
+│   └── cleanup_subagents.py       # 子智能体目录清理
 │
 ├── tests/                        # 测试目录
 │   ├── unit/                      # 单元测试
@@ -335,24 +348,51 @@ curl http://localhost:8000/metrics
 - [项目技术文档](CLAUDE.md)
 - [Hermes 框架详解](docs/Hermes-Agent框架与智能体架构详解.md)
 
+## 测试
+
+### 运行测试
+
+```bash
+# 主智能体身份文件测试
+python scripts/test_identity_content.py
+
+# 主智能体对话测试
+python scripts/test_master_conversation.py
+
+# 子智能体身份文件测试
+python scripts/test_subagent_identity_content.py
+
+# 主智能体调用子智能体测试
+python scripts/test_master_calls_subagent.py
+```
+
+### 测试覆盖
+
+| 测试项目 | 覆盖内容 | 状态 |
+|---------|---------|------|
+| 身份文件内容 | SOUL.md, AGENTS.md, MEMORY.md | ✅ 56/56 通过 |
+| 主智能体对话 | LLM 集成、工具加载、问题回答 | ✅ 测试通过 |
+| 子智能体调用 | 初始化、通信、结果汇总 | ✅ 3/3 通过 |
+
 ## 项目完成度
 
 | 模块 | 状态 |
 |------|------|
 | Hermes 框架集成 | ✅ 100% |
 | 主智能体 | ✅ 100% |
-| 4 个子智能体 | ✅ 95% |
+| 4 个子智能体 | ✅ 100% |
+| 子智能体调用 | ✅ 100% |
 | FastAPI 后端 | ✅ 100% |
 | shared/ 资源库 | ✅ 100% |
 | 数据流发送器 | ✅ 100% |
 | 监控配置 | ✅ 100% |
-| 前端界面 | ⏳ 部分实现 |
+| 前端界面 | ⏳ 待开发 |
 
-**整体完成度：~80%**（前端界面继续开发中）
+**整体完成度：~85%**（前端界面待开发）
 
 ---
 
-**版本**：v2.1.1  
-**最后更新**：2026-07-08  
-**Python**：3.12.12  
+**版本**：v2.2.0
+**最后更新**：2026-07-14
+**Python**：3.12.12
 **LLM**：LongCat-2.0 (美团，OpenAI 兼容 API)

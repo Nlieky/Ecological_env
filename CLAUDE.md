@@ -1,8 +1,11 @@
 # 废水监测系统 - Claude AI助手配置
 
-> **重要架构更新（2026-06-30）**
+> **重要架构更新（2026-07-14）**
 >
-> 本项目已迁移到**Hermes Agent框架**作为底层智能体框架。
+> 本项目基于 **Hermes Agent 框架**实现多智能体架构：
+> - 主智能体和 4 个子智能体身份文件已完善
+> - 子智能体目录结构已简化（只保留 3 个身份文件 + skills/）
+> - 主智能体调用子智能体功能已验证通过
 
 ## 核心架构原则
 
@@ -137,12 +140,24 @@ cp .env.example .env
 ### 测试
 
 ```bash
-# 运行集成测试
-python tests/integration/test_full_pipeline.py
+# 主智能体身份文件测试
+python scripts/test_identity_content.py
 
-# 验证子智能体
-python scripts/verify_all_subagents.py
+# 主智能体对话测试
+python scripts/test_master_conversation.py
+
+# 子智能体身份文件测试
+python scripts/test_subagent_identity_content.py
+
+# 主智能体调用子智能体测试
+python scripts/test_master_calls_subagent.py
 ```
+
+### 测试结果
+
+- 身份文件内容验证：**56/56 通过**
+- 主智能体对话：**测试通过**
+- 子智能体调用：**3/3 通过**
 
 ### 监控
 
@@ -236,11 +251,11 @@ LLM_MODEL=LongCat-2.0
 - TOOLS.md: Environment-specific notes
 
 **Sub-Agents** (subagents/{agent}/):
-- IDENTITY.md: Identity card
-- AGENTS.md: Sub-agent specific task instructions
-- SOUL.md: Sub-agent's role and personality
-- TOOLS.md: Sub-agent specific tool conventions
+- SOUL.md: Identity and personality
+- AGENTS.md: Usage instructions and responsibilities
 - MEMORY.md: Professional long-term memory
+
+注意：子智能体只需要 3 个身份文件（SOUL.md, AGENTS.md, MEMORY.md），不需要 IDENTITY.md、TOOLS.md、USER.md 等主智能体文件。
 
 ---
 
