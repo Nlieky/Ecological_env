@@ -1,1 +1,0 @@
-/e/project/Ecological_env/subagents/anomaly-detection-agent/skills/anomaly-detection-core
