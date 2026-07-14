@@ -4,31 +4,33 @@ Skills define _how_ tools work. This file is for _your_ specifics — the stuff 
 
 ## Environment Configuration
 
-### Flask Middleware
+### Backend API
 
 | 配置项 | 值 |
 |-------|-----|
-| 路径 | middleware/app_orchestrator.py |
-| 端口 | 5000 |
+| 主文件 | backend/main.py |
+| 端口 | 8000 |
 | 主机 | 0.0.0.0 |
+| 框架 | FastAPI |
 
 ### Data Paths
 
 | 数据类型 | 路径 |
 |---------|------|
-| 进水数据 | data/pollution_water_in.csv |
-| 出水数据 | data/pollution_water_out.csv |
+| 进水数据 | shared/data/pollution_water_in.csv |
+| 出水数据 | shared/data/pollution_water_out.csv |
 | 历史数据 | shared/data/historical/ |
 | 知识库 | shared/knowledge/ |
+| 算子库 | shared/operators/ |
 
-### Sub-Agent Scripts
+### Sub-Agent Paths
 
-| 子智能体 | 脚本路径 |
-|---------|---------|
-| data-governance-agent | subagents/data-governance-agent/skills/data-governance-core/scripts/ |
-| feature-analysis-agent | subagents/feature-analysis-agent/skills/feature-analysis-core/scripts/ |
-| anomaly-detection-agent | subagents/anomaly-detection-agent/skills/anomaly-detection-core/scripts/ |
-| rule-reasoning-agent | subagents/rule-reasoning-agent/skills/rule-reasoning-core/scripts/ |
+| 子智能体 | 路径 |
+|---------|------|
+| multi-dimensional-data-perception-agent | subagents/multi-dimensional-data-perception-agent/ |
+| anomaly-detection-agent | subagents/anomaly-detection-agent/ |
+| rule-reasoning-agent | subagents/rule-reasoning-agent/ |
+| disposition-execution-agent | subagents/disposition-execution-agent/ |
 
 ### Endpoints
 
@@ -38,16 +40,15 @@ Skills define _how_ tools work. This file is for _your_ specifics — the stuff 
 | /metrics | GET | Prometheus指标 |
 | /api/dual-stream | POST | 接收双数据流 |
 | /api/analyze/stats | GET | 获取分析器状态 |
+| /api/query | POST | 主智能体查询接口 |
+| /docs | GET | API文档 |
 
 ### Monitoring
 
 - **Prometheus**: http://localhost:9090
 - **Grafana**: http://localhost:3000 (admin/admin)
+- **Hermes API**: http://localhost:8642
 
 ---
 
 Add whatever helps you do your job. This is your cheat sheet.
-
-## Related
-
-- [Agent workspace](/concepts/agent-workspace)

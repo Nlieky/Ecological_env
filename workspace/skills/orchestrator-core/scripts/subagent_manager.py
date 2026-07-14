@@ -62,7 +62,7 @@ class SubagentManager:
             return
 
         try:
-            from run_agent import AIAgent
+            from shared.framework.hermes_agent.run_agent import AIAgent
 
             for name, config in self.SUBAGENT_CONFIGS.items():
                 try:
