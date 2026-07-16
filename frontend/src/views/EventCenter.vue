@@ -23,6 +23,7 @@
       :data="filteredEvents"
       style="width: 100%"
       :height="tableHeight"
+      v-loading="loading"
       stripe
       @row-click="showEventDetail"
     >
@@ -127,18 +128,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { eventsApi } from '@/api/events'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { useEventsStore } from '@/stores/events'
+import type { EventListRequest } from '@/api/types/api.types'
 import type { AlertEvent } from '@/types'
 import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
-const events = ref<AlertEvent[]>([])
+const eventsStore = useEventsStore()
+
+const filters = ref<EventListRequest>({})
 const filterStatus = ref('')
 const filterSeverity = ref('')
 const detailVisible = ref(false)
 const selectedEvent = ref<AlertEvent | null>(null)
 const tableHeight = ref(600)
+
+const events = computed(() => eventsStore.events)
+const loading = computed(() => eventsStore.loading)
+const pagination = computed(() => eventsStore.pagination)
 
 const filteredEvents = computed(() => {
   return events.value.filter(event => {
@@ -176,11 +184,19 @@ const showEventDetail = (event: AlertEvent) => {
   detailVisible.value = true
 }
 
+const fetchEvents = async () => {
+  await eventsStore.fetchEvents(filters.value)
+}
+
+const updateEventStatus = async (id: string, status: string) => {
+  await eventsStore.updateStatus(id, status)
+}
+
 const updateStatus = async (eventId: string, status: string) => {
   try {
-    await eventsApi.updateStatus(eventId, status)
+    await eventsStore.updateStatus(eventId, status)
     ElMessage.success(`Event updated to ${status}`)
-    await loadEvents()
+    await fetchEvents()
   } catch (error) {
     console.error('Failed to update event:', error)
     ElMessage.error('Failed to update event status')
@@ -189,7 +205,7 @@ const updateStatus = async (eventId: string, status: string) => {
 
 const exportEvents = async () => {
   try {
-    const blob = await eventsApi.export({
+    const blob = await eventsStore.exportEvents({
       format: 'xlsx',
       status: filterStatus.value,
       severity: filterSeverity.value
@@ -209,17 +225,13 @@ const exportEvents = async () => {
   }
 }
 
-const loadEvents = async () => {
-  try {
-    const data = await eventsApi.list({
-      page: 1,
-      page_size: 100
-    })
-    events.value = data.items || []
-  } catch (error) {
-    console.error('Failed to load events:', error)
-    ElMessage.error('Failed to load events')
-  }
+const handleFilterChange = () => {
+  fetchEvents()
+}
+
+const handlePageChange = (page: number) => {
+  filters.value.page = page
+  fetchEvents()
 }
 
 const handleResize = () => {
@@ -227,7 +239,7 @@ const handleResize = () => {
 }
 
 onMounted(() => {
-  loadEvents()
+  fetchEvents()
   handleResize()
   window.addEventListener('resize', handleResize)
 })

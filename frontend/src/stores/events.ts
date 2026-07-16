@@ -35,11 +35,16 @@ export const useEventsStore = defineStore('events', () => {
     }
   }
 
+  const exportEvents = async (params?: any) => {
+    return await eventsService.exportEvents(params)
+  }
+
   return {
     events,
     loading,
     pagination,
     fetchEvents,
-    updateStatus
+    updateStatus,
+    exportEvents
   }
 })
