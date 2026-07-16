@@ -1,0 +1,95 @@
+{
+  "skill_name": "rule-reasoning-core",
+  "evals": [
+    {
+      "id": 1,
+      "name": "标准违规判定流程",
+      "prompt": "检测最近24小时是否存在违规排放行为，如果有，请判定违规类型和嫌疑等级。",
+      "expected_output": "调用 run_rule_reasoning.py 脚本，生成包含 has_violation、suspicion_level、violation_types 的违规判定结果",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "插瓶干扰识别",
+      "prompt": "检查最近24小时数据是否存在插瓶干扰行为（指标长时间恒定，接近限值）。",
+      "expected_output": "调用脚本并识别 bottle_interference 违规类型，嫌疑等级为 high 或 critical",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "超标判定",
+      "prompt": "最近24小时出水COD是否超过排放标准（GB 18918-2002 一级A标准50mg/L）？",
+      "expected_output": "调用脚本进行法规匹配，检查是否 exceedance 违规",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "工艺机理校验",
+      "prompt": "验证最近24小时数据是否符合废水处理工艺机理，是否存在违背工艺规律的情况。",
+      "expected_output": "调用脚本进行工艺机理校验，返回 mechanism_compliance 状态",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "无异常情况",
+      "prompt": "在没有异常数据的情况下，违规判定应该返回什么结果？",
+      "expected_output": "脚本应该正常运行，返回 has_violation=false, suspicion_level=low",
+      "files": []
+    }
+  ],
+  "assertions": [
+    {
+      "eval_id": 1,
+      "assertions": [
+        {
+          "name": "脚本调用",
+          "check": "output.contains('run_rule_reasoning.py') || output.contains('脚本执行完成')"
+        },
+        {
+          "name": "结果结构",
+          "check": "result_file_exists('rule_reasoning_result.json')"
+        },
+        {
+          "name": "必要字段",
+          "check": "json_contains('rule_reasoning_result.json', ['has_violation', 'suspicion_level', 'violation_types'])"
+        }
+      ]
+    },
+    {
+      "eval_id": 2,
+      "assertions": [
+        {
+          "name": "违规类型识别",
+          "check": "json_contains_value('rule_reasoning_result.json', 'violation_types', 'bottle_interference')"
+        }
+      ]
+    },
+    {
+      "eval_id": 3,
+      "assertions": [
+        {
+          "name": "法规匹配",
+          "check": "json_path_exists('rule_reasoning_result.json', 'result.regulation_matches')"
+        }
+      ]
+    },
+    {
+      "eval_id": 4,
+      "assertions": [
+        {
+          "name": "工艺校验",
+          "check": "json_path_exists('rule_reasoning_result.json', 'result.process_validation')"
+        }
+      ]
+    },
+    {
+      "eval_id": 5,
+      "assertions": [
+        {
+          "name": "无异常处理",
+          "check": "json_contains_value('rule_reasoning_result.json', 'result.has_violation', false)"
+        }
+      ]
+    }
+  ]
+}

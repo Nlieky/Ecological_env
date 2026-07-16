@@ -1,95 +1,18 @@
 """
-查询接口 - Hermes 智能体核心接口
+查询接口 - 使用 AgentService 封装的智能体调用
 
-直接调用 Hermes AIAgent，无需额外的 HTTP API Server
-
-注意：hermes-agent 已安装在项目虚拟环境中，无需额外路径配置
+重构后：通过 AgentService 调用自定义 AIAgent (shared/framework/hermes_agent)
+不再依赖 HermesAPIClient 或 Hermes API Server
 """
-import os
-import sys
 import logging
 import time
-from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from backend.models.query import QueryRequest, QueryResponse
+from backend.services.agent_service import AgentService
 from backend.utils.loggers import generate_session_id, log_master_decision
-
-# 导入 AIAgent（hermes-agent 已安装在虚拟环境中）
-try:
-    from run_agent import AIAgent
-except ImportError:
-    # 如果导入失败，提供明确的错误信息
-    raise ImportError(
-        "无法导入 run_agent。请确保 hermes-agent 已安装在虚拟环境中：\n"
-        "  pip install hermes-agent"
-    )
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# 项目目录
-PROJECT_DIR = Path("E:/project/Ecological_env").resolve()
-
-# 缓存 agent 实例
-_agent_cache = {}
-
-# 导入编排器工具以注册到 Hermes 工具集
-# 这必须在 AIAgent 创建之前完成，以便工具可用
-# 导入时会自动调用 register_orchestrator_tools()
-try:
-    # 强制重新加载模块以获取最新更改
-    if 'workspace.tools.orchestrator_tools' in sys.modules:
-        del sys.modules['workspace.tools.orchestrator_tools']
-    import workspace.tools.orchestrator_tools  # noqa: F401
-    logger.info("Orchestrator tools registered with Hermes")
-except Exception as e:
-    logger.warning(f"Failed to register orchestrator tools: {e}")
-
-
-def get_agent(session_id: str = None) -> AIAgent:
-    """
-    获取或创建 AIAgent 实例
-
-    Args:
-        session_id: 会话ID（可选）
-
-    Returns:
-        AIAgent 实例
-    """
-    if session_id and session_id in _agent_cache:
-        return _agent_cache[session_id]
-
-    # 确保在项目目录
-    current_cwd = os.getcwd()
-    if current_cwd != str(PROJECT_DIR):
-        logger.info(f"切换目录: {current_cwd} -> {PROJECT_DIR}")
-        os.chdir(PROJECT_DIR)
-
-    # 读取环境变量
-    base_url = os.environ.get("LLM_BASE_URL", "http://172.16.12.41:30000/v1")
-    model = os.environ.get("LLM_MODEL", "ctgu-vlm")
-    provider = os.environ.get("LLM_PROVIDER", "custom")
-    api_key = os.environ.get("LLM_API_KEY", "")
-
-    # 创建 AIAgent
-    agent = AIAgent(
-        base_url=base_url,
-        api_key=api_key,
-        model=model,
-        provider=provider,
-        load_soul_identity=True,      # 加载 workspace/SOUL.md
-        skip_context_files=False,     # 加载 AGENTS.md、MEMORY.md
-        enabled_toolsets=["orchestrator", "skills", "terminal"],  # 启用编排器、技能和终端工具集
-        max_iterations=10,             # 限制迭代次数避免超时
-        quiet_mode=False,              # 启用日志以便调试
-        session_id=session_id,
-    )
-
-    if session_id:
-        _agent_cache[session_id] = agent
-
-    logger.info(f"创建 AIAgent 实例: session_id={session_id}")
-    return agent
 
 
 def parse_decision_path(content: str) -> list:
@@ -150,10 +73,13 @@ def parse_decision_path(content: str) -> list:
     return path
 
 
-@router.post("/query", response_model=QueryResponse, tags=["查询"])
+@router.post("/query", tags=["查询"])
 async def execute_query(request: QueryRequest):
     """
-    执行自然语言查询 - 展示 Hermes 智能体的完整决策过程
+    执行自然语言查询 - 使用 AgentService
+
+    **架构**：
+    FastAPI → AgentService → AIAgent (shared/framework/hermes_agent)
 
     **Hermes 主智能体决策树**：
     1. 需要数据吗？ -> data-perception
@@ -176,26 +102,15 @@ async def execute_query(request: QueryRequest):
     try:
         logger.info(f"收到查询: {request.query[:50]}...")
 
-        # 获取 agent（自动加载身份文件）
-        agent = get_agent(session_id)
-
-        # 直接调用 AIAgent
-        response = agent.run_conversation(
-            user_message=request.query,
-            conversation_history=None,  # 可选：实现历史记录管理
+        # 使用 AgentService 处理查询
+        service = AgentService()
+        query_response = service.process_query(
+            query=request.query,
+            session_id=session_id
         )
 
-        # AIAgent 返回字典，提取 final_response 和 chart
-        chart_data = None
-        if isinstance(response, dict):
-            content = response.get('final_response', str(response))
-            # 尝试提取 chart 字段（如果 LLM 生成了图表配置）
-            chart_data = response.get('chart')
-        else:
-            content = str(response) if response else ""
-
-        # 解析决策路径
-        decision_path = parse_decision_path(content)
+        # 解析决策路径（可选）
+        decision_path = parse_decision_path(query_response.content)
 
         # 提取子智能体调用列表
         subagents_called = []
@@ -203,6 +118,19 @@ async def execute_query(request: QueryRequest):
             if "action" in step and "调用" in step["action"]:
                 agent_name = step["action"].replace("调用 ", "")
                 subagents_called.append(agent_name)
+
+        # 直接返回字典，避免 Pydantic 模型问题
+        return {
+            "content": query_response.content,
+            "session_id": query_response.session_id,
+            "timestamp": query_response.timestamp,
+            "chartData": query_response.chartData,
+            "decision_path": decision_path,
+            "sub_agent_calls": [],
+            "data_sources": [],
+            "reasoning": query_response.reasoning,
+            "metadata": query_response.metadata
+        }
 
         # 计算耗时
         total_latency_ms = (time.time() - start_time) * 1000
@@ -215,32 +143,11 @@ async def execute_query(request: QueryRequest):
                 intent="query",
                 decision_path=[step.get("step_name", "") for step in decision_path],
                 subagents_called=subagents_called,
-                reasoning_summary=f"查询完成，返回 {len(content)} 字符",
+                reasoning_summary=f"查询完成，返回 {len(query_response.content)} 字符",
                 total_latency_ms=total_latency_ms
             )
         except Exception as log_error:
             logger.warning(f"Failed to log master decision: {log_error}")
-
-        # 构建响应
-        query_response = QueryResponse(
-            content=content,
-            session_id=session_id,
-            timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            chartData=chart_data,
-            decision_path=decision_path,
-            sub_agent_calls=[],  # TODO: 从 AIAgent 响应元数据提取
-            data_sources=[],      # TODO: 从 AIAgent 响应元数据提取
-            reasoning={
-                "intent": "通过 AIAgent 直接调用，无需 HTTP API",
-                "model": os.environ.get("LLM_MODEL", "ctgu-vlm")
-            },
-            metadata={
-                "model": os.environ.get("LLM_MODEL", "ctgu-vlm"),
-                "base_url": os.environ.get("LLM_BASE_URL", ""),
-                "load_soul_identity": True,
-                "skip_context_files": False
-            }
-        )
 
         logger.info(f"查询完成: session={session_id}, 耗时={time.time() - start_time:.2f}s")
 
@@ -269,8 +176,8 @@ async def execute_query(request: QueryRequest):
         raise HTTPException(
             status_code=500,
             detail={
-                "error": "HermesQueryError",
-                "message": "AIAgent 调用失败",
+                "error": "QueryError",
+                "message": "智能体调用失败",
                 "detail": str(e)
             }
         )
@@ -291,12 +198,16 @@ async def get_hermes_capabilities():
             "location": "workspace/SOUL.md"
         },
         "implementation": {
-            "method": "Direct AIAgent Call",
-            "description": "直接调用 Hermes AIAgent，无需 HTTP API Server",
+            "method": "AgentService + Custom AIAgent",
+            "description": "通过 AgentService 调用自定义 AIAgent (shared/framework/hermes_agent)",
             "identity_files_loaded": [
+                "workspace/IDENTITY.md",
                 "workspace/SOUL.md",
                 "workspace/AGENTS.md",
-                "workspace/MEMORY.md"
+                "workspace/MEMORY.md",
+                "workspace/USER.md",
+                "workspace/TOOLS.md",
+                "workspace/HEARTBEAT.md"
             ]
         },
         "decision_tree": [

@@ -1,0 +1,219 @@
+{
+  "task_id": "anomaly_20260715_102523",
+  "status": "completed",
+  "result": {
+    "anomalies": [
+      {
+        "data_type": "effluent",
+        "indicator": "化学需氧量浓度（毫克/升）",
+        "timestamp": "2024-12-31T00:00:00",
+        "type": "boundary",
+        "score": 2.1890030534903415,
+        "value": 50.345,
+        "votes": 2,
+        "expected_range": [
+          34.37925,
+          37.11025
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "pH值",
+        "timestamp": "2024-12-30T09:00:00",
+        "type": "spike",
+        "score": 2.185654967434781,
+        "value": 7.156,
+        "votes": 3,
+        "expected_range": [
+          6.996,
+          7.03125
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "悬浮物浓度（毫克/升）",
+        "timestamp": "2024-12-30T11:00:00",
+        "type": "spike",
+        "score": 2.1786443567383382,
+        "value": 7.688,
+        "votes": 3,
+        "expected_range": [
+          0.5802499999999999,
+          2.3205
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "化学需氧量浓度（毫克/升）",
+        "timestamp": "2024-12-30T13:00:00",
+        "type": "trend",
+        "score": 2.021704308286984,
+        "value": 21.854,
+        "votes": 2,
+        "expected_range": [
+          34.37925,
+          37.11025
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "化学需氧量浓度（毫克/升）",
+        "timestamp": "2024-12-30T12:00:00",
+        "type": "trend",
+        "score": 1.8059833629954012,
+        "value": 22.958,
+        "votes": 2,
+        "expected_range": [
+          34.37925,
+          37.11025
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2024-12-30T01:00:00",
+        "type": "boundary",
+        "score": 1.761914974588455,
+        "value": 25.8363,
+        "votes": 2,
+        "expected_range": [
+          16.10445,
+          18.10845
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2024-12-30T13:00:00",
+        "type": "trend",
+        "score": 1.662113065913184,
+        "value": 8.4283,
+        "votes": 2,
+        "expected_range": [
+          16.10445,
+          18.10845
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "氨氮浓度（毫克/升）",
+        "timestamp": "2024-12-30T14:00:00",
+        "type": "trend",
+        "score": 1.6321848813101456,
+        "value": 2.94,
+        "votes": 2,
+        "expected_range": [
+          6.58495,
+          7.6236
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2024-12-30T12:00:00",
+        "type": "trend",
+        "score": 1.5845561009847973,
+        "value": 8.9512,
+        "votes": 2,
+        "expected_range": [
+          16.10445,
+          18.10845
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "氨氮浓度（毫克/升）",
+        "timestamp": "2024-12-30T15:00:00",
+        "type": "trend",
+        "score": 1.4975802065220252,
+        "value": 3.1104,
+        "votes": 2,
+        "expected_range": [
+          6.58495,
+          7.6236
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总磷浓度（毫克/升）",
+        "timestamp": "2024-12-30T11:00:00",
+        "type": "trend",
+        "score": 1.3750472618406098,
+        "value": 8.0129,
+        "votes": 2,
+        "expected_range": [
+          2.02665,
+          4.14385
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2024-12-30T16:00:00",
+        "type": "trend",
+        "score": 1.2902675682226221,
+        "value": 6.673,
+        "votes": 2,
+        "expected_range": [
+          7.914,
+          8.533249999999999
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2024-12-30T17:00:00",
+        "type": "trend",
+        "score": 1.2902675682226221,
+        "value": 6.673,
+        "votes": 2,
+        "expected_range": [
+          7.914,
+          8.533249999999999
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "氨氮浓度（毫克/升）",
+        "timestamp": "2024-12-30T11:00:00",
+        "type": "trend",
+        "score": 0.9803519365228767,
+        "value": 9.9075,
+        "votes": 2,
+        "expected_range": [
+          6.58495,
+          7.6236
+        ]
+      }
+    ],
+    "summary": {
+      "total_anomalies": 14,
+      "by_data_type": {
+        "effluent": 7,
+        "influent": 7
+      },
+      "by_indicator": {
+        "化学需氧量浓度（毫克/升）": 3,
+        "pH值": 1,
+        "悬浮物浓度（毫克/升）": 1,
+        "总氮浓度（毫克/升）": 5,
+        "氨氮浓度（毫克/升）": 3,
+        "总磷浓度（毫克/升）": 1
+      },
+      "by_type": {
+        "boundary": 2,
+        "spike": 2,
+        "trend": 10
+      }
+    }
+  },
+  "metadata": {
+    "subagent": "anomaly-detection-agent",
+    "timestamp": "2026-07-15T10:25:25.955161",
+    "time_range": "24h",
+    "data_points": {
+      "influent": 24,
+      "effluent": 24
+    }
+  }
+}

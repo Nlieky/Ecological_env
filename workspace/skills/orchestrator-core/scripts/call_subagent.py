@@ -106,15 +106,11 @@ def generate_task_id() -> str:
     return f"task_{timestamp}_{unique_id}"
 
 
-def call_subagent(
-    subagent_name: str,
-    task: str,
-    context: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+def call_subagent(**kwargs) -> Dict[str, Any]:
     """
     调用子智能体执行任务
 
-    Args:
+    Args (通过关键字参数传递):
         subagent_name: 子智能体名称（必须是 SUBAGENT_PATHS 中的键）
         task: 任务描述
         context: 上下文信息（可选）
@@ -129,6 +125,35 @@ def call_subagent(
             "metadata": dict
         }
     """
+    # 从关键字参数中提取必需参数
+    subagent_name = kwargs.get('subagent_name') or kwargs.get('name')
+    task = kwargs.get('task')
+    context = kwargs.get('context')
+
+    # 验证必需参数
+    if not subagent_name:
+        return {
+            "task_id": generate_task_id(),
+            "status": "failed",
+            "result": None,
+            "error": "Missing required parameter: subagent_name (or name)",
+            "metadata": {
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+
+    if not task:
+        return {
+            "task_id": generate_task_id(),
+            "status": "failed",
+            "result": None,
+            "error": "Missing required parameter: task",
+            "metadata": {
+                "subagent_name": subagent_name,
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+
     # 验证子智能体名称
     if subagent_name not in SUBAGENT_PATHS:
         return {

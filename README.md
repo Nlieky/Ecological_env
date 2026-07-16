@@ -120,7 +120,7 @@ Ecological_env/                    # 项目主目录
 │           ├── references/        # 参考文档
 │           └── assets/            # 资源文件
 │
-├── subagents/                     # 4 个子智能体（简洁结构）
+├── subagents/                     # 4 个子智能体
 │   ├── multi-dimensional-data-perception-agent/  # 多维数据感知
 │   │   ├── SOUL.md               # 子智能体身份和个性
 │   │   ├── AGENTS.md             # 子智能体规范

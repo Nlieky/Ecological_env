@@ -1,0 +1,95 @@
+{
+  "skill_name": "anomaly-detection-core",
+  "evals": [
+    {
+      "id": 1,
+      "name": "标准异常检测流程",
+      "prompt": "检测最近24小时数据中的异常情况。",
+      "expected_output": "调用 run_anomaly_detection_simple.py 脚本，生成包含 anomalies 列表和 summary 统计的异常检测结果",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "指定时间范围检测",
+      "prompt": "检测最近48小时的数据异常。",
+      "expected_output": "调用脚本时指定 --hours 48 参数，返回48小时的异常检测结果",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "恒定值异常检测",
+      "prompt": "检查是否存在指标长时间恒定不变的情况（可能是插瓶干扰）。",
+      "expected_output": "调用脚本并识别 type='constant' 的异常点",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "突变异常检测",
+      "prompt": "检测数据中是否存在突然升高或降低的突变点。",
+      "expected_output": "调用脚本并识别 type='spike' 的异常点",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "多指标分析",
+      "prompt": "分析pH、COD、TN等多个指标的异常情况。",
+      "expected_output": "调用脚本返回多个指标的异常检测结果，summary.by_indicator 包含各指标统计",
+      "files": []
+    }
+  ],
+  "assertions": [
+    {
+      "eval_id": 1,
+      "assertions": [
+        {
+          "name": "脚本调用",
+          "check": "output.contains('run_anomaly_detection_simple.py') || output.contains('脚本执行完成')"
+        },
+        {
+          "name": "结果结构",
+          "check": "result_file_exists('anomaly_result.json')"
+        },
+        {
+          "name": "必要字段",
+          "check": "json_contains('anomaly_result.json', ['anomalies', 'summary'])"
+        }
+      ]
+    },
+    {
+      "eval_id": 2,
+      "assertions": [
+        {
+          "name": "时间范围参数",
+          "check": "output.contains('--hours 48')"
+        }
+      ]
+    },
+    {
+      "eval_id": 3,
+      "assertions": [
+        {
+          "name": "恒定值识别",
+          "check": "json_contains_type('anomaly_result.json', 'anomalies', 'type', 'constant')"
+        }
+      ]
+    },
+    {
+      "eval_id": 4,
+      "assertions": [
+        {
+          "name": "突变识别",
+          "check": "json_contains_type('anomaly_result.json', 'anomalies', 'type', 'spike')"
+        }
+      ]
+    },
+    {
+      "eval_id": 5,
+      "assertions": [
+        {
+          "name": "多指标统计",
+          "check": "json_path_exists('anomaly_result.json', 'summary.by_indicator')"
+        }
+      ]
+    }
+  ]
+}

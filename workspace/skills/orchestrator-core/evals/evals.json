@@ -1,0 +1,107 @@
+{
+  "skill_name": "orchestrator-core",
+  "evals": [
+    {
+      "id": 1,
+      "name": "简单异常查询",
+      "prompt": "最近24小时出水COD异常吗？",
+      "expected_output": "调用 data-perception 和 anomaly-detection 子智能体，整合结果生成自然语言回答",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "违规判定查询",
+      "prompt": "最近24小时出水是否超标？",
+      "expected_output": "调用 data-perception、anomaly-detection 和 rule-reasoning 子智能体，整合结果生成自然语言回答",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "完整预警流程",
+      "prompt": "生成今天的异常预警工单",
+      "expected_output": "按顺序调用全部4个子智能体，生成完整的预警工单和处置建议",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "数据获取",
+      "prompt": "获取最近48小时的监测数据",
+      "expected_output": "只调用 data-perception 子智能体，返回监测数据",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "违规模式识别",
+      "prompt": "检查是否存在插瓶干扰行为",
+      "expected_output": "调用 data-perception、anomaly-detection 和 rule-reasoning 子智能体，判定是否存在插瓶干扰",
+      "files": []
+    }
+  ],
+  "assertions": [
+    {
+      "eval_id": 1,
+      "assertions": [
+        {
+          "name": "子智能体调用",
+          "check": "output_mentions_subagent('multi-dimensional-data-perception-agent') && output_mentions_subagent('anomaly-detection-agent')"
+        },
+        {
+          "name": "结果整合",
+          "check": "output.contains('异常') || output.contains('检测结果')"
+        }
+      ]
+    },
+    {
+      "eval_id": 2,
+      "assertions": [
+        {
+          "name": "完整流程",
+          "check": "output_mentions_subagent('rule-reasoning-agent')"
+        },
+        {
+          "name": "违规判定",
+          "check": "output.contains('超标') || output.contains('违规') || output.contains('符合标准')"
+        }
+      ]
+    },
+    {
+      "eval_id": 3,
+      "assertions": [
+        {
+          "name": "全部调用",
+          "check": "output_mentions_subagent('disposition-execution-agent')"
+        },
+        {
+          "name": "工单生成",
+          "check": "output.contains('工单') || output.contains('WO-')"
+        }
+      ]
+    },
+    {
+      "eval_id": 4,
+      "assertions": [
+        {
+          "name": "单一调用",
+          "check": "output_mentions_subagent('multi-dimensional-data-perception-agent')"
+        },
+        {
+          "name": "数据返回",
+          "check": "output.contains('数据') || output.contains('条记录')"
+        }
+      ]
+    },
+    {
+      "eval_id": 5,
+      "assertions": [
+        {
+          "name": "违规判定",
+          "check": "output_mentions_subagent('rule-reasoning-agent')"
+        },
+        {
+          "name": "插瓶干扰识别",
+          "check": "output.contains('插瓶') || output.contains('恒定')"
+        }
+      ]
+    }
+  ]
+}

@@ -17,7 +17,7 @@
         :collapse="sidebarCollapsed"
         router
         :collapse-transition="false"
-        :default-openeds="['observability', 'events']"
+        :default-openeds="['events']"
       >
         <el-menu-item index="/dashboard">
           <el-icon><Monitor /></el-icon>
@@ -29,19 +29,11 @@
           <template #title><span>AI 助手</span></template>
         </el-menu-item>
 
-        <el-sub-menu index="observability">
+        <el-sub-menu index="logs">
           <template #title>
-            <el-icon><DataAnalysis /></el-icon>
-            <span>可观测性</span>
+            <el-icon><Notebook /></el-icon>
+            <span>日志管理</span>
           </template>
-          <el-menu-item index="/observability/tracing">
-            <el-icon><Connection /></el-icon>
-            <template #title><span>链路追踪</span></template>
-          </el-menu-item>
-          <el-menu-item index="/observability/metrics">
-            <el-icon><TrendCharts /></el-icon>
-            <template #title><span>指标查询</span></template>
-          </el-menu-item>
           <el-menu-item index="/logs/query">
             <el-icon><Document /></el-icon>
             <template #title><span>日志查询</span></template>
@@ -177,10 +169,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  Monitor, ChatDotRound, Bell, Document, Connection, Fold, Expand,
-  Service, DataAnalysis, TrendCharts, Warning, Setting, Notebook, Promotion
+  Monitor, ChatDotRound, Bell, Document, Fold, Expand,
+  Service, Warning, Setting, Notebook, Promotion
 } from '@element-plus/icons-vue'
-import { eventsApi } from '@/api/events'
+import { eventsService } from '@/api/services/events.service'
 import EcoAIOpsWidget from '@/components/aiops/EcoAIOpsWidget.vue'
 
 const route = useRoute()
@@ -193,8 +185,6 @@ let notificationTimer: any = null
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/chat')) return '/chat'
-  if (path.startsWith('/observability/tracing')) return '/observability/tracing'
-  if (path.startsWith('/observability/metrics')) return '/observability/metrics'
   if (path.startsWith('/logs/query')) return '/logs/query'
   if (path.startsWith('/logs')) return '/logs'
   if (path.startsWith('/events') && path !== '/events') return '/events'
@@ -205,8 +195,6 @@ const currentTitle = computed(() => {
   const titles: Record<string, string> = {
     '/dashboard': '监测大屏',
     '/chat': 'AI 智能助手',
-    '/observability/tracing': '链路追踪',
-    '/observability/metrics': '指标查询',
     '/logs/query': '日志查询',
     '/logs': '系统日志',
     '/events': '告警事件'
@@ -233,8 +221,8 @@ function formatDateTime(value: string) {
 async function loadNotifications() {
   notificationsLoading.value = true
   try {
-    const result = await eventsApi.getEvents({ page: 1, pageSize: 6, status: 'pending' })
-    const items = (result.data || []).map((item: any) => {
+    const result = await eventsService.getEvents({ page: 1, page_size: 6, status: 'pending' })
+    const items = (result.items || []).map((item: any) => {
       const severityMap: any = {
         high: { tag: '严重告警', tagType: 'danger', dotTone: 'danger' },
         medium: { tag: '告警提醒', tagType: 'warning', dotTone: 'warning' },

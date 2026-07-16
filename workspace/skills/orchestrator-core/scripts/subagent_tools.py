@@ -41,10 +41,10 @@ def get_subagent_manager():
     return _subagent_manager
 
 
-def initialize_subagents(model: str = None, base_url: str = None, api_key: str = None) -> Dict[str, Any]:
+def initialize_subagents(**kwargs) -> Dict[str, Any]:
     """初始化所有子智能体
 
-    Args:
+    Args (通过关键字参数传递):
         model: LLM模型名称
         base_url: API基础URL
         api_key: API密钥
@@ -57,6 +57,10 @@ def initialize_subagents(model: str = None, base_url: str = None, api_key: str =
         - error: str - 错误信息（如果有）
     """
     try:
+        model = kwargs.get('model')
+        base_url = kwargs.get('base_url')
+        api_key = kwargs.get('api_key')
+
         manager = get_subagent_manager()
         manager.create_subagents(model=model, base_url=base_url, api_key=api_key)
 
@@ -73,14 +77,10 @@ def initialize_subagents(model: str = None, base_url: str = None, api_key: str =
         }
 
 
-def call_subagent(
-    subagent_name: str,
-    task: str,
-    context: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+def call_subagent(**kwargs) -> Dict[str, Any]:
     """调用子智能体执行任务
 
-    Args:
+    Args (通过关键字参数传递):
         subagent_name: 子智能体名称
         task: 需要子智能体执行的任务描述
         context: 可选的上下文信息
@@ -91,6 +91,23 @@ def call_subagent(
         - result: str - 执行结果
         - error: str - 错误信息（如果有）
     """
+    # 从关键字参数中提取必需参数
+    subagent_name = kwargs.get('subagent_name') or kwargs.get('name')
+    task = kwargs.get('task')
+    context = kwargs.get('context')
+
+    # 验证必需参数
+    if not subagent_name:
+        return {
+            "success": False,
+            "error": "缺少必需参数: subagent_name (或 name)"
+        }
+    if not task:
+        return {
+            "success": False,
+            "error": "缺少必需参数: task"
+        }
+
     try:
         manager = get_subagent_manager()
 
@@ -141,7 +158,7 @@ def call_subagent(
         }
 
 
-def list_available_subagents() -> Dict[str, Any]:
+def list_available_subagents(**kwargs) -> Dict[str, Any]:
     """列出所有可用的子智能体
 
     Returns:
@@ -165,10 +182,10 @@ def list_available_subagents() -> Dict[str, Any]:
         }
 
 
-def get_subagent_info(subagent_name: str) -> Dict[str, Any]:
+def get_subagent_info(**kwargs) -> Dict[str, Any]:
     """获取子智能体信息
 
-    Args:
+    Args (通过关键字参数传递):
         subagent_name: 子智能体名称
 
     Returns:
@@ -179,6 +196,13 @@ def get_subagent_info(subagent_name: str) -> Dict[str, Any]:
         - error: str - 错误信息（如果有）
     """
     try:
+        subagent_name = kwargs.get('subagent_name')
+        if not subagent_name:
+            return {
+                "success": False,
+                "error": "缺少必需参数: subagent_name"
+            }
+
         manager = get_subagent_manager()
 
         if subagent_name not in SubagentManager.SUBAGENT_CONFIGS:
@@ -202,7 +226,7 @@ def get_subagent_info(subagent_name: str) -> Dict[str, Any]:
         }
 
 
-def shutdown_subagents() -> Dict[str, Any]:
+def shutdown_subagents(**kwargs) -> Dict[str, Any]:
     """关闭所有子智能体
 
     Returns:

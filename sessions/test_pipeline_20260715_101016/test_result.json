@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-07-15T10:10:32.903005",
+  "session_dir": "E:\\project\\Ecological_env\\sessions\\test_pipeline_20260715_101016",
+  "results": {
+    "1. 多维数据感知子智能体": {
+      "status": "success",
+      "output_file": "E:\\project\\Ecological_env\\sessions\\test_pipeline_20260715_101016\\data_result.json"
+    },
+    "2. 异常检测子智能体": {
+      "status": "success",
+      "output_file": "E:\\project\\Ecological_env\\sessions\\test_pipeline_20260715_101016\\anomaly_result.json"
+    },
+    "3. 规则推理子智能体": {
+      "status": "success",
+      "output_file": "E:\\project\\Ecological_env\\sessions\\test_pipeline_20260715_101016\\rule_reasoning_result.json"
+    },
+    "4. 预警处置子智能体": {
+      "status": "success",
+      "output_file": "E:\\project\\Ecological_env\\sessions\\test_pipeline_20260715_101016\\disposition_result.json"
+    }
+  },
+  "summary": {
+    "total": 4,
+    "success": 4,
+    "failed": 0,
+    "pass_rate": 1.0
+  }
+}

@@ -29,17 +29,7 @@ const router = createRouter({
     },
     {
       path: '/observability',
-      redirect: '/observability/tracing'
-    },
-    {
-      path: '/observability/tracing',
-      component: () => import('@/views/TraceObservability.vue'),
-      meta: { title: '链路追踪' }
-    },
-    {
-      path: '/observability/metrics',
-      component: () => import('@/views/TraceObservability.vue'),
-      meta: { title: '指标查询' }
+      redirect: '/logs'
     },
     {
       path: '/logs/query',

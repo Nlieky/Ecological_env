@@ -3,10 +3,20 @@
 
 为已完成的 Hermes 智能体系统提供 HTTP 接口
 """
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# 加载项目根目录的 .env 文件
+project_root = Path(__file__).parent.parent
+env_file = project_root / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
-from backend.api.routes import health, hermes, query, logs, realtime, events, tracing
+from backend.api.routes import health, query, logs, realtime, events, tracing
 from backend.core.config import settings
 from backend.metrics.definitions import (
     api_requests_total,
@@ -27,8 +37,6 @@ app = FastAPI(
 ### 核心接口
 
 - `/api/query` - 查询接口（展示决策树和调用链）
-- `/api/hermes/system` - Hermes 系统完整信息
-- `/api/hermes/skills` - 加载的技能列表
 - `/api/health` - 健康检查
 
 ### 架构
@@ -67,7 +75,6 @@ async def metrics():
 
 # 路由注册
 app.include_router(health.router, prefix="/api")
-app.include_router(hermes.router, prefix="/api")
 app.include_router(query.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
@@ -110,14 +117,13 @@ async def root():
 @app.on_event("startup")
 async def startup():
     """启动时初始化"""
-    from backend.api.client import get_hermes_client
-    # 验证 Hermes API Server 连接
+    # 验证 AgentService 可用
     try:
-        client = get_hermes_client()
-        await client.health_check()
-        print("[OK] Hermes API Server connected")
+        from backend.services.agent_service import AgentService
+        service = AgentService()
+        print("[OK] AgentService initialized")
     except Exception as e:
-        print(f"[ERROR] Hermes API Server connection failed: {e}")
+        print(f"[ERROR] AgentService initialization failed: {e}")
 
 
 @app.on_event("shutdown")

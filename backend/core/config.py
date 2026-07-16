@@ -22,9 +22,10 @@ class Settings(BaseSettings):
     # CORS 配置
     CORS_ORIGINS: List[str] = ["*"]
 
-    # Hermes API Server 配置
-    HERMES_API_URL: str = "http://localhost:8642"
-    HERMES_API_KEY: str = "sk-hermes-api-key"
+    # ❌ 已弃用：Hermes API Server 不再需要
+    # 系统直接使用自定义 AIAgent (shared/framework/hermes_agent)
+    # HERMES_API_URL: str = "http://localhost:8642"
+    # HERMES_API_KEY: str = "sk-hermes-api-key"
 
     # LLM 配置（用于展示）
     LLM_MODEL: str = "ctgu-vlm"
@@ -44,5 +45,5 @@ settings = Settings()
 # 调试：验证配置加载
 import logging
 logger = logging.getLogger(__name__)
-logger.info(f"Loaded HERMES_API_KEY: {settings.HERMES_API_KEY[:2]}***{settings.HERMES_API_KEY[-2:] if len(settings.HERMES_API_KEY) > 4 else '****'}")
-logger.info(f"HERMES_API_URL: {settings.HERMES_API_URL}")
+# logger.info(f"Loaded HERMES_API_KEY: {settings.HERMES_API_KEY[:2]}***{settings.HERMES_API_KEY[-2:] if len(settings.HERMES_API_KEY) > 4 else '****'}")
+# logger.info(f"HERMES_API_URL: {settings.HERMES_API_URL}")

@@ -1,0 +1,103 @@
+{
+  "task_id": "rule_reasoning_20260715_144858",
+  "status": "completed",
+  "result": {
+    "has_violation": true,
+    "suspicion_level": "critical",
+    "suspicion_level_cn": "严重",
+    "confidence": 0.855,
+    "violation_types": [
+      "secret_pipe"
+    ],
+    "violation_type_names": [
+      "暗管偷排"
+    ],
+    "evidence_points": [],
+    "anomaly_count": 14,
+    "regulation_matches": {
+      "matches": [],
+      "violations": [],
+      "compliance_status": "compliant"
+    },
+    "process_validation": {
+      "violations": [
+        {
+          "type": "nitrogen_conversion_violation",
+          "rule": "nh3_tn_correlation",
+          "description": "氨氮与总氮相关性过低，违背氮转化机理",
+          "severity": "high",
+          "evidence": "相关系数: 0.257, 期望: ≥0.3"
+        }
+      ],
+      "warnings": [],
+      "violations_count": 1,
+      "mechanism_compliance": "warning"
+    },
+    "expert_reasoning": {
+      "matched_patterns": [
+        {
+          "pattern_key": "secret_pipe",
+          "name": "暗管偷排",
+          "match_score": 0.9,
+          "confidence": 0.95,
+          "suspicion_level": "critical"
+        }
+      ],
+      "suspicion_level": "critical",
+      "confidence": 0.855,
+      "reasoning_path": [
+        {
+          "step": "feature_extraction",
+          "features": {
+            "indicators": [
+              "氨氮浓度（毫克/升）",
+              "悬浮物浓度（毫克/升）",
+              "pH值",
+              "总磷浓度（毫克/升）",
+              "总氮浓度（毫克/升）",
+              "化学需氧量浓度（毫克/升）"
+            ],
+            "patterns": {
+              "": 14
+            },
+            "severities": {
+              "": 14
+            },
+            "constant_indicators": [],
+            "high_score_indicators": [
+              "化学需氧量浓度（毫克/升）",
+              "pH值",
+              "悬浮物浓度（毫克/升）",
+              "化学需氧量浓度（毫克/升）",
+              "化学需氧量浓度（毫克/升）",
+              "总氮浓度（毫克/升）",
+              "总氮浓度（毫克/升）",
+              "氨氮浓度（毫克/升）",
+              "总氮浓度（毫克/升）",
+              "氨氮浓度（毫克/升）",
+              "总磷浓度（毫克/升）",
+              "总氮浓度（毫克/升）",
+              "总氮浓度（毫克/升）",
+              "氨氮浓度（毫克/升）"
+            ]
+          }
+        },
+        {
+          "step": "pattern_matching",
+          "matched_patterns": [
+            "暗管偷排"
+          ]
+        }
+      ],
+      "matched_cases": [],
+      "has_mechanism_violation": true
+    },
+    "conclusion": "嫌疑等级：严重违规，应立即采取措施；疑似违规类型：暗管偷排；检测到 1 处违背工艺机理。"
+  },
+  "metadata": {
+    "subagent": "rule-reasoning-agent",
+    "timestamp": "2026-07-15T14:48:58.521044",
+    "anomaly_task_id": "anomaly_20260715_144853",
+    "has_mechanism_violation": true
+  }
+}

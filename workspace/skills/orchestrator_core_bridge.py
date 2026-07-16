@@ -45,6 +45,14 @@ spec.loader.exec_module(create_session_module)
 
 create_session = create_session_module.create_session
 
+# 加载 list_subagents 工具
+list_subagents_path = scripts_dir / "subagent_tools.py"
+spec = importlib.util.spec_from_file_location("subagent_tools_impl", list_subagents_path)
+list_subagents_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(list_subagents_module)
+
+list_subagents = list_subagents_module.list_available_subagents
+
 # 导出列表
 __all__ = [
     "call_subagent",

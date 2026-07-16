@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-def create_session() -> str:
+def create_session(**kwargs) -> str:
     """
     创建新的会话目录
 

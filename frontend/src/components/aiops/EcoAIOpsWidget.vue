@@ -116,7 +116,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { queryApi } from '@/api/query'
+import { queryService } from '@/api/services/query.service'
 import { User, Service, Promotion, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
@@ -188,7 +188,7 @@ async function sendMessage() {
   isLoading.value = true
 
   try {
-    const response = await queryApi.query({
+    const response = await queryService.executeQuery({
       query,
       context: {
         page: 'aiops-chat'
