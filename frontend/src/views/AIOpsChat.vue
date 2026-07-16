@@ -40,7 +40,7 @@
         </div>
       </div>
 
-      <div v-if="isTyping" class="message assistant">
+      <div v-if="isQuerying" class="message assistant">
         <div class="message-avatar">
           <el-icon><Service /></el-icon>
         </div>
@@ -74,12 +74,12 @@
         :rows="2"
         placeholder="Ask about water quality, anomalies, regulations..."
         @keydown.enter.ctrl="sendMessage"
-        :disabled="isTyping"
+        :disabled="isQuerying"
       />
       <el-button
         type="primary"
         @click="sendMessage"
-        :loading="isTyping"
+        :loading="isQuerying"
         :disabled="!inputMessage.trim()"
       >
         <el-icon><Promotion /></el-icon>
@@ -90,30 +90,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
-import { queryApi } from '@/api/query'
-import type { ChatMessage } from '@/types'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useQueryAgent } from '@/composables/useQueryAgent'
+import { useChatStore } from '@/stores/chat'
 import { User, Service, Promotion } from '@element-plus/icons-vue'
-import { Service as ServiceIcon } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 
-const messages = ref<ChatMessage[]>([])
+const { query, isQuerying, currentSessionId } = useQueryAgent()
+const chatStore = useChatStore()
+
 const inputMessage = ref('')
-const isTyping = ref(false)
 const messagesContainer = ref<HTMLElement>()
 const suggestedQuestions = ref<string[]>([
-  'Check recent anomalies in Plant A',
-  'Show pH trends for all plants',
-  'What violations were detected today?'
+  '检查A厂最近的异常情况',
+  '显示所有厂区pH趋势',
+  '今天检测到哪些违规？'
 ])
+
+const messages = computed(() => chatStore.messages)
 
 const formatTime = (iso: string) => {
   return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
 const renderMarkdown = (text: string) => {
-  // Simple markdown-like rendering
   return text
     .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -135,45 +136,18 @@ const sendSuggested = (question: string) => {
 }
 
 const sendMessage = async () => {
-  if (!inputMessage.value.trim() || isTyping.value) return
+  if (!inputMessage.value.trim() || isQuerying.value) return
 
-  const userMessage: ChatMessage = {
-    id: Date.now().toString(),
-    role: 'user',
-    content: inputMessage.value,
-    timestamp: new Date().toISOString()
-  }
-
-  messages.value.push(userMessage)
-  const query = inputMessage.value
+  const queryText = inputMessage.value
   inputMessage.value = ''
-  scrollToBottom()
-
-  isTyping.value = true
 
   try {
-    const response = await queryApi.query({
-      query,
-      context: {
-        page: 'chat'
-      }
-    })
+    const response = await query(queryText, { page: 'chat' })
 
-    const assistantMessage: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: response.content || response.answer || response.result || 'Analysis complete',
-      timestamp: new Date().toISOString(),
-      evidence: response.evidence,
-      chartData: response.chartData
-    }
-
-    messages.value.push(assistantMessage)
-
-    // 渲染图表（如果有）
     if (response.chartData) {
       nextTick(() => {
-        const container = document.querySelector(`[data-chart-id="${assistantMessage.id}"]`) as HTMLElement
+        const messageId = (Date.now() + 1).toString()
+        const container = document.querySelector(`[data-chart-id="${messageId}"]`) as HTMLElement
         if (container) {
           const chart = echarts.init(container)
           chart.setOption(response.chartData)
@@ -181,29 +155,18 @@ const sendMessage = async () => {
       })
     }
   } catch (error) {
-    console.error('Query failed:', error)
-    ElMessage.error('Failed to get response from AI assistant')
-
-    const errorMessage: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: 'Sorry, I encountered an error processing your request. Please try again.',
-      timestamp: new Date().toISOString()
-    }
-    messages.value.push(errorMessage)
-  } finally {
-    isTyping.value = false
-    scrollToBottom()
+    ElMessage.error('查询失败')
   }
+
+  scrollToBottom()
 }
 
 onMounted(() => {
-  // Welcome message
-  messages.value.push({
-    id: 'welcome',
-    role: 'assistant',
-    content: 'Hello! I am your AI assistant for wastewater monitoring. I can help you with:\n\n* Analyzing water quality data\n* Detecting anomalies and violations\n* Explaining regulations and compliance\n* Generating reports and evidence chains',
-    timestamp: new Date().toISOString()
+  chatStore.addAssistantMessage({
+    content: '你好！我是废水监测AI助手。我可以帮助你：\n\n* 分析水质数据\n* 检测异常和违规\n* 解释法规和合规性\n* 生成报告和证据链',
+    session_id: '',
+    timestamp: new Date().toISOString(),
+    decision_path: []
   })
 })
 </script>
