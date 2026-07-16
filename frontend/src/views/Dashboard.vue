@@ -12,7 +12,7 @@
           {{ onlineCount }} 个在线
         </el-tag>
         <el-tag type="info">{{ lastUpdate }}</el-tag>
-        <el-button @click="loadPlants" :loading="loading">
+        <el-button @click="handleRefresh" :loading="isPolling">
           <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
@@ -164,15 +164,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { realtimeApi } from '@/api/realtime'
+import { useRealtimePolling } from '@/composables/useRealtimePolling'
+import { useRealtimeStore } from '@/stores/realtime'
 import type { PlantData } from '@/types'
 import { Warning, CircleCheck, WarningFilled, Refresh } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 
-const plants = ref<PlantData[]>([])
+const { isPolling, refresh } = useRealtimePolling(10000)
+const realtimeStore = useRealtimeStore()
+
+const plants = computed(() => realtimeStore.plants)
 const detailVisible = ref(false)
 const selectedPlant = ref<PlantData | null>(null)
-const loading = ref(false)
 
 const onlineCount = computed(() => plants.value.filter(p => p.status === 'online').length)
 
@@ -225,23 +227,12 @@ const showPlantDetail = (plant: PlantData) => {
   detailVisible.value = true
 }
 
-const loadPlants = async () => {
-  loading.value = true
-  try {
-    const data = await realtimeApi.getAllPlants()
-    plants.value = data
-  } catch (error) {
-    console.error('Failed to load plants:', error)
-    ElMessage.error('加载厂区数据失败')
-  } finally {
-    loading.value = false
-  }
+const handleRefresh = () => {
+  refresh()
 }
 
 onMounted(() => {
-  loadPlants()
-  // Auto refresh every 10 seconds
-  setInterval(loadPlants, 10000)
+  // Initial data fetch is handled by useRealtimePolling
 })
 </script>
 
