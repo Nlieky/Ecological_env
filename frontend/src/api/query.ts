@@ -1,5 +1,4 @@
 import api from './index'
-import type { ChatMessage } from '@/types'
 
 export const queryApi = {
   // Send query (alias for sendQuery)

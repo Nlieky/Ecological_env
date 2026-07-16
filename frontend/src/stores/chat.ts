@@ -1,69 +1,79 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { ChatMessage, PageContext } from '@/types'
-import { queryApi } from '@/api/query'
+import type { QueryResponse } from '@/api/types/api.types'
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([])
+  const currentSessionId = ref<string>()
   const loading = ref(false)
-  const currentSessionId = ref<string | null>(null)
   const pageContext = ref<PageContext | null>(null)
 
-  // Send message
-  const sendMessage = async (content: string) => {
-    loading.value = true
+  const messageCount = computed(() => messages.value.length)
+  const lastMessage = computed(() => messages.value[messages.value.length - 1])
 
-    // Add user message
-    const userMessage: ChatMessage = {
+  const addUserMessage = (content: string) => {
+    const message: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
       content,
       timestamp: new Date().toISOString()
     }
-    messages.value.push(userMessage)
-
-    try {
-      const response = await queryApi.sendQuery(content, pageContext.value)
-      currentSessionId.value = response.sessionId
-
-      // Add assistant message
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.content,
-        timestamp: new Date().toISOString()
-      }
-      messages.value.push(assistantMessage)
-    } catch (e: any) {
-      messages.value.push({
-        id: (Date.now() + 1).toString(),
-        role: 'system',
-        content: 'Query failed, please try again later',
-        timestamp: new Date().toISOString()
-      })
-    } finally {
-      loading.value = false
-    }
+    messages.value.push(message)
   }
 
-  // Set page context
+  const addAssistantMessage = (response: QueryResponse) => {
+    const message: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: response.content,
+      timestamp: response.timestamp,
+      chartData: response.chartData,
+      evidence: response.decision_path
+    }
+    messages.value.push(message)
+  }
+
+  const addErrorMessage = (content: string) => {
+    const message: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: 'system',
+      content,
+      timestamp: new Date().toISOString()
+    }
+    messages.value.push(message)
+  }
+
+  const clearMessages = () => {
+    messages.value = []
+    currentSessionId.value = undefined
+  }
+
+  const setSessionId = (id: string) => {
+    currentSessionId.value = id
+  }
+
+  const setLoading = (value: boolean) => {
+    loading.value = value
+  }
+
   const setPageContext = (context: PageContext) => {
     pageContext.value = context
   }
 
-  // Clear messages
-  const clearMessages = () => {
-    messages.value = []
-    currentSessionId.value = null
-  }
-
   return {
     messages,
-    loading,
     currentSessionId,
+    loading,
     pageContext,
-    sendMessage,
-    setPageContext,
-    clearMessages
+    messageCount,
+    lastMessage,
+    addUserMessage,
+    addAssistantMessage,
+    addErrorMessage,
+    clearMessages,
+    setSessionId,
+    setLoading,
+    setPageContext
   }
 })
