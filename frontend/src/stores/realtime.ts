@@ -1,40 +1,26 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { PlantData } from '@/types'
-import { realtimeApi } from '@/api/realtime'
+import type { PlantData } from '@/api/types/api.types'
 
 export const useRealtimeStore = defineStore('realtime', () => {
   const plants = ref<PlantData[]>([])
   const loading = ref(false)
-  const error = ref<string | null>(null)
+  const lastUpdate = ref<string>()
 
-  // Initialize plant data (4x4 grid, 1 with data)
-  const initializePlants = async () => {
-    loading.value = true
-    error.value = null
-    try {
-      const data = await realtimeApi.getAllPlants()
-      plants.value = data
-    } catch (e: any) {
-      error.value = e.message
-    } finally {
-      loading.value = false
-    }
+  const setPlants = (data: PlantData[]) => {
+    plants.value = data
+    lastUpdate.value = new Date().toISOString()
   }
 
-  // Update single plant data
-  const updatePlant = (plantId: string, data: Partial<PlantData>) => {
-    const index = plants.value.findIndex(p => p.id === plantId)
-    if (index !== -1) {
-      plants.value[index] = { ...plants.value[index], ...data }
-    }
+  const getPlantById = (id: string) => {
+    return plants.value.find(p => p.id === id)
   }
 
   return {
     plants,
     loading,
-    error,
-    initializePlants,
-    updatePlant
+    lastUpdate,
+    setPlants,
+    getPlantById
   }
 })
