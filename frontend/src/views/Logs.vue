@@ -186,15 +186,16 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
+import { logsService } from '@/api/services/logs.service'
+import type { LogsRequest } from '@/api/types/api.types'
 import { ElMessage } from 'element-plus'
 import {
   Refresh, Search, Download, Document, Loading
 } from '@element-plus/icons-vue'
-import axios from 'axios'
 
 const loading = ref(false)
 const exporting = ref(false)
-const logs = ref([])
+const logs = ref<any[]>([])
 const total = ref(0)
 const latency = ref('--')
 const errorCount = ref(0)
@@ -204,7 +205,7 @@ const sessionTrace = ref({})
 
 const timeRange = ref([Date.now() - 3600 * 1000, Date.now()])
 
-const filterForm = reactive({
+const filterForm = reactive<LogsRequest>({
   log_type: 'api',
   page: 1,
   page_size: 20
@@ -288,7 +289,7 @@ function toggleRow(index: number) {
 async function runQuery() {
   loading.value = true
   try {
-    const params: any = {
+    const params: LogsRequest = {
       log_type: filterForm.log_type,
       page: filterForm.page,
       page_size: filterForm.page_size
@@ -297,10 +298,10 @@ async function runQuery() {
       params.start_time = new Date(timeRange.value[0]).toISOString()
       params.end_time = new Date(timeRange.value[1]).toISOString()
     }
-    const response = await axios.get('/api/logs', { params })
-    logs.value = response.data.data || []
-    total.value = response.data.total || 0
-    latency.value = response.data.took_ms ? `${response.data.took_ms}ms` : '--'
+    const response = await logsService.getLogs(params)
+    logs.value = response.items
+    total.value = response.total
+    latency.value = response.took_ms ? `${response.took_ms}ms` : '--'
     errorCount.value = logs.value.filter((log: any) => {
       if (filterForm.log_type === 'api') return log.response_status >= 400
       if (filterForm.log_type === 'error') return true
@@ -315,8 +316,8 @@ async function runQuery() {
 
 async function loadSessionTrace(sessionId: string) {
   try {
-    const response = await axios.get(`/api/logs/trace/${sessionId}`)
-    sessionTrace.value = response.data
+    const response = await logsService.getSessionTrace(sessionId)
+    sessionTrace.value = response
   } catch (error) {
     ElMessage.error('加载会话证据链失败')
   }
@@ -337,11 +338,8 @@ async function exportLogs() {
       params.start_time = new Date(timeRange.value[0]).toISOString()
       params.end_time = new Date(timeRange.value[1]).toISOString()
     }
-    const response = await axios.get('/api/logs/export', {
-      params,
-      responseType: 'blob'
-    })
-    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const response = await logsService.exportLogs(params)
+    const url = window.URL.createObjectURL(new Blob([response]))
     const a = document.createElement('a')
     a.href = url
     a.download = `logs_${filterForm.log_type}_${new Date().toISOString()}.json`
