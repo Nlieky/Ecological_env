@@ -18,6 +18,12 @@ from backend.models.logging import (
     LLMCallLog,
     SystemErrorLog
 )
+from backend.models.conversation import (
+    Conversation,
+    ConversationMessage,
+    MasterDecision,
+    SubagentCall
+)
 
 
 def init_db():
@@ -35,6 +41,10 @@ def init_db():
     print("  - operator_call_logs")
     print("  - llm_call_logs")
     print("  - system_error_logs")
+    print("  - conversations")
+    print("  - conversation_messages")
+    print("  - master_decisions")
+    print("  - subagent_calls")
 
 
 if __name__ == "__main__":
