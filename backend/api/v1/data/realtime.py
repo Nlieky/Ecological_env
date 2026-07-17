@@ -6,6 +6,7 @@ from typing import Optional
 from backend.services.data_service import DataService
 from backend.models.monitoring import MonitoringData, DataQualityMetric
 from backend.models.api import StandardResponse
+from backend.exceptions import DataUnavailableException
 
 router = APIRouter(tags=["实时监测数据"])
 
@@ -27,6 +28,11 @@ async def get_realtime_data():
                 "timestamp": data["timestamp"],
                 "data_source": "monitoring_system"
             }
+        )
+    except DataUnavailableException as e:
+        return StandardResponse(
+            success=False,
+            error=e.to_dict()
         )
     except Exception as e:
         return StandardResponse(
@@ -51,6 +57,11 @@ async def get_data_quality(
         return StandardResponse(
             success=True,
             data=data
+        )
+    except DataUnavailableException as e:
+        return StandardResponse(
+            success=False,
+            error=e.to_dict()
         )
     except Exception as e:
         return StandardResponse(

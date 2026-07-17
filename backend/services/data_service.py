@@ -7,7 +7,7 @@ import os
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 class DataService:
@@ -25,7 +25,7 @@ class DataService:
         # 这里应该从实际的数据源获取数据
         # 暂时返回模拟数据
         return {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "influent": {
                 "pH": 7.2,
                 "COD": 150.5,
@@ -57,7 +57,7 @@ class DataService:
             "completeness_rate": 0.98,
             "missing_data_count": 15,
             "anomaly_count": 3,
-            "last_update": datetime.now().isoformat()
+            "last_update": datetime.now(timezone.utc).isoformat()
         }
 
     def query_history_data(self, time_range: str = "24h",
