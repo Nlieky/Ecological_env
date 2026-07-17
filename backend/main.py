@@ -84,6 +84,7 @@ app.include_router(tracing.router, prefix="/api")
 
 # 注册v1路由
 app.include_router(v1_data.realtime.router, prefix="/api/v1")
+app.include_router(v1_data.history.router, prefix="/api/v1")
 
 
 # 全局异常处理器
