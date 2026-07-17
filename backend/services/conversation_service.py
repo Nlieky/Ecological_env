@@ -131,23 +131,34 @@ class ConversationService:
         finally:
             db.close()
     
-    def add_message(self, conversation_id: str, role: str, 
+    def add_message(self, conversation_id: str, role: str,
                    content: str, tool_call_info: Optional[Dict] = None) -> Dict[str, Any]:
         """添加消息到对话
-        
+
         Args:
             conversation_id: 对话ID
             role: 消息角色
             content: 消息内容
             tool_call_info: 工具调用信息
-            
+
         Returns:
             消息ID
+
+        Raises:
+            ValueError: 如果对话不存在
         """
         db = self.get_db_session()
         try:
+            # 首先检查对话是否存在
+            conversation = db.query(Conversation).filter(
+                Conversation.id == conversation_id
+            ).first()
+
+            if not conversation:
+                raise ValueError(f"对话不存在: {conversation_id}")
+
             message_id = f"msg_{uuid.uuid4().hex[:12]}"
-            
+
             message = ConversationMessage(
                 id=message_id,
                 conversation_id=conversation_id,
@@ -156,18 +167,17 @@ class ConversationService:
                 tool_call_info=tool_call_info,
                 timestamp=datetime.now()
             )
-            
+
             # 更新对话的消息计数
-            conversation = db.query(Conversation).filter(
-                Conversation.id == conversation_id
-            ).first()
-            if conversation:
-                conversation.message_count += 1
-            
+            conversation.message_count += 1
+
             db.add(message)
             db.commit()
-            
+
             return {"id": message_id, "timestamp": message.timestamp.isoformat()}
+        except ValueError:
+            # 直接重新抛出 ValueError，不需要 rollback（没有修改）
+            raise
         except Exception as e:
             db.rollback()
             raise e
