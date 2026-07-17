@@ -76,3 +76,26 @@ def test_quality_time_range_parameter():
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
+
+
+def test_realtime_data_values_sane():
+    """实时数据返回真实数值（pH 合理、quality_score ∈ [0,1]）"""
+    client = TestClient(app)
+    data = client.get("/api/v1/monitoring/realtime").json()["data"]
+    for side in ("influent", "effluent"):
+        ph = data[side]["pH"]
+        assert ph is None or 0 <= ph <= 14
+    assert 0 <= data["quality_score"] <= 1
+    assert isinstance(data["flow_rate"], (int, float))
+    # influent/effluent 只含 pH/COD/TN/TP
+    assert set(data["influent"].keys()) == {"pH", "COD", "TN", "TP"}
+
+
+def test_quality_values_sane():
+    """数据质量返回真实数值"""
+    client = TestClient(app)
+    data = client.get("/api/v1/monitoring/quality").json()["data"]
+    assert 0 <= data["completeness_rate"] <= 1
+    assert isinstance(data["missing_data_count"], int) and data["missing_data_count"] >= 0
+    assert isinstance(data["anomaly_count"], int) and data["anomaly_count"] >= 0
+    assert data["last_update"].endswith("Z")
