@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 from backend.api.routes import health, query, logs, realtime, events, tracing
+from backend.api.v1 import data as v1_data
 from backend.core.config import settings
 from backend.metrics.definitions import (
     api_requests_total,
@@ -80,6 +81,9 @@ app.include_router(logs.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(tracing.router, prefix="/api")
+
+# 注册v1路由
+app.include_router(v1_data.realtime.router, prefix="/api/v1")
 
 
 # 全局异常处理器
