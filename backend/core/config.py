@@ -22,10 +22,11 @@ class Settings(BaseSettings):
     # CORS 配置
     CORS_ORIGINS: List[str] = ["*"]
 
-    # Agent服务配置
-    # 独立运行的Agent服务地址，后端通过HTTP转发请求
+    # AgentService 配置
+    # AgentService 封装了对 Hermes 智能体的调用，通过 HTTP 与 Hermes API 通信
+    # 注意：Hermes API 仍运行在 localhost:8642（由 Hermes Agent 框架提供）
     AGENT_SERVICE_URL: str = "http://localhost:8642"
-    AGENT_TIMEOUT: int = 300  # Agent服务请求超时时间（秒）
+    AGENT_TIMEOUT: int = 300  # AgentService 请求超时时间（秒）
 
     # LLM 配置（用于展示）
     LLM_MODEL: str = "ctgu-vlm"

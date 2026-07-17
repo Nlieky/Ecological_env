@@ -4,7 +4,10 @@
 为已完成的 Hermes 智能体系统提供 HTTP 接口
 """
 import os
+import traceback
+from datetime import datetime
 from pathlib import Path
+from typing import Dict, Any
 from dotenv import load_dotenv
 
 # 加载项目根目录的 .env 文件
@@ -27,6 +30,32 @@ from backend.metrics.definitions import (
 )
 from backend.middleware import LoggingMiddleware
 from backend.utils.loggers import log_system_error
+
+
+def _log_exception_error(exc: Exception, request: Request) -> None:
+    """
+    Helper function to log exception errors consistently.
+
+    This function handles the duplicate logging logic that was previously
+    in both exception handlers, ensuring consistent error logging across
+    all exception types.
+
+    Args:
+        exc: The exception that was raised
+        request: The FastAPI request object
+    """
+    try:
+        log_system_error(
+            level="ERROR",
+            module="backend",
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            stack_trace=traceback.format_exc(),
+            context={"path": request.url.path, "method": request.method}
+        )
+    except Exception as log_error:
+        print(f"Failed to log system error: {log_error}")
+
 
 app = FastAPI(
     title="废水监测系统 API",
@@ -94,21 +123,7 @@ app.include_router(v1_conversations.conversations.router, prefix="/api/v1")
 @app.exception_handler(BackendException)
 async def backend_exception_handler(request: Request, exc: BackendException):
     """后端异常处理器"""
-    import traceback
-    from datetime import datetime
-
-    # 记录错误日志
-    try:
-        log_system_error(
-            level="ERROR",
-            module="backend",
-            error_type=type(exc).__name__,
-            error_message=str(exc),
-            stack_trace=traceback.format_exc(),
-            context={"path": request.url.path, "method": request.method}
-        )
-    except Exception as log_error:
-        print(f"Failed to log system error: {log_error}")
+    _log_exception_error(exc, request)
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -123,21 +138,7 @@ async def backend_exception_handler(request: Request, exc: BackendException):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """全局异常处理，记录到系统错误日志"""
-    import traceback
-    from datetime import datetime
-
-    # 记录错误日志
-    try:
-        log_system_error(
-            level="ERROR",
-            module="backend",
-            error_type=type(exc).__name__,
-            error_message=str(exc),
-            stack_trace=traceback.format_exc(),
-            context={"path": request.url.path, "method": request.method}
-        )
-    except Exception as log_error:
-        print(f"Failed to log system error: {log_error}")
+    _log_exception_error(exc, request)
 
     # 返回错误响应
     return JSONResponse(
