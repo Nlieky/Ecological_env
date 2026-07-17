@@ -3,11 +3,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import StaticPool
 import os
 
-# 数据库文件路径
-DB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+# 数据库文件路径（三库一体：使用shared/data目录）
+# 从backend/database/base.py获取项目根目录
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+DB_DIR = os.path.join(PROJECT_ROOT, "shared", "data")
 DB_PATH = os.path.join(DB_DIR, "ecological_logs.db")
 
-# 确保 logs 目录存在
+# 确保 shared/data 目录存在
 os.makedirs(DB_DIR, exist_ok=True)
 
 # 数据库 URL

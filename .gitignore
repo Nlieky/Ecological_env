@@ -32,3 +32,8 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Runtime SQLite databases (created by init_db.py, not version-controlled)
+*.db
+*.db-journal
+*.sqlite3

@@ -1,98 +1,54 @@
 """
-查询接口 - 使用 AgentService 封装的智能体调用
+查询接口 - 转发到独立的Agent服务
 
-重构后：通过 AgentService 调用自定义 AIAgent (shared/framework/hermes_agent)
-不再依赖 HermesAPIClient 或 Hermes API Server
+重构后：通过HTTP请求转发到Agent服务(localhost:8642)
+不再直接创建AIAgent实例，Agent服务独立运行
 """
 import logging
 import time
+import requests
 from fastapi import APIRouter, HTTPException
 from backend.models.query import QueryRequest, QueryResponse
-from backend.services.agent_service import AgentService
 from backend.utils.loggers import generate_session_id, log_master_decision
+from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Agent服务配置（从settings读取）
+AGENT_SERVICE_URL = settings.AGENT_SERVICE_URL
+AGENT_TIMEOUT = settings.AGENT_TIMEOUT
 
-def parse_decision_path(content: str) -> list:
-    """
-    从响应内容解析决策路径
 
-    Hermes 主智能体会根据决策树执行，
-    我们可以通过分析响应内容推断走了哪些分支。
-    """
-    path = []
-
-    # 检测数据获取
-    if any(keyword in content for keyword in ["数据", "指标", "进水", "出水", "pH", "COD"]):
-        path.append({
-            "step_number": 1,
-            "step_name": "需要数据吗？",
-            "decision": "YES",
-            "action": "调用 multi-dimensional-data-perception"
-        })
-    else:
-        path.append({
-            "step_number": 1,
-            "step_name": "需要数据吗？",
-            "decision": "NO",
-            "action": "跳过数据分析"
-        })
-
-    # 检测异常检测
-    if any(keyword in content for keyword in ["异常", "突变", "检测"]):
-        path.append({
-            "step_number": 2,
-            "step_name": "需要异常检测吗？",
-            "decision": "YES",
-            "action": "调用 anomaly-detection"
-        })
-        path.append({
-            "step_number": 3,
-            "step_name": "需要违规判定吗？",
-            "decision": "NO",
-            "action": "跳过"
-        })
-    else:
-        path.append({
-            "step_number": 2,
-            "step_name": "需要异常检测吗？",
-            "decision": "NO",
-            "action": "跳过"
-        })
-
-    # 整合结果
-    path.append({
-        "step_number": 5,
-        "step_name": "整合结果",
-        "decision": "YES",
-        "action": "生成自然语言回答"
-    })
-
-    return path
+def check_agent_service() -> bool:
+    """检查Agent服务是否可用"""
+    try:
+        response = requests.get(f"{AGENT_SERVICE_URL}/health", timeout=5)
+        return response.status_code == 200
+    except Exception as e:
+        logger.warning(f"Agent服务不可用: {e}")
+        return False
 
 
 @router.post("/query", tags=["查询"])
 async def execute_query(request: QueryRequest):
     """
-    执行自然语言查询 - 使用 AgentService
+    执行自然语言查询 - 转发到Agent服务
 
     **架构**：
-    FastAPI → AgentService → AIAgent (shared/framework/hermes_agent)
+    FastAPI → HTTP转发 → Agent服务(localhost:8642) → AIAgent(主智能体)
 
-    **Hermes 主智能体决策树**：
-    1. 需要数据吗？ -> data-perception
-    2. 需要异常检测吗？ -> anomaly-detection
-    3. 需要违规判定吗？ -> rule-reasoning
-    4. 需要预警/工单吗？ -> disposition-execution
-    5. 整合结果
+    **Agent服务处理**：
+    1. 主智能体通过LLM理解意图
+    2. 根据需要调用子智能体（通过orchestrator-core工具）
+    3. 整合结果并返回
 
     **返回的响应包含**：
     - content: LLM 生成的最终回答
-    - decision_path: 决策树的执行路径
-    - sub_agent_calls: 子智能体调用链
-    - data_sources: 数据溯源
+    - session_id: 会话ID
+    - timestamp: 响应时间戳
+    - success: 是否成功
+    - error: 错误信息（如果失败）
     """
     start_time = time.time()
 
@@ -102,35 +58,46 @@ async def execute_query(request: QueryRequest):
     try:
         logger.info(f"收到查询: {request.query[:50]}...")
 
-        # 使用 AgentService 处理查询
-        service = AgentService()
-        query_response = service.process_query(
-            query=request.query,
-            session_id=session_id
+        # 检查Agent服务是否可用
+        if not check_agent_service():
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "ServiceUnavailable",
+                    "message": "Agent服务不可用，请确保Agent服务已启动"
+                }
+            )
+
+        # 转发请求到Agent服务
+        agent_response = requests.post(
+            f"{AGENT_SERVICE_URL}/query",
+            json={
+                "query": request.query,
+                "session_id": session_id
+            },
+            timeout=AGENT_TIMEOUT
         )
 
-        # 解析决策路径（可选）
-        decision_path = parse_decision_path(query_response.content)
+        if agent_response.status_code != 200:
+            raise HTTPException(
+                status_code=agent_response.status_code,
+                detail={
+                    "error": "AgentError",
+                    "message": f"Agent服务返回错误: {agent_response.status_code}"
+                }
+            )
 
-        # 提取子智能体调用列表
-        subagents_called = []
-        for step in decision_path:
-            if "action" in step and "调用" in step["action"]:
-                agent_name = step["action"].replace("调用 ", "")
-                subagents_called.append(agent_name)
+        # 解析Agent服务响应
+        agent_data = agent_response.json()
 
-        # 直接返回字典，避免 Pydantic 模型问题
-        return {
-            "content": query_response.content,
-            "session_id": query_response.session_id,
-            "timestamp": query_response.timestamp,
-            "chartData": query_response.chartData,
-            "decision_path": decision_path,
-            "sub_agent_calls": [],
-            "data_sources": [],
-            "reasoning": query_response.reasoning,
-            "metadata": query_response.metadata
-        }
+        if not agent_data.get("success"):
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "QueryFailed",
+                    "message": agent_data.get("error", "查询失败")
+                }
+            )
 
         # 计算耗时
         total_latency_ms = (time.time() - start_time) * 1000
@@ -141,9 +108,9 @@ async def execute_query(request: QueryRequest):
                 session_id=session_id,
                 user_query=request.query,
                 intent="query",
-                decision_path=[step.get("step_name", "") for step in decision_path],
-                subagents_called=subagents_called,
-                reasoning_summary=f"查询完成，返回 {len(query_response.content)} 字符",
+                decision_path=["Agent转发"],
+                subagents_called=[],
+                reasoning_summary=f"查询完成，返回 {len(agent_data.get('content', ''))} 字符",
                 total_latency_ms=total_latency_ms
             )
         except Exception as log_error:
@@ -151,8 +118,29 @@ async def execute_query(request: QueryRequest):
 
         logger.info(f"查询完成: session={session_id}, 耗时={time.time() - start_time:.2f}s")
 
-        return query_response
+        # 返回标准格式的响应
+        return QueryResponse(
+            content=agent_data.get("content", ""),
+            session_id=agent_data.get("session_id", session_id),
+            timestamp=agent_data.get("timestamp", ""),
+            chartData=None,
+            decision_path=[],
+            sub_agent_calls=[],
+            data_sources=[],
+            reasoning={"agent_service": True, "latency_ms": total_latency_ms},
+            metadata={"forwarded": True, "agent_service_url": AGENT_SERVICE_URL}
+        )
 
+    except HTTPException:
+        raise
+    except requests.Timeout:
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "error": "Timeout",
+                "message": "Agent服务响应超时"
+            }
+        )
     except Exception as e:
         logger.error(f"查询失败: {str(e)}")
         import traceback
@@ -177,7 +165,7 @@ async def execute_query(request: QueryRequest):
             status_code=500,
             detail={
                 "error": "QueryError",
-                "message": "智能体调用失败",
+                "message": "查询处理失败",
                 "detail": str(e)
             }
         )
