@@ -111,7 +111,10 @@ class ConversationService:
                 query = query.filter(Conversation.status == status)
             
             total_count = query.count()
-            conversations = query.offset((page - 1) * page_size).limit(page_size).all()
+            # 按开始时间倒序（最新对话在前），保证分页结果确定性
+            conversations = query.order_by(
+                Conversation.started_at.desc()
+            ).offset((page - 1) * page_size).limit(page_size).all()
             
             return {
                 "conversations": [
