@@ -16,6 +16,7 @@ if env_file.exists():
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
+from backend.exceptions import BackendException
 from backend.api.routes import health, query, logs, realtime, events, tracing
 from backend.api.v1 import data as v1_data
 from backend.api.v1 import conversations as v1_conversations
@@ -90,10 +91,40 @@ app.include_router(v1_conversations.conversations.router, prefix="/api/v1")
 
 
 # 全局异常处理器
+@app.exception_handler(BackendException)
+async def backend_exception_handler(request: Request, exc: BackendException):
+    """后端异常处理器"""
+    import traceback
+    from datetime import datetime
+
+    # 记录错误日志
+    try:
+        log_system_error(
+            level="ERROR",
+            module="backend",
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            stack_trace=traceback.format_exc(),
+            context={"path": request.url.path, "method": request.method}
+        )
+    except Exception as log_error:
+        print(f"Failed to log system error: {log_error}")
+
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "success": False,
+            "error": exc.to_dict(),
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """全局异常处理，记录到系统错误日志"""
     import traceback
+    from datetime import datetime
 
     # 记录错误日志
     try:
@@ -111,7 +142,15 @@ async def global_exception_handler(request: Request, exc: Exception):
     # 返回错误响应
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error"}
+        content={
+            "success": False,
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "Internal server error",
+                "details": {}
+            },
+            "timestamp": datetime.now().isoformat()
+        }
     )
 
 

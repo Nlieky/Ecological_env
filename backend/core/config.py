@@ -22,16 +22,28 @@ class Settings(BaseSettings):
     # CORS 配置
     CORS_ORIGINS: List[str] = ["*"]
 
-    # ❌ 已弃用：Hermes API Server 不再需要
-    # 系统直接使用自定义 AIAgent (shared/framework/hermes_agent)
-    # HERMES_API_URL: str = "http://localhost:8642"
-    # HERMES_API_KEY: str = "sk-hermes-api-key"
+    # Agent服务配置
+    # 独立运行的Agent服务地址，后端通过HTTP转发请求
+    AGENT_SERVICE_URL: str = "http://localhost:8642"
+    AGENT_TIMEOUT: int = 300  # Agent服务请求超时时间（秒）
 
     # LLM 配置（用于展示）
     LLM_MODEL: str = "ctgu-vlm"
 
     # 日志配置
     LOG_LEVEL: str = "INFO"
+
+    # 缓存配置
+    CACHE_TTL_REALTIME: int = 30
+    CACHE_TTL_HISTORY: int = 300
+    CACHE_TTL_CONVERSATIONS: int = 3600
+
+    # 数据源配置
+    DATA_SOURCE_PATH: str = "./data"
+    AGENT_SERVICE_SYNC_INTERVAL: int = 300  # 秒
+
+    # API配置
+    API_V1_PREFIX: str = "/api/v1"
 
     class Config:
         env_file = str(PROJECT_ROOT / ".env")
