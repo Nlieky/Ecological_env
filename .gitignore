@@ -37,3 +37,11 @@ htmlcov/
 *.db
 *.db-journal
 *.sqlite3
+
+# Agent runtime artifacts (project-root level)
+/sessions/
+*.log
+anomaly_result.csv
+
+# Editor/dev backups
+*.bak
