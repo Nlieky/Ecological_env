@@ -53,6 +53,28 @@ export interface CapabilitiesResponse {
   sub_agents: SubAgentInfo[]
 }
 
+// ========== Observability / Tracing DataSources ==========
+export interface TracingDataSource {
+  id: string
+  name: string
+  provider: string
+  config: { url: string } & Record<string, unknown>
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+export interface DataSourceInput {
+  name: string
+  provider: string
+  config: Record<string, unknown>
+  enabled: boolean
+}
+export interface TestConnectionResult {
+  status: string
+  message: string
+  latency_ms: number
+}
+
 // ========== Realtime Data Interface ==========
 // 字段名与后端 /api/realtime/plants 实际返回对齐（驼峰）；离线厂 metrics/metricStatus 为 null。
 export interface PlantData {
