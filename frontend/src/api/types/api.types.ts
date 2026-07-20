@@ -75,6 +75,35 @@ export interface TestConnectionResult {
   latency_ms: number
 }
 
+// ========== Tracing catalog / search / trace detail ==========
+export interface CatalogService { name: string; operations: string[] }
+export interface CatalogResponse { services: CatalogService[] }
+export interface TraceSearchResult {
+  traceID: string
+  rootSpanName: string
+  rootServiceName: string
+  startTime: number   // 微秒
+  duration: number    // 微秒
+  spanCount: number
+}
+export interface TraceSpanLog { timestamp: number; fields: Record<string, unknown> }
+export interface TraceSpan {
+  spanID: string
+  operationName: string
+  duration: number    // 微秒
+  startTime: number   // 微秒
+  tags: Record<string, unknown>
+  logs: TraceSpanLog[]
+  processID: string
+  references: { refType: string; traceID: string; spanID: string }[]
+}
+export interface TraceProcess { serviceName: string; tags: Record<string, unknown> }
+export interface TraceDetail {
+  traceID: string
+  spans: TraceSpan[]
+  processes: Record<string, TraceProcess>
+}
+
 // ========== Realtime Data Interface ==========
 // 字段名与后端 /api/realtime/plants 实际返回对齐（驼峰）；离线厂 metrics/metricStatus 为 null。
 export interface PlantData {
