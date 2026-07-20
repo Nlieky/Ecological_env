@@ -1,50 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { AlertEvent, EventListRequest } from '@/api/types/api.types'
-import { eventsService } from '@/api/services/events.service'
+import { eventsService } from '@/api/modules/events'
+import type { AlertEvent } from '@/api/types/api.types'
 
 export const useEventsStore = defineStore('events', () => {
   const events = ref<AlertEvent[]>([])
+  const total = ref(0)
   const loading = ref(false)
-  const pagination = ref({
-    total: 0,
-    page: 1,
-    pageSize: 20
-  })
 
-  const fetchEvents = async (params?: EventListRequest) => {
+  async function fetchEvents(params: any = { page: 1, page_size: 20 }) {
     loading.value = true
     try {
-      const response = await eventsService.getEvents(params)
-      events.value = response.items
-      pagination.value = {
-        total: response.total,
-        page: response.page,
-        pageSize: response.pageSize
-      }
+      const res = await eventsService.list(params)
+      events.value = (res.items || []) as AlertEvent[]
+      total.value = res.total || 0
     } finally {
       loading.value = false
     }
   }
-
-  const updateStatus = async (id: string, status: string) => {
-    await eventsService.updateStatus(id, status)
-    const event = events.value.find(e => e.id === id)
-    if (event) {
-      event.status = status as any
-    }
-  }
-
-  const exportEvents = async (params?: any) => {
-    return await eventsService.exportEvents(params)
-  }
-
-  return {
-    events,
-    loading,
-    pagination,
-    fetchEvents,
-    updateStatus,
-    exportEvents
-  }
+  return { events, total, loading, fetchEvents }
 })

@@ -1,26 +1,23 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { PlantData } from '@/api/types/api.types'
+import { monitoringService } from '@/api/modules/monitoring'
+import type { RealtimeData, DataQuality } from '@/api/types/api.types'
 
 export const useRealtimeStore = defineStore('realtime', () => {
-  const plants = ref<PlantData[]>([])
+  const realtime = ref<RealtimeData | null>(null)
+  const quality = ref<DataQuality | null>(null)
   const loading = ref(false)
-  const lastUpdate = ref<string>()
+  const lastUpdate = ref<string>('')
 
-  const setPlants = (data: PlantData[]) => {
-    plants.value = data
-    lastUpdate.value = new Date().toISOString()
+  async function fetchRealtime() {
+    loading.value = true
+    try {
+      realtime.value = await monitoringService.realtime()
+      quality.value = await monitoringService.quality('24h')
+      lastUpdate.value = realtime.value?.timestamp || ''
+    } finally {
+      loading.value = false
+    }
   }
-
-  const getPlantById = (id: string) => {
-    return plants.value.find(p => p.id === id)
-  }
-
-  return {
-    plants,
-    loading,
-    lastUpdate,
-    setPlants,
-    getPlantById
-  }
+  return { realtime, quality, loading, lastUpdate, fetchRealtime }
 })
