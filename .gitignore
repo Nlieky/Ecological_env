@@ -8,6 +8,9 @@ workspace/state/
 subagents/*/state/
 *.state/
 
+# Brainstorm visual companion scratch (mockups); committed specs live in docs/superpowers/specs/
+.superpowers/
+
 # Hermes 智能体自动生成的运行时目录
 workspace/cron/
 workspace/logs/
