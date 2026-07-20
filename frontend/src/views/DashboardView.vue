@@ -1,11 +1,8 @@
 <template>
   <div>
-    <div class="top-row">
-      <div class="seg">
-        <button :class="{ on: mode === 'plant' }" @click="mode = 'plant'">单厂 · 全指标</button>
-        <button :class="{ on: mode === 'overview' }" @click="mode = 'overview'">全厂总览</button>
-      </div>
-      <button v-if="!app.fullscreen" class="fs-btn" @click="app.setFullscreen(true)">⛶ 全屏大屏</button>
+    <div class="seg">
+      <button :class="{ on: mode === 'plant' }" @click="mode = 'plant'">单厂 · 全指标</button>
+      <button :class="{ on: mode === 'overview' }" @click="mode = 'overview'">全厂总览</button>
     </div>
     <template v-if="mode === 'plant'">
       <CockpitFilterBar :last-update="realtime.lastUpdate" />
@@ -67,13 +64,9 @@ watch(() => app.dashboardFilters.timeWindow, () => void loadHistory())
 </script>
 
 <style scoped>
-.top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 12px; }
-.seg { display: inline-flex; background: var(--card-bg); border: 1px solid var(--brd); border-radius: 11px; padding: 4px; }
+.seg { display: inline-flex; background: var(--card-bg); border: 1px solid var(--brd); border-radius: 11px; padding: 4px; margin-bottom: 14px; }
 .seg button { background: transparent; border: 0; color: var(--text-secondary); font-size: 13px; padding: 7px 16px; border-radius: 8px; cursor: pointer; font-family: inherit; }
 .seg button.on { color: #04121a; background: linear-gradient(135deg, var(--cyan), #5fb9ff); font-weight: 600; }
-.fs-btn { flex-shrink: 0; background: var(--card-bg); border: 1px solid var(--brd); color: var(--text-secondary);
-  font-size: 12.5px; padding: 8px 14px; border-radius: 9px; cursor: pointer; font-family: inherit; transition: all .15s }
-.fs-btn:hover { color: var(--primary); border-color: var(--primary) }
 .matrix-wrap { margin-top: 14px; }
 .loading { color: var(--text-muted); font-size: 13px; padding: 20px; }
 </style>
