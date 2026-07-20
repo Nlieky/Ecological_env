@@ -22,10 +22,8 @@ const router = createRouter({
         // ── 监控大屏 ──
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue'),
           meta: { title: '监测大屏', group: '监控大屏' } },
-        { path: 'metrics', component: Placeholder,
-          meta: { title: '指标查询', group: '监控大屏', phTitle: '指标查询',
-            phDesc: '按指标 / 时间窗口查询历史监测数据',
-            phHint: 'Phase B 接 /api/v1/data/history' } },
+        { path: 'metrics', component: () => import('@/views/MetricsView.vue'),
+          meta: { title: '指标查询', group: '监控大屏' } },
         { path: 'logs', component: () => import('@/views/LogsView.vue'),
           meta: { title: '日志中心', group: '监控大屏' } },
         { path: 'logs/trace/:id', component: () => import('@/views/TraceView.vue'),
