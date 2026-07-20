@@ -66,7 +66,7 @@ const openGroups = GROUPS.map((g) => g.title)
 </script>
 
 <style scoped>
-.sidebar { width: var(--sidebar-width); background: #fff; border-right: 1px solid var(--brd);
+.sidebar { width: var(--sidebar-width); flex-shrink: 0; position: relative; z-index: 10; background: #fff; border-right: 1px solid var(--brd);
   transition: width var(--transition); overflow: hidden; display: flex; flex-direction: column }
 .sidebar.collapsed { width: var(--sidebar-collapsed-width) }
 .logo { display: flex; align-items: center; gap: 10px; padding: 14px; flex-shrink: 0 }

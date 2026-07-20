@@ -25,7 +25,9 @@ onMounted(() => chat.fetchConversations())
 </script>
 
 <style scoped>
-.chat-wrap { display: flex; height: calc(100vh - var(--header-height) - 40px); margin: -20px; }
+/* 去掉脆弱的 margin:-20px 全屏铺满技巧；chat-wrap 在 .content 的 20px padding 内正常排布。
+   height 精确扣掉顶栏(60) + 上下 padding(40)，填满内容区，内部 .body 自行滚动。 */
+.chat-wrap { display: flex; height: calc(100vh - var(--header-height) - 40px); min-height: 0; }
 .chat { flex: 1; display: flex; flex-direction: column; min-width: 0 }
 .chdr { height: 52px; border-bottom: 1px solid var(--brd); display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: #fff }
 .ttl { font-size: 15px; font-weight: 600 }
