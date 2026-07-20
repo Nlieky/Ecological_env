@@ -1,14 +1,9 @@
 <template>
-  <AppLayout />
+  <router-view />
 </template>
 
-<script setup lang="ts">
-import AppLayout from '@/components/layout/AppLayout.vue'
-</script>
+<script setup lang="ts"></script>
 
 <style>
-#app {
-  height: 100vh;
-  overflow: hidden;
-}
+#app { height: 100vh; }
 </style>
