@@ -1,0 +1,49 @@
+:root {
+  /* ---- 浅色后台(AdminShell)---- */
+  --primary: #6366f1;
+  --primary-light: #818cf8;
+  --primary-dark: #4f46e5;
+  --brand-gradient: linear-gradient(135deg, #67b7ab 0%, #5586b6 58%, #49639a 100%);
+
+  --content-bg: #f1f5f9;
+  --card-bg: #ffffff;
+  --card-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --card-radius: 12px;
+  --brd: #e2e8f0;
+
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  --sidebar-width: 188px;
+  --sidebar-collapsed-width: 68px;
+  --header-height: 60px;
+  --transition: all .3s cubic-bezier(.4,0,.2,1);
+}
+
+/* ---- 深色驾驶舱(CockpitShell 及其后代)---- */
+.cockpit {
+  --content-bg: #070b14;
+  --card-bg: rgba(150,180,230,.05);
+  --card-shadow: 0 4px 16px rgba(0,0,0,.3);
+  --card-radius: 13px;
+  --brd: rgba(120,180,255,.14);
+
+  --text-primary: #e8eef7;
+  --text-secondary: #8da3c2;
+  --text-muted: #5e7393;
+
+  --cyan: #22d3ee;
+  --emerald: #34d399;   /* 上升 */
+  --danger: #fb5a6a;    /* 下降 */
+  --warning: #f5b042;   /* 波动 */
+  --violet: #8b9bff;
+
+  --hud-grid: rgba(120,180,255,.07);
+  --cockpit-bg: linear-gradient(160deg, #070b14, #0c1424 55%, #0a1018);
+}

@@ -8,6 +8,7 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import App from './App.vue'
 import router from './router'
 import './assets/main.css'
+import './styles/tokens.css'
 
 const app = createApp(App)
 const pinia = createPinia()
