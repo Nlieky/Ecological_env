@@ -20,8 +20,9 @@ import FloatingAssistant from '@/components/aiops/FloatingAssistant.vue'
 
 const app = useAppStore()
 const route = useRoute()
-// fullscreen 仅对 /dashboard 有意义；离开 dashboard 自动退出全屏
-watch(() => route.path, (p) => { if (app.fullscreen && p !== '/dashboard') app.setFullscreen(false) })
+// 监测大屏是深色沉浸式驾驶舱：进入 /dashboard 自动全屏（隐藏侧栏/顶栏 + .cockpit 深色主题）；
+// 离开则退出全屏。immediate 保证刷新/直进 dashboard 时也立即生效（不受 HMR 残留影响）。
+watch(() => route.path, (p) => { app.setFullscreen(p === '/dashboard') }, { immediate: true })
 </script>
 
 <style scoped>
