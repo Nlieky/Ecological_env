@@ -23,30 +23,31 @@ export interface DecisionPath {
 }
 
 // ========== Realtime Data Interface ==========
+// 字段名与后端 /api/realtime/plants 实际返回对齐（驼峰）；离线厂 metrics/metricStatus 为 null。
 export interface PlantData {
   id: string
   name: string
   status: 'online' | 'offline'
-  metrics: WaterMetrics
-  metric_status: MetricStatus
-  last_update: string
+  metrics: WaterMetrics | null
+  metricStatus: MetricStatus | null
+  lastUpdate: string
 }
 
 export interface WaterMetrics {
-  ph: number
+  pH: number
   cod: number
-  ammonia_nitrogen: number
-  total_nitrogen: number
-  total_phosphorus: number
+  ammoniaNitrogen: number
+  totalNitrogen: number
+  totalPhosphorus: number
   flow: number
 }
 
 export interface MetricStatus {
-  ph: 'normal' | 'abnormal' | 'offline'
+  pH: 'normal' | 'abnormal' | 'offline'
   cod: 'normal' | 'abnormal' | 'offline'
-  ammonia_nitrogen: 'normal' | 'abnormal' | 'offline'
-  total_nitrogen: 'normal' | 'abnormal' | 'offline'
-  total_phosphorus: 'normal' | 'abnormal' | 'offline'
+  ammoniaNitrogen: 'normal' | 'abnormal' | 'offline'
+  totalNitrogen: 'normal' | 'abnormal' | 'offline'
+  totalPhosphorus: 'normal' | 'abnormal' | 'offline'
   flow: 'normal' | 'abnormal' | 'offline'
 }
 

@@ -4,7 +4,7 @@
     <div class="plants">
       <div v-for="p in plants" :key="p.id" class="plant" :class="health(p)" @click="$emit('select', p.id)">
         <div class="pname">{{ p.name }}</div>
-        <div class="pstat">COD {{ p.metrics.cod }} mg/L · {{ p.status === 'online' ? '在线' : '离线' }}</div>
+        <div class="pstat">COD {{ p.metrics?.cod ?? '—' }} mg/L · {{ p.status === 'online' ? '在线' : '离线' }}</div>
         <div class="prow"><span class="pkey">健康度</span><span class="pval">{{ healthScore(p) }}</span></div>
         <div class="pbar"><i :style="{ width: healthScore(p) + '%' }"></i></div>
       </div>
@@ -19,7 +19,9 @@ defineProps<{ plants: PlantData[] }>()
 defineEmits<{ (e: 'select', id: string): void }>()
 
 function healthScore(p: PlantData): number {
-  const entries = Object.values(p.metric_status) as string[]
+  // 离线厂 metricStatus 为 null；在线厂才有指标状态。空则健康度 0。
+  if (!p.metricStatus) return 0
+  const entries = Object.values(p.metricStatus) as string[]
   if (!entries.length) return 0
   const normal = entries.filter((s) => s === 'normal').length
   return Math.round((normal / entries.length) * 100)
