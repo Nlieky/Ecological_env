@@ -12,8 +12,10 @@ import { useAppStore } from '@/stores/app'
 import { Fold, Expand } from '@element-plus/icons-vue'
 const app = useAppStore()
 const route = useRoute()
-const titles: Record<string,string> = { '/chat':'AI 智能助手','/events':'事件中心','/logs':'系统日志','/logs/query':'日志查询','/dashboard':'监测大屏' }
+const titles: Record<string,string> = { '/chat':'AI 智能助手','/events':'事件中心','/logs':'日志中心','/dashboard':'监测大屏' }
 const currentTitle = computed(() => {
+  const meta = route.meta?.title
+  if (typeof meta === 'string' && meta.trim()) return meta
   for (const k of Object.keys(titles)) if (route.path.startsWith(k)) return titles[k]
   return '废水监测系统'
 })
