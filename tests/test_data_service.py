@@ -123,3 +123,13 @@ def test_get_aggregated_data_unknown_metrics_dropped():
     service = DataService()
     result = service.get_aggregated_data("daily", "avg,bogus,min")
     assert result["metrics"] == ["avg", "min"]
+
+
+def test_realtime_exposes_ammonia_nitrogen():
+    """RESPONSE_INDICATORS 应包含 AN(氨氮),且实时接口两侧都返回它。"""
+    from backend.services.monitoring_data_loader import RESPONSE_INDICATORS
+    assert "AN" in RESPONSE_INDICATORS
+    service = DataService()
+    result = service.get_realtime_data()
+    assert "AN" in result["influent"]
+    assert "AN" in result["effluent"]

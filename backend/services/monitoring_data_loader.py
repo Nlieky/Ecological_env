@@ -25,8 +25,10 @@ import pandas as pd
 
 from backend.exceptions import DataUnavailableException
 
-# 响应中暴露的指标（进水/出水通用）
-RESPONSE_INDICATORS: List[str] = ["pH", "COD", "TN", "TP"]
+# 响应中暴露的指标(进水/出水通用)。AN=氨氮,两份 CSV 都有,可对称暴露。
+# flow 已作为顶层 flow_rate 字段单独返回(不纳入,避免影响质量评分);
+# discharge 仅进水侧有,不对称,不纳入。
+RESPONSE_INDICATORS: List[str] = ["pH", "COD", "TN", "AN", "TP"]
 # 必须存在的列（缺失则视为数据不可用）
 REQUIRED_KEYS: List[str] = ["time", "pH", "COD", "TN", "AN", "TP"]
 
