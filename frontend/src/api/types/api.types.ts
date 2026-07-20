@@ -22,6 +22,37 @@ export interface DecisionPath {
   action: string
 }
 
+// ========== Agent Capabilities (/api/query/capabilities) ==========
+export interface MasterAgentInfo {
+  name: string
+  role: string
+  location: string
+}
+export interface ImplementationInfo {
+  method: string
+  description: string
+  identity_files_loaded: string[]
+}
+export interface DecisionTreeNode {
+  step: number
+  question: string
+  condition?: string
+  yes_action?: string
+  no_action?: string
+  action?: string
+}
+export interface SubAgentInfo {
+  name: string
+  role: string
+  location: string
+}
+export interface CapabilitiesResponse {
+  master_agent: MasterAgentInfo
+  implementation: ImplementationInfo
+  decision_tree: DecisionTreeNode[]
+  sub_agents: SubAgentInfo[]
+}
+
 // ========== Realtime Data Interface ==========
 // 字段名与后端 /api/realtime/plants 实际返回对齐（驼峰）；离线厂 metrics/metricStatus 为 null。
 export interface PlantData {

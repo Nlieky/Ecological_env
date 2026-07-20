@@ -15,14 +15,10 @@ const router = createRouter({
         // ── 智能助手 ──
         { path: 'chat', component: () => import('@/views/AIOpsChatView.vue'),
           meta: { title: 'AI 助手', group: '智能助手' } },
-        { path: 'agents/config', component: Placeholder,
-          meta: { title: '智能体配置', group: '智能助手', phTitle: '智能体配置',
-            phDesc: '主智能体 / 4 个子智能体的身份与能力配置展示',
-            phHint: 'Phase B 接 /api/query/capabilities' } },
-        { path: 'agents/audit', component: Placeholder,
-          meta: { title: '智能体审计', group: '智能助手', phTitle: '智能体审计',
-            phDesc: '主智能体决策与会话追溯审计',
-            phHint: 'Phase B 接 /api/logs + /api/logs/trace' } },
+        { path: 'agents/config', component: () => import('@/views/AgentConfigView.vue'),
+          meta: { title: '智能体配置', group: '智能助手' } },
+        { path: 'agents/audit', component: () => import('@/views/AgentAuditView.vue'),
+          meta: { title: '智能体审计', group: '智能助手' } },
         // ── 监控大屏 ──
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue'),
           meta: { title: '监测大屏', group: '监控大屏' } },
