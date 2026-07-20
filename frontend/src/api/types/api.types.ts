@@ -103,3 +103,76 @@ export interface PageContext {
   plant_id?: string
   time_range?: string
 }
+
+// ========== Monitoring (v1) ==========
+export interface RealtimeData {
+  timestamp: string
+  influent: Record<string, number | null>
+  effluent: Record<string, number | null>
+  flow_rate: number
+  quality_score: number
+}
+export interface DataQuality {
+  completeness_rate: number
+  missing_data_count: number
+  anomaly_count: number
+  last_update: string
+}
+export interface HistoryRecord {
+  timestamp: string
+  influent: Record<string, number | null>
+  effluent: Record<string, number | null>
+}
+export interface HistoryData {
+  records: HistoryRecord[]
+  summary: Record<string, number>
+  total_count: number
+  page: number
+  page_size: number
+}
+
+// ========== Conversations (v1) ==========
+export interface ConversationListItem {
+  id: string
+  title: string
+  started_at: string | null
+  message_count: number
+  status: string
+}
+export interface ConversationMessage {
+  role: 'user' | 'assistant' | 'tool'
+  content: string | null
+  tool_call_info?: any
+  timestamp: string | null
+}
+export interface ConversationDetail {
+  id: string
+  title: string
+  message_count: number
+  messages: ConversationMessage[]
+}
+export interface ConversationListResponse {
+  conversations: ConversationListItem[]
+  total_count: number
+  page: number
+  page_size: number
+}
+
+// ========== Logs / Trace ==========
+export type LogType = 'api' | 'master' | 'subagent' | 'operator' | 'llm' | 'error'
+export interface LogEntryV1 {
+  id: string
+  timestamp: string
+  module: string
+  content: string
+  details?: any
+  latency_ms?: number | null
+}
+export interface SessionTrace {
+  session_id: string
+  api_call: any
+  master_decision: Record<string, any> | null
+  subagent_executions: Record<string, any>[]
+  operator_calls: Record<string, any>[]
+  llm_calls: Record<string, any>[]
+}
