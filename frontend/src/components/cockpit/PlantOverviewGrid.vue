@@ -42,7 +42,7 @@ function health(p: PlantData) {
 .pstat { font-size: 11px; color: var(--text-muted); margin: 2px 0 7px; }
 .prow { display: flex; justify-content: space-between; font-size: 11px; }
 .pkey { color: var(--text-secondary); } .pval { color: var(--text-primary); font-weight: 600; }
-.pbar { height: 4px; border-radius: 3px; margin-top: 8px; background: rgba(255,255,255,.06); overflow: hidden; }
+.pbar { height: 4px; border-radius: 3px; margin-top: 8px; background: var(--surface-2); overflow: hidden; }
 .pbar i { display: block; height: 100%; }
 .ok .pbar i { background: var(--emerald); } .warn .pbar i { background: var(--warning); } .err .pbar i { background: var(--danger); }
 .plant.err { border-color: rgba(251,90,106,.35); }

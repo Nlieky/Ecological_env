@@ -20,6 +20,14 @@
   --danger: #ef4444;
   --info: #3b82f6;
 
+  /* 高亮色：浅色壳下用更深的版本（cockpit 仍用 .cockpit 里的霓虹版）*/
+  --cyan: #0891b2;
+  --emerald: #059669;
+  --violet: #7c3aed;
+  /* 次级表面（chip / 列表条目 / 进度条轨道），浅深自适应 */
+  --surface-1: #f1f5f9;
+  --surface-2: #e2e8f0;
+
   --sidebar-width: 188px;
   --sidebar-collapsed-width: 68px;
   --header-height: 60px;
@@ -46,4 +54,6 @@
 
   --hud-grid: rgba(120,180,255,.07);
   --cockpit-bg: linear-gradient(160deg, #070b14, #0c1424 55%, #0a1018);
+  --surface-1: rgba(255,255,255,.04);
+  --surface-2: rgba(255,255,255,.06);
 }

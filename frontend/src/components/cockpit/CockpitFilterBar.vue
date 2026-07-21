@@ -29,7 +29,7 @@ function set(k: 'category' | 'timeWindow' | 'sort', v: string) {
 .bar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 11px 14px; border-radius: 13px; background: var(--card-bg); border: 1px solid var(--brd); backdrop-filter: blur(6px); }
 .grp { display: flex; align-items: center; gap: 7px; }
 .lbl { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; }
-.chip { font-size: 12px; padding: 5px 11px; border-radius: 8px; color: var(--text-secondary); cursor: pointer; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); }
+.chip { font-size: 12px; padding: 5px 11px; border-radius: 8px; color: var(--text-secondary); cursor: pointer; background: var(--surface-1); border: 1px solid var(--brd); }
 .chip.on { color: #04121a; background: linear-gradient(135deg, var(--cyan), #5fb9ff); border-color: transparent; font-weight: 600; box-shadow: 0 0 14px rgba(34,211,238,.4); }
 .ts { margin-left: auto; font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 </style>
