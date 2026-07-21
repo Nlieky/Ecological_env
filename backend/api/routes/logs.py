@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Query, Depends
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
+import enum
 from backend.database.session import get_db
 from backend.models.logging import (
     APICallLog,
@@ -15,6 +16,42 @@ from backend.models.log_query import LogQueryParams, LogListResponse, LogEntry, 
 import json
 
 router = APIRouter()
+
+
+def _safe(v: Any) -> Any:
+    """把 SQLAlchemy 列值转成 JSON 可序列化的标量。"""
+    if isinstance(v, datetime):
+        return v.isoformat()
+    if isinstance(v, enum.Enum):
+        return v.value
+    return v
+
+
+def _details(log: Any) -> dict:
+    """日志行的全字段字典（JSON 安全）。"""
+    return {c.name: _safe(getattr(log, c.name)) for c in log.__table__.columns}
+
+
+def _summary(log_type: str, log: Any) -> str:
+    """按日志类型生成可读摘要（替代旧的 str(log) 内存地址）。"""
+    try:
+        if log_type == 'api':
+            return f"{log.method} {log.path} → {log.response_status} ({(log.latency_ms or 0):.0f}ms)"
+        if log_type == 'master':
+            q = (log.user_query or '').replace('\n', ' ').strip()[:60]
+            return f"意图={log.intent or '—'} | {q}"
+        if log_type == 'subagent':
+            return f"{log.subagent_name}: {log.status}"
+        if log_type == 'operator':
+            return f"{log.operator_name} ({log.category}): {log.status}"
+        if log_type == 'llm':
+            return f"{log.provider}/{log.model} · {log.purpose} · {log.total_tokens or 0} tokens"
+        if log_type == 'error':
+            return f"[{log.level}] {log.error_type}: {(log.error_message or '')[:80]}"
+    except Exception:
+        pass
+    return f"{log_type}#{getattr(log, 'id', '?')}"
+
 
 
 @router.get("/logs", response_model=LogListResponse)
@@ -62,8 +99,8 @@ async def query_logs(
             id=log.id,
             timestamp=log.timestamp.isoformat(),
             module=log_type,
-            content=str(log),
-            details=None,
+            content=_summary(log_type, log),
+            details=_details(log),
             latency_ms=getattr(log, 'latency_ms', None) or getattr(log, 'execution_time_ms', None)
         )
         data.append(entry)
