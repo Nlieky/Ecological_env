@@ -274,6 +274,8 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
         print(f"[DEBUG] Using Python: {python_exe}", file=sys.stderr, flush=True)
 
         # 调用子智能体的 entry.py（统一入口点，避免命名冲突）
+        # 子智能体自身是一次完整 AIAgent 会话（多轮 LLM），60s 远不够，给到 180s。
+        subagent_timeout = int(os.getenv('SUBAGENT_TIMEOUT', '180'))
         result = subprocess.run(
             [python_exe, 'entry.py'],
             env=env,
@@ -281,7 +283,7 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
             text=True,
             encoding='utf-8',
             errors='replace',  # 替换无法解码的字符
-            timeout=60,  # 1分钟超时
+            timeout=subagent_timeout,
             cwd=str(subagent_path)
         )
 
@@ -306,7 +308,7 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
             "task_id": task_id,
             "status": "failed",
             "result": None,
-            "error": "Subagent timed out after 300 seconds",
+            "error": f"Subagent timed out after {subagent_timeout} seconds",
             "metadata": {"timestamp": datetime.now().isoformat()}
         }
     except Exception as e:

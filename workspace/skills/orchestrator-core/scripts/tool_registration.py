@@ -48,6 +48,61 @@ def register_orchestrator_tools(agent):
     if not hasattr(agent, 'tools') or agent.tools is None:
         agent.tools = []
 
+    # 关键：把 4 个 orchestrator 工具 schema 灌进 agent.tools。
+    # conversation_loop 只读 agent.tools 喂给 LLM（completion(tools=agent.tools)），
+    # 不读 tool_registry。不灌这里 LLM 就看不到工具、永远不会发起 call_subagent。
+    _ORCH_SCHEMAS = [
+        {"type": "function", "function": {
+            "name": "call_subagent",
+            "description": "调用指定的子智能体执行任务。可用子智能体：multi-dimensional-data-perception(数据感知)、anomaly-detection(异常检测)、rule-reasoning(规则推理)、disposition-execution(处置执行)",
+            "parameters": {"type": "object", "properties": {
+                "subagent_name": {"type": "string", "enum": ["multi-dimensional-data-perception", "anomaly-detection", "rule-reasoning", "disposition-execution"], "description": "子智能体名称"},
+                "task": {"type": "string", "description": "具体任务描述"},
+                "context": {"type": "string", "description": "前置结果（可选）"}
+            }, "required": ["subagent_name", "task"]}
+        }},
+        {"type": "function", "function": {
+            "name": "list_subagents", "description": "列出所有可用的子智能体及其功能",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }},
+        {"type": "function", "function": {
+            "name": "create_session", "description": "创建新的会话目录用于子智能体通信",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }},
+        {"type": "function", "function": {
+            "name": "read_result", "description": "读取子智能体的执行结果文件",
+            "parameters": {"type": "object", "properties": {
+                "result_file": {"type": "string", "description": "结果文件名"}
+            }, "required": ["result_file"]}
+        }},
+    ]
+    existing = {t.get('function', {}).get('name') for t in agent.tools if isinstance(t, dict)}
+    for s in _ORCH_SCHEMAS:
+        if s['function']['name'] not in existing:
+            agent.tools.append(s)
+
+    # 覆盖注册到 hermes 全局 registry（修正 hermes 自带 tools/orchestrator_tool.py 的 handler 签名 bug）。
+    # hermes dispatch 是 entry.handler(args, **kwargs)，把工具参数 dict 作第 1 个位置参数传入；
+    # hermes 自带那 4 个 handler 只收 **kwargs -> "takes 0 positional arguments"。
+    # 这里用本项目 handler（*args, **kwargs，签名正确）override=True 覆盖，dispatch 才能走到
+    # bridge -> call_subagent.py -> 子智能体 entry.py。
+    try:
+        from tools.registry import registry as _hg
+        _OVR = [
+            ("call_subagent", _call_subagent_handler, _ORCH_SCHEMAS[0]["function"]),
+            ("list_subagents", _list_subagents_handler, _ORCH_SCHEMAS[1]["function"]),
+            ("create_session", _create_session_handler, _ORCH_SCHEMAS[2]["function"]),
+            ("read_result", _read_result_handler, _ORCH_SCHEMAS[3]["function"]),
+        ]
+        for _n, _h, _sch in _OVR:
+            _hg.register(
+                name=_n, toolset="orchestrator", schema=_sch, handler=_h,
+                check_fn=lambda: True, requires_env=[], is_async=False, override=True,
+            )
+        print(f"已覆盖注册 {len(_OVR)} 个 orchestrator 工具到 hermes 全局 registry（签名修正）")
+    except Exception as _e:
+        print(f"⚠ orchestrator 全局 registry 覆盖失败: {_e}")
+
     # 导入桥接模块
     try:
         from workspace.skills.orchestrator_core_bridge import (
