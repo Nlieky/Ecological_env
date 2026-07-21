@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""把 hermes-agent 运行时 vendor 进项目 shared/framework/hermes-agent/。
+
+用法:
+    python scripts/vendor_hermes.py [--src D:\\Hermes\\hermes-agent]
+
+步骤:
+1. 从 src 拷运行时 Python 到 dst（排除 docs/tests/web/node_modules 等非运行时）。
+2. 用 shared/framework/hermes-overlays/ 里的文件覆盖（小定制 + 修正版 orchestrator_tool）。
+
+dst 整体被 .gitignore；本脚本 + overlays 进 git，保证可复现。
+"""
+import argparse
+import shutil
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+DST = REPO / "shared" / "framework" / "hermes-agent"
+OVERLAYS = REPO / "shared" / "framework" / "hermes-overlays"
+
+# 非运行时目录/文件（拷贝时排除）
+EXCLUDE_DIRS = {
+    "docs", "tests", "web", "website", "ui-tui", "tui_gateway", "node_modules",
+    "venv", "locales", "docker", "packaging", "assets", "infographic",
+    "datagen-config-examples", "optional-mcps", "optional-skills", "apps",
+    "scripts", "plans", "__pycache__", ".git", ".github",
+}
+EXCLUDE_SUFFIXES = (".egg-info",)
+EXCLUDE_FILES = {".gitignore", ".gitattributes"}
+
+
+def _ignore(directory, names):
+    ignored = set()
+    for n in names:
+        p = Path(directory) / n
+        if n in EXCLUDE_DIRS:
+            ignored.add(n)
+        elif p.is_dir() and any(n.endswith(s) for s in EXCLUDE_SUFFIXES):
+            ignored.add(n)
+        elif n in EXCLUDE_FILES:
+            ignored.add(n)
+        elif n.endswith(".pyc"):
+            ignored.add(n)
+    return ignored
+
+
+def copy_runtime(src: Path) -> None:
+    if DST.exists():
+        shutil.rmtree(DST)
+    print(f"[vendor] copying {src} -> {DST}")
+    shutil.copytree(src, DST, ignore=_ignore, dirs_exist_ok=False)
+    print(f"[vendor] copied runtime (excluded: {len(EXCLUDE_DIRS)} dir patterns)")
+
+
+def apply_overlays() -> int:
+    if not OVERLAYS.exists():
+        print("[vendor] no overlays dir; skipping")
+        return 0
+    n = 0
+    for p in OVERLAYS.rglob("*"):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(OVERLAYS)
+        target = DST / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(p, target)
+        n += 1
+        print(f"[vendor] overlay: {rel}")
+    return n
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--src", default=r"D:\Hermes\hermes-agent", help="hermes-agent 源目录")
+    args = ap.parse_args()
+    src = Path(args.src)
+    if not src.exists():
+        raise SystemExit(f"source not found: {src}")
+    copy_runtime(src)
+    n = apply_overlays()
+    print(f"[vendor] done. overlays applied: {n}. vendored at {DST}")
+
+
+if __name__ == "__main__":
+    main()
