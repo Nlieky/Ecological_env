@@ -232,13 +232,17 @@ curl http://localhost:8000/api/health
 ### LLM Configuration
 
 ```bash
-# .env 文件配置
-LLM_BASE_URL=https://api.longcat.chat/openai/v1
-LLM_API_KEY=ak_xxx  # 从美团获取
-LLM_MODEL=LongCat-2.0
+# .env 文件配置（当前实际使用：本地部署的 ctgu-vlm）
+LLM_BASE_URL=http://172.16.12.41:30000/v1
+LLM_API_KEY=sk-xxx  # 由部署方提供
+LLM_MODEL=ctgu-vlm
+
+# 备用：美团 LongCat-2.0（OpenAI 兼容 API，已在 .env 中注释保留）
+# LLM_BASE_URL=https://api.longcat.chat/openai/v1
+# LLM_MODEL=LongCat-2.0
 ```
 
-**注意**：LongCat-2.0 是 OpenAI 兼容 API，不是 Anthropic Claude API。
+**注意**：ctgu-vlm 与 LongCat-2.0 均为 OpenAI 兼容 API，不是 Anthropic Claude API。实际生效配置以 `.env` 为准，本文件仅作文档说明。
 
 ### Identity Files
 
@@ -326,7 +330,7 @@ The system detects 4 types of violations:
 
 - **Python**: 3.12.12
 - **虚拟环境**: `ecological_env` (通过 uv 创建)
-- **LLM**: LongCat-2.0 (美团，OpenAI 兼容 API)
+- **LLM**: ctgu-vlm (本地部署 @ http://172.16.12.41:30000/v1，OpenAI 兼容 API；备用 LongCat-2.0 美团)
 - **后端端口**: 8000 (FastAPI), 5000 (简单包装器)
 - **Hermes API**: 8642
 
@@ -337,4 +341,7 @@ The system detects 4 types of violations:
 - Path resolution uses multiple strategies to find workspace/ and subagents/ directories dynamically
 - IntentResult is a dataclass - access attributes via dot notation, not `.get()` method
 - Prometheus metrics expose influent/effluent pH, COD, TN, AN, TP, flow rate, and counters for data processed, anomalies detected, and alerts
+- **实时数据为历史数据模拟**：当前无真实传感器接入，`/api/v1/monitoring/realtime` 等接口返回的是 `data/*.csv` 历史数据的最新行（截至 2024-12-31），用于打通"采集→主智能体→子智能体→报告"全链路。接入真实数据源后，替换 `backend/services/monitoring_data_loader.py` 的取数逻辑即可，上下游接口不变。
+- **对话历史持久化**：`/api/query` 在拿到 Agent 响应后，会把用户提问 + Agent 回答写入 `conversations` / `conversation_messages` 表（以 `session_id` 作为 `conversation_id`，同一 session 的多轮问答追加到同一条对话）。前端可通过 `/api/v1/conversations` 及 `/api/v1/conversations/{id}`（含 messages）读取真实问答。Hermes 框架自身另有 session DB（`_persist_session`）与 `workspace/MEMORY.md`（长期领域知识），与本表的对话历史是分离的存储。
 - **前端界面尚未开发**，当前只有后端 API
+- **Hermes 框架本地化现状（2026-07-21）**：`D:\Hermes\hermes-agent` 已退役为**代码依赖**——hermes 以 editable 安装指向项目内 vendored 副本 `shared/framework/hermes-agent/`（gitignore，用 `scripts/vendor_hermes.py --src <源>` 复现，overlay 在 `shared/framework/hermes-overlays/`）。`tools/`、`conversation_loop` 等重头戏解析到 vendored。**但** `run_agent`/`agent_init` 这层定制仍在 `shared/framework/hermes_agent/`（下划线旧部分副本）——因为这套定制是个**相互依赖的子系统**（run_agent→agent_init→identity_loader→…，且 identity_loader 等文件只存在于该副本、不在上游 hermes），无法只 fold 几个文件；而整个副本含精简版 conversation_loop（会让子智能体丢 terminal），又不能整体覆盖。所以旧副本暂保留（运行时 `start_agent.py` 等仍 `from shared.framework.hermes_agent.run_agent`）。彻底合并需要解耦这套定制子系统（单独工作流）。orchestrator 工具由 `tool_registration.py` 的 override 注册（correct schema + bridge），覆盖 vendored 自带的损坏版 `tools/orchestrator_tool.py`。
