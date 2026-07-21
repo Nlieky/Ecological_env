@@ -29,27 +29,32 @@ EXCLUDE_SUFFIXES = (".egg-info",)
 EXCLUDE_FILES = {".gitignore", ".gitattributes"}
 
 
-def _ignore(directory, names):
-    ignored = set()
-    for n in names:
-        p = Path(directory) / n
-        if n in EXCLUDE_DIRS:
-            ignored.add(n)
-        elif p.is_dir() and any(n.endswith(s) for s in EXCLUDE_SUFFIXES):
-            ignored.add(n)
-        elif n in EXCLUDE_FILES:
-            ignored.add(n)
-        elif n.endswith(".pyc"):
-            ignored.add(n)
-    return ignored
+def _make_ignore(src_resolved: Path):
+    """EXCLUDE_DIRS 只在顶层(src 直接子项)生效，避免误删嵌套同名运行时目录
+    （如 plugins/web、plugins/*/scripts）。__pycache__/.pyc/.egg-info 全层级排除。"""
+    def _ignore(directory, names):
+        at_top = Path(directory).resolve() == src_resolved
+        ignored = set()
+        for n in names:
+            p = Path(directory) / n
+            if at_top and n in EXCLUDE_DIRS:
+                ignored.add(n)
+            elif n == "__pycache__" or n.endswith(".pyc"):
+                ignored.add(n)
+            elif n in EXCLUDE_FILES:
+                ignored.add(n)
+            elif p.is_dir() and any(n.endswith(s) for s in EXCLUDE_SUFFIXES):
+                ignored.add(n)
+        return ignored
+    return _ignore
 
 
 def copy_runtime(src: Path) -> None:
     if DST.exists():
         shutil.rmtree(DST)
     print(f"[vendor] copying {src} -> {DST}")
-    shutil.copytree(src, DST, ignore=_ignore, dirs_exist_ok=False)
-    print(f"[vendor] copied runtime (excluded: {len(EXCLUDE_DIRS)} dir patterns)")
+    shutil.copytree(src, DST, ignore=_make_ignore(src.resolve()), dirs_exist_ok=False)
+    print(f"[vendor] copied runtime (top-level excluded: {len(EXCLUDE_DIRS)} dir patterns)")
 
 
 def apply_overlays() -> int:
