@@ -48,3 +48,7 @@ anomaly_result.csv
 
 # Editor/dev backups
 *.bak
+# Prometheus 二进制(vendored) + TSDB 数据，不入库
+prometheus/prometheus.exe
+prometheus/prom_data/
+grafana/prom_data/

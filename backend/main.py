@@ -113,6 +113,9 @@ from backend.metrics.updater import get_updater as _get_ww_updater
 @app.on_event("startup")
 async def _start_wastewater_metrics():
     _get_ww_updater(interval=5.0).start()
+    # 托管 Prometheus 子进程（项目内二进制，不再依赖外部路径）；端口已占用则自动跳过
+    from backend.metrics.prometheus_runner import start_prometheus
+    start_prometheus()
 
 # 路由注册
 app.include_router(health.router, prefix="/api")
