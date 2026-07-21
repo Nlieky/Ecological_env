@@ -105,6 +105,15 @@ async def metrics():
     from fastapi.responses import Response
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+
+# 启动废水指标后台更新器（从历史 CSV 模拟实时，填充 wastewater_* gauge 供 Prometheus 抓取）
+from backend.metrics.updater import get_updater as _get_ww_updater
+
+
+@app.on_event("startup")
+async def _start_wastewater_metrics():
+    _get_ww_updater(interval=5.0).start()
+
 # 路由注册
 app.include_router(health.router, prefix="/api")
 app.include_router(query.router, prefix="/api")

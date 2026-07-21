@@ -36,10 +36,8 @@ const router = createRouter({
           meta: { title: '告警中心', group: '监控大屏', phTitle: '告警中心',
             phDesc: '告警事件汇总与处置',
             phHint: 'Phase B 复用 /api/events' } },
-        { path: 'grafana', component: Placeholder,
-          meta: { title: 'Grafana 大屏', group: '监控大屏', phTitle: 'Grafana 大屏',
-            phDesc: '嵌入 Grafana 双数据流监控面板',
-            phHint: 'Phase B：需确认 Grafana 实例在跑且开启 iframe 嵌入' } },
+        { path: 'grafana', component: () => import('@/views/GrafanaView.vue'),
+          meta: { title: 'Grafana 大屏', group: '监控大屏' } },
         // ── 事件中心 ──
         { path: 'events', component: () => import('@/views/EventCenterView.vue'),
           meta: { title: '事件中心', group: '事件中心' } },

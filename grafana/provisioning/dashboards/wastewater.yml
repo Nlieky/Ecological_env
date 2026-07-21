@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: 'wastewater-dashboards'
+    orgId: 1
+    folder: '废水监测'
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: E:/project/Ecological_env/grafana/dashboards

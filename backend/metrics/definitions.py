@@ -54,3 +54,20 @@ active_sessions = Gauge(
     'active_sessions',
     '当前活跃会话数'
 )
+
+# === 废水监测指标（供 Prometheus 抓取 + Grafana 可视化）===
+# 指标名严格对齐 grafana/dashboards/stream_01.json，不加 label（dashboard 按裸指标名查询）。
+# 数据由 backend/metrics/updater.py 后台线程从 MonitoringDataset 推进游标实时填充。
+_INFLUENT_KEYS = ["ph", "cod", "tn", "an", "tp", "flow_rate", "discharge_volume"]
+_EFFLUENT_KEYS = ["ph", "cod", "tn", "an", "tp", "flow_rate", "discharge_volume", "suspended_solids"]
+
+wastewater_influent = {k: Gauge(f"wastewater_influent_{k}", f"进水 {k}") for k in _INFLUENT_KEYS}
+wastewater_effluent = {k: Gauge(f"wastewater_effluent_{k}", f"出水 {k}") for k in _EFFLUENT_KEYS}
+
+wastewater_data_processed_total = Counter(
+    "wastewater_data_processed_total", "已处理的监测数据点总数"
+)
+wastewater_anomaly_detected_total = Counter(
+    "wastewater_anomaly_detected_total", "检测到的异常总数"
+)
+
