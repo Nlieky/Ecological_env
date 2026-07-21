@@ -145,21 +145,25 @@ export interface EventListRequest {
   pageSize?: number
 }
 
+export interface EventEvidence {
+  dataSnapshot?: Record<string, unknown>
+  operators?: { name: string; result: unknown }[]
+  rules?: { name: string; matched: boolean }[]
+  llmReasoning?: string
+}
 export interface AlertEvent {
   id: string
   timestamp: string
   type: string
-  plant_id: string
+  plantId: string
   severity: 'low' | 'medium' | 'high'
   status: 'pending' | 'processing' | 'resolved' | 'ignored'
-  evidence?: any
+  evidence?: EventEvidence
 }
 
 export interface EventListResponse {
-  items: AlertEvent[]
+  data: AlertEvent[]
   total: number
-  page: number
-  pageSize: number
 }
 
 // ========== Logs Interface ==========

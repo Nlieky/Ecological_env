@@ -12,7 +12,7 @@ export const useEventsStore = defineStore('events', () => {
     loading.value = true
     try {
       const res = await eventsService.list(params)
-      events.value = (res.items || []) as AlertEvent[]
+      events.value = (res.data || []) as AlertEvent[]
       total.value = res.total || 0
     } finally {
       loading.value = false
