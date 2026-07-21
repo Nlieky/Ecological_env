@@ -12,11 +12,13 @@ from pathlib import Path
 # 添加项目路径（仅在运行时可用）
 PROJECT_ROOT = Path("E:/project/Ecological_env").resolve()
 
-# 工具函数：延迟导入 subagent_tools
+# 工具函数：延迟导入子智能体工具（从 bridge，它正确聚合了 4 个函数）
 def _get_subagent_tools():
-    """延迟导入 subagent_tools，仅在调用时加载
+    """延迟导入 orchestrator_core_bridge，仅在调用时加载。
 
-    使用 importlib 处理带连字符的模块名 (orchestrator-core)
+    bridge 正确聚合了 call_subagent / create_session / list_subagents / read_result
+    （分别来自 call_subagent.py / create_session.py / subagent_tools.py / bridge 自身）。
+    不直接 import subagent_tools——它不导出 create_session/read_result。
     """
     import importlib
 
@@ -26,8 +28,7 @@ def _get_subagent_tools():
         sys.path.insert(0, project_str)
 
     try:
-        # 使用 importlib 导入带连字符的模块名
-        module = importlib.import_module('workspace.skills.orchestrator-core.scripts.subagent_tools')
+        module = importlib.import_module('workspace.skills.orchestrator_core_bridge')
         return (
             module.call_subagent,
             module.create_session,

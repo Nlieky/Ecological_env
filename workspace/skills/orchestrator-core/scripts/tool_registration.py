@@ -81,6 +81,27 @@ def register_orchestrator_tools(agent):
         if s['function']['name'] not in existing:
             agent.tools.append(s)
 
+    # 覆盖注册到 hermes 全局 registry：vendored hermes 自带的 tools/orchestrator_tool.py
+    # 是项目早年塞进 hermes 目录的、多处损坏的桥接（handler 签名错、_get_subagent_tools
+    # 指错模块、schema 双层包裹致 LLM 400）。这里用本项目签名正确、走 bridge、schema 正确
+    # 的 handler 以 override=True 覆盖那 4 个工具，让 dispatch 真正走通。
+    try:
+        from tools.registry import registry as _hg
+        _OVR = [
+            ("call_subagent", _call_subagent_handler, _ORCH_SCHEMAS[0]["function"]),
+            ("list_subagents", _list_subagents_handler, _ORCH_SCHEMAS[1]["function"]),
+            ("create_session", _create_session_handler, _ORCH_SCHEMAS[2]["function"]),
+            ("read_result", _read_result_handler, _ORCH_SCHEMAS[3]["function"]),
+        ]
+        for _n, _h, _sch in _OVR:
+            _hg.register(
+                name=_n, toolset="orchestrator", schema=_sch, handler=_h,
+                check_fn=lambda: True, requires_env=[], is_async=False, override=True,
+            )
+        print(f"已覆盖注册 {len(_OVR)} 个 orchestrator 工具到 hermes 全局 registry")
+    except Exception as _e:
+        print(f"⚠ orchestrator 全局 registry 覆盖失败: {_e}")
+
     # 导入桥接模块
     try:
         from workspace.skills.orchestrator_core_bridge import (
