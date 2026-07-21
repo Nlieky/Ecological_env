@@ -52,3 +52,6 @@ anomaly_result.csv
 prometheus/prometheus.exe
 prometheus/prom_data/
 grafana/prom_data/
+
+# vendored hermes（脚本生成，不入库；用 scripts/vendor_hermes.py 复现）
+shared/framework/hermes-agent/

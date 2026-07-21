@@ -60,6 +60,8 @@ def apply_overlays() -> int:
     for p in OVERLAYS.rglob("*"):
         if not p.is_file():
             continue
+        if "__pycache__" in p.parts or p.suffix == ".pyc":
+            continue
         rel = p.relative_to(OVERLAYS)
         target = DST / rel
         target.parent.mkdir(parents=True, exist_ok=True)
