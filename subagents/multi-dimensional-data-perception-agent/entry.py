@@ -115,6 +115,41 @@ def build_user_message(task: Dict[str, Any]) -> str:
         return task_description
 
 
+def _read_script_result(session_dir, result_filename):
+    """读取 skill 脚本在会话目录里写的结构化结果。
+
+    SKILL.md 要求子智能体"只调用脚本、传递结果，不要生成报告"。脚本（如 get_data.py）
+    会把结构化 dict 写到 *_result.json。本函数优先取 result_filename，兜底扫描会话目录
+    其它 *_result.json。区分脚本结构化产物 vs LLM 文字报告的判据：顶层 result 是 dict、
+    或顶层含 data/statistics 视为结构化；result 是 str 视为 LLM 文字报告（跳过）。
+    返回 dict 或 None。
+    """
+    if not session_dir:
+        return None
+    session_path = Path(session_dir).resolve()
+    candidates = [session_path / result_filename]
+    try:
+        candidates += list(session_path.glob("*_result.json"))
+    except Exception:
+        pass
+    seen = set()
+    for p in candidates:
+        key = str(p)
+        if key in seen or not p.exists():
+            continue
+        seen.add(key)
+        try:
+            loaded = json.loads(p.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        if not isinstance(loaded, dict) or loaded.get("status") == "failed":
+            continue
+        inner = loaded.get("result")
+        if isinstance(inner, dict) or "data" in loaded or "statistics" in loaded:
+            return loaded
+    return None
+
+
 def run_subagent() -> Dict[str, Any]:
     """子智能体主入口"""
     session_dir = os.getenv('SESSION_DIR')
@@ -167,9 +202,17 @@ def run_subagent() -> Dict[str, Any]:
         )
 
         response = agent.run_conversation(user_message)
-        result = response.get('final_response', response)
-
         logger.info(f"[LLM] 任务完成")
+
+        # 优先回传 skill 脚本写的结构化结果（SKILL.md：只调用脚本、传递结果，不要生成报告）。
+        # 找不到结构化产物时才回退到 LLM 的 final_response（文字）。
+        result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
+        result = _read_script_result(session_dir, result_filename)
+        if result is None:
+            result = response.get('final_response', response)
+            logger.info(f"[LLM] 未找到脚本结构化结果，回退 final_response")
+        else:
+            logger.info(f"[LLM] 回传脚本结构化结果")
 
     except Exception as e:
         logger.error(f"[LLM] 执行失败: {e}", exc_info=True)
@@ -193,9 +236,9 @@ def run_subagent() -> Dict[str, Any]:
                 "timestamp": datetime.now().isoformat()
             }
 
-        # 确保 task_id 存在
-        if "task_id" not in result:
-            result["task_id"] = task_id
+        # 强制对齐 task_id：脚本/子智能体自带的 task_id 可能与 call_subagent 写入 task.json 的
+        # 不一致（格式/生成方式不同）→ call_subagent 的防串台校验会报 "Task ID mismatch"。
+        result["task_id"] = task_id
 
         write_result(session_dir, result, result_filename)
 
