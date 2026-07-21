@@ -49,7 +49,7 @@ _COLUMN_RULES = [
     ("总氮", "TN"),
     ("氨氮", "AN"),
     ("总磷", "TP"),
-    ("悬浮物", None),  # 出水独有，丢弃
+    ("悬浮物", "suspended_solids"),  # 出水独有，保留供 Prometheus gauge
     ("排放", "discharge"),
     ("流量", "flow"),
 ]

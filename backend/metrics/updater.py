@@ -30,6 +30,7 @@ _COL_TO_KEY: Dict[str, str] = {
     "TP": "tp",
     "flow": "flow_rate",
     "discharge": "discharge_volume",
+    "suspended_solids": "suspended_solids",  # 仅出水有
 }
 
 # 出水简单超标阈值（用于 anomaly 计数器；标准限值近似）
