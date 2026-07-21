@@ -10,6 +10,17 @@
     </div>
 
     <el-table :data="rows" v-loading="loading" stripe style="width: 100%">
+      <el-table-column type="expand">
+        <template #default="{ row }">
+          <div class="detail">
+            <div v-for="(v, k) in row.details || {}" :key="k" class="kv">
+              <span class="dk">{{ k }}</span>
+              <span class="dv">{{ fmtVal(v) }}</span>
+            </div>
+            <div v-if="!row.details || !Object.keys(row.details).length" class="empty">无详细信息</div>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="时间" width="170">
         <template #default="{ row }"><span class="ts">{{ row.timestamp || '—' }}</span></template>
       </el-table-column>
@@ -62,6 +73,11 @@ async function load() {
 }
 function onTypeChange() { page.value = 1; void load() }
 function onPage(p: number) { page.value = p; void load() }
+function fmtVal(v: unknown) {
+  if (v == null || v === '') return '—'
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
 
 onMounted(load)
 </script>
@@ -75,4 +91,9 @@ onMounted(load)
   display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom }
 .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 4px }
 .total { font-size: 12px; color: var(--text-muted) }
+.detail { padding: 6px 16px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px }
+.kv { display: flex; gap: 8px; min-width: 0; font-size: 12px }
+.dk { color: var(--text-muted); flex-shrink: 0; font-family: ui-monospace, monospace }
+.dv { color: var(--text-primary); word-break: break-all; font-family: ui-monospace, monospace }
+.detail .empty { padding: 4px 0; grid-column: 1 / -1 }
 </style>
