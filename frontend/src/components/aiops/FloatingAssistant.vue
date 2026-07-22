@@ -1,5 +1,6 @@
 <template>
-  <button class="fab" @click="app.toggleAssistant" title="AIOps 智能助手">
+  <!-- /chat 页本身就是助手，fab 冗余且会盖住页面自己的发送按钮，故隐藏 -->
+  <button v-if="route.path !== '/chat'" class="fab" @click="app.toggleAssistant" title="AIOps 智能助手">
     <el-icon><ChatDotRound /></el-icon>
   </button>
   <el-drawer v-model="app.assistantOpen" title="AIOps 智能助手" direction="rtl" size="420px">
@@ -16,10 +17,12 @@
 
 <script setup lang="ts">
 import { ChatDotRound } from '@element-plus/icons-vue'
+import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
 import ChatMessage from './ChatMessage.vue'
 import ChatComposer from './ChatComposer.vue'
+const route = useRoute()
 const app = useAppStore()
 const chat = useChatStore()
 </script>
