@@ -20,7 +20,8 @@
 | **底层框架** | [Hermes Agent](https://github.com/NousResearch/hermes-agent) - LLM驱动智能体框架 |
 | **后端** | FastAPI + Uvicorn |
 | **Python** | 3.12.12 (uv 虚拟环境 `ecological_env`) |
-| **LLM** | LongCat-2.0 (美团，OpenAI 兼容 API) |
+| **LLM** | ctgu-vlm（本地部署 @ http://172.16.12.41:30000/v1，OpenAI 兼容 API；备用 LongCat-2.0） |
+| **前端** | Vue 3 + Element Plus + Pinia + ECharts |
 | **监控** | Prometheus + Grafana |
 
 ## 架构
@@ -74,6 +75,24 @@
 │  └──────────┘ └──────────┘ └──────────┘                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### 实际运行链路（2026-07-23）
+
+上面是专利 6 层概念架构；**实际运行**是 3 个服务 + LLM 驱动多智能体 + 流式：
+
+```
+浏览器(5173) → 后端(8000) → 智能体服务(8642)
+                              ↓ 主智能体（LLM，4 个编排工具，加载 7 个身份文件）
+                              ↓ call_subagent → 共享 subagent_entry.py（subprocess）
+                              ↓ 4 个子智能体（各自 LLM 会话，加载自己的 SOUL/AGENTS/MEMORY）
+                              ↓   预加载 SKILL.md → terminal 跑 canonical 脚本 → 调 shared 算子/知识
+                              ↓ 结果经 sessions/ 共享目录链式传递（data→anomaly→rule→disposition）
+                              ↓ SSE 流式回前端（子智能体调用进度 + 回答逐字）
+```
+
+- 主智能体 + 4 子智能体**都是 LLM 驱动**（各自加载身份、LLM 选 skill 调脚本，脚本调 shared 三库干活）。
+- **防瞎逛**：子智能体 SKILL.md 预加载进 prompt + 仅开 terminal 工具 + 低迭代上限。
+- 一轮完整违规研判 ~2 分钟（LLM 驱动代价）；针对性查询（如只查异常）主智能体动态只调必要子智能体。
 
 ## 目录结构
 
@@ -233,50 +252,37 @@ pip install -r requirements.txt
 编辑 `.env` 文件，配置 LLM 服务：
 
 ```bash
-# LLM API 配置
-LLM_BASE_URL=https://api.longcat.chat/openai/v1
-LLM_API_KEY=ak_xxx  # 从美团获取
-LLM_MODEL=LongCat-2.0
-
-# FastAPI 配置
-FASTAPI_HOST=0.0.0.0
-FASTAPI_PORT=8000
+# LLM API 配置（当前实际使用：本地部署的 ctgu-vlm）
+LLM_BASE_URL=http://172.16.12.41:30000/v1
+LLM_API_KEY=sk-xxx  # 由部署方提供
+LLM_MODEL=ctgu-vlm
+# 备用：美团 LongCat-2.0（OpenAI 兼容 API，已在 .env 注释保留）
 ```
 
-### 启动服务
+### 启动服务（3 个服务，按顺序）
 
-**启动 Hermes API Server：**
+**① 智能体服务（Hermes 主智能体，端口 8642）：**
 
 ```bash
-# Windows
-scripts\start_hermes_server.bat
-
-# Linux/Mac
-bash scripts/start_hermes_server.sh
+python scripts/start_agent.py
 ```
 
-**启动后端：**
+**② 后端（FastAPI，端口 8000）：**
 
 ```bash
-# Windows
-scripts\start_backend.bat
-
-# Linux/Mac
-bash scripts/start_backend.sh
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**启动前端：**
+**③ 前端（Vite 开发服务器，端口 5173）：**
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd frontend && npm install && npm run dev
 ```
 
 访问：
-- 后端 API：`http://localhost:8000/docs`
-- 前端界面：`http://localhost:3000`
-- Hermes API：`http://localhost:8642`
+- **前端界面**：`http://localhost:5173`（默认进 AI 助手页 /chat）
+- 后端 API 文档：`http://localhost:8000/docs`
+- 智能体服务健康检查：`http://localhost:8642/health`
 
 ### API 端点
 
@@ -285,7 +291,8 @@ npm run dev
 | `/api/health` | GET | 健康检查 |
 | `/api/hermes/system` | GET | Hermes 系统信息 |
 | `/api/hermes/skills` | GET | 加载的技能列表 |
-| `/api/query` | POST | 自然语言查询 |
+| `/api/query` | POST | 自然语言查询（阻塞，等完整结果） |
+| `/api/query/stream` | POST | **流式查询**（SSE：实时返回子智能体调用进度 + 最终回答逐字） |
 | `/api/logs` | GET | 日志查询 |
 | `/metrics` | GET | Prometheus 指标 |
 
@@ -386,13 +393,14 @@ python scripts/test_master_calls_subagent.py
 | shared/ 资源库 | ✅ 100% |
 | 数据流发送器 | ✅ 100% |
 | 监控配置 | ✅ 100% |
-| 前端界面 | ⏳ 待开发 |
+| 前端界面 | ✅ 已开发（Phase 0-3A：AI 助手页含**流式问答 + 决策路径面板**、监测大屏、日志、链路追踪等；Phase B 部分占位页待填充） |
+| 智能体 pipeline | ✅ 跑通（LLM 驱动主智能体 + 4 子智能体，端到端流式 + 进度反馈） |
 
-**整体完成度：~85%**（前端界面待开发）
+**整体完成度：~95%**（智能体 + 三层链路 + 流式均已跑通；前端部分占位页待填充）
 
 ---
 
-**版本**：v2.2.0
-**最后更新**：2026-07-14
+**版本**：v2.3.0
+**最后更新**：2026-07-23
 **Python**：3.12.12
-**LLM**：LongCat-2.0 (美团，OpenAI 兼容 API)
+**LLM**：ctgu-vlm（本地部署，OpenAI 兼容 API）

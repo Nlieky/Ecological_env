@@ -30,7 +30,7 @@
 
 - **记忆机制**：跨会话记忆，让项目越来越清晰
 - **身份文件支持**：SOUL.md（个性）、AGENTS.md（规则）、MEMORY.md（记忆）、USER.md（用户配置）
-- **OpenAI 兼容接口**：支持 LongCat-2.0 模型（美团）
+- **OpenAI 兼容接口**：支持 ctgu-vlm（本地部署，当前实际使用）/ LongCat-2.0（美团）等 OpenAI 兼容 API
 
 ---
 
