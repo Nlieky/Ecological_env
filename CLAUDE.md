@@ -344,7 +344,11 @@ The system detects 4 types of violations:
 - Prometheus metrics expose influent/effluent pH, COD, TN, AN, TP, flow rate, and counters for data processed, anomalies detected, and alerts
 - **实时数据为历史数据模拟**：当前无真实传感器接入，`/api/v1/monitoring/realtime` 等接口返回的是 `data/*.csv` 历史数据的最新行（截至 2024-12-31），用于打通"采集→主智能体→子智能体→报告"全链路。接入真实数据源后，替换 `backend/services/monitoring_data_loader.py` 的取数逻辑即可，上下游接口不变。
 - **对话历史持久化**：`/api/query` 在拿到 Agent 响应后，会把用户提问 + Agent 回答写入 `conversations` / `conversation_messages` 表（以 `session_id` 作为 `conversation_id`，同一 session 的多轮问答追加到同一条对话）。前端可通过 `/api/v1/conversations` 及 `/api/v1/conversations/{id}`（含 messages）读取真实问答。Hermes 框架自身另有 session DB（`_persist_session`）与 `workspace/MEMORY.md`（长期领域知识），与本表的对话历史是分离的存储。
-- **前端界面尚未开发**，当前只有后端 API
+- **前端界面**：已开发（Phase 0-3A 框架完成：AI 助手页 / 监测大屏 / 日志 / 链路追踪等；Phase B 部分占位页待填充）。AI 助手页支持流式（见下）。
+- **流式+进度反馈 + 服务/后端非阻塞（2026-07-23）**：
+  - **非阻塞**：agent 服务(`scripts/start_agent.py`)与后端(`backend/api/routes/query.py`)都修了事件循环阻塞——`/query`、`/api/query` 由 `async def` 改 `sync def`（FastAPI 自动丢线程池，事件循环畅通；查询中 `/health` 从冻结→~2s）。agent 服务加 `threading.Lock` 串行化 master_agent + 300s 锁超时；`HERMES_TOTAL_TIMEOUT` 2400→300s。
+  - **流式端点**（SSE-over-POST，查询带 body 故前端用 `fetch` 读流而非 EventSource）：`POST /query/stream`(agent 服务，`scripts/start_agent.py`) → `/api/query/stream`(后端 `httpx` 流式透传) → 前端 `queryService.executeStream` 消费。事件 `data:{json}`：`progress`(子智能体 start/done+摘要，如"14个异常")、`delta`(最终回答逐字)、`done`、`error`。进度经 `tool_registration.py` 模块级队列挂钩 `call_subagent`（靠锁串行保证安全；工具在 ThreadPoolExecutor 线程跑，故用模块全局而非 contextvar）；逐字经 `run_conversation(stream_callback=)`。**保留**阻塞 `/query` 向后兼容。
+  - 前端 AI 助手页(`AIOpsChatView`/`ChatMessage`)：流式中实时显示「⏳ 正在调用 X 子智能体…」+ 回答逐字（流式时原始文本+光标，完成后转 markdown），不再是 30-60s 静态转圈。
 - **Hermes 框架本地化现状（2026-07-23，已清理 + 修通）**：三层干净结构。
   - ① **原生引擎** `shared/framework/hermes-agent/`（vendored upstream v0.16.0，editable 安装，gitignore，`scripts/vendor_hermes.py --src D:\Hermes\hermes-agent` 复现）。`agent/`(conversation_loop/system_prompt/tools 等)、顶层 `run_agent`/`hermes_constants` 都解析到这里——这是真正在跑的引擎。
   - ② **定制层** `shared/framework/hermes_agent/`（下划线，7 个活文件）：薄壳 AIAgent(`run_agent.py`，forward `run_conversation` 到原生 loop) + `agent_init.py` + **`identity_loader.py`（唯一真定制：读全部身份文件，原生只读 SOUL.md）** + process_bootstrap.py/utils.py。早期 ~1 万行的死代码 fork（slim conversation_loop、下划线 system_prompt/prompt_builder/hermes_constants/runtime_cwd）已于 2026-07-23 删除。
