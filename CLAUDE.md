@@ -20,9 +20,9 @@
 ### 子智能体调用规范
 
 主智能体通过**编排工具**调用子智能体（`tool_registration.py` 把 4 个编排工具灌进 `agent.tools`，并精简为只留这 4 个）：
-- **调用方式**：主智能体 LLM 调 `call_subagent(subagent_name, task)` → `call_subagent.py` subprocess 跑子智能体 `entry.py`
+- **调用方式**：主智能体 LLM 调 `call_subagent(subagent_name, task)` → `call_subagent.py` subprocess 跑**共享入口 `subagent_entry.py`**（一份，靠 `HERMES_HOME`/`SUBAGENT_NAME` 区分是哪个子智能体）
 - **LLM 驱动**：主智能体按 `workspace/AGENTS.md` 顶部的"编排铁律"决定调哪些子智能体、什么顺序
-- **LLM 驱动执行**：子智能体 `entry.py` 起一个 AIAgent 会话，LLM 读**预加载的 SKILL.md** 选+调对应脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition），脚本再调 shared 算子/知识处理数据。**防瞎逛**（早期 LLM 会用 terminal 瞎逛几十轮）：SKILL.md 预加载进 prompt（不用 skill_view 翻）+ `enabled_toolsets` 仅 `["terminal"]`（去掉 skills/memory 等探索工具）+ `max_iterations=4` + 收紧 prompt。一轮完整研判 ~2 分钟（LLM 驱动的代价）
+- **LLM 驱动执行**：共享 `subagent_entry.py` 起一个 AIAgent 会话，LLM 读**预加载的 SKILL.md** 选+调对应脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition），脚本再调 shared 算子/知识处理数据。**防瞎逛**（早期 LLM 会用 terminal 瞎逛几十轮）：SKILL.md 预加载进 prompt（不用 skill_view 翻）+ `enabled_toolsets` 仅 `["terminal"]`（去掉 skills/memory 等探索工具）+ `max_iterations=4` + 收紧 prompt。一轮完整研判 ~2 分钟（LLM 驱动的代价）
 - **通信机制**：通过共享 `sessions/<session>/` 目录传 task.json + 各 `*_result.json`（链式：规则读异常结果、处置读规则结果）
 - **身份文件**：主智能体加载 7 个身份文件；子智能体加载自己的 SOUL/AGENTS/MEMORY（3 个）
 
@@ -355,6 +355,6 @@ The system detects 4 types of violations:
   - ③ **overlays** `shared/framework/hermes-overlays/`（3 个，全功能必需）：`agent_init.py` + `run_agent.py`（身份定制，转发到下划线 agent_init）、`tools/orchestrator_tool.py`（编排桥）。orchestrator 工具运行时由 `tool_registration.py` 以 `override=True` 注册（correct schema + bridge），覆盖 vendored 自带的损坏版。
   - **身份加载（2026-07-23 修好，之前是坏的）**：原生 system_prompt 只读 SOUL.md；通过 `vendor_hermes.py` 的 PATCH 给原生 `agent/system_prompt.py` 接了 20 行——按 `_identity_path`(主智能体) / `HERMES_HOME`(子智能体) 加载目录里全部身份文件。主智能体读 7 个、子智能体读 3 个（SOUL/AGENTS/MEMORY）。
   - **主智能体工具精简（2026-07-23）**：`tool_registration.py` 注册 4 个编排工具后，把 `agent.tools` 过滤成只剩这 4 个（call_subagent/list_subagents/create_session/read_result），移除 skill_view/skill_manage/memory/terminal 等会让主智能体跑偏的工具——砍后编排可靠性 3/3。
-  - **LLM 驱动子智能体（2026-07-23 改回 + 防瞎逛）**：`subagents/*/entry.py` 起 AIAgent 会话，LLM 读预加载的 SKILL.md 选+调对应 canonical 脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition）。**防瞎逛**（早期 ctgu-vlm 会用 terminal/skill_view 瞎逛几十轮）：SKILL.md 预加载进 prompt（不用 skill_view 翻）+ `enabled_toolsets` 仅 `["terminal"]`（去掉 skills/memory 等探索工具）+ `max_iterations=4` + 收紧 prompt。一轮完整研判 ~2 分钟，结果经 `sessions/` 共享目录链式传递。
+  - **LLM 驱动子智能体（2026-07-23 改回 + 防瞎逛）**：`workspace/skills/orchestrator-core/scripts/subagent_entry.py`（**共享入口**，靠 `HERMES_HOME` 定位子智能体、读其身份+技能；不再每个子智能体目录各放一份 entry.py）起 AIAgent 会话，LLM 读预加载的 SKILL.md 选+调对应 canonical 脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition）。**防瞎逛**（早期 ctgu-vlm 会用 terminal/skill_view 瞎逛几十轮）：SKILL.md 预加载进 prompt（不用 skill_view 翻）+ `enabled_toolsets` 仅 `["terminal"]`（去掉 skills/memory 等探索工具）+ `max_iterations=4` + 收紧 prompt。一轮完整研判 ~2 分钟，结果经 `sessions/` 共享目录链式传递。
   - **超时**：`shared/framework/hermes_agent/agent/conversation_loop.py` 的 total/tool/llm_timeout 改 env 驱动（`HERMES_TOTAL_TIMEOUT` 等，默认 2400/300/120）；`call_subagent.py` 的 `SUBAGENT_TIMEOUT` 默认 600s。
-  - **仍待办（不影响运行）**：下划线 `run_agent.py`(5358行)/`agent_init.py`(1763行) 仍是从原生拷的大 fork，瘦身 = 切原生 AIAgent（要改 start_agent.py + entry.py 的 import，有风险，单独工作流）。
+  - **仍待办（不影响运行）**：下划线 `run_agent.py`(5358行)/`agent_init.py`(1763行) 仍是从原生拷的大 fork，瘦身 = 切原生 AIAgent（要改 start_agent.py + subagent_entry.py 的 import，有风险，单独工作流）。
