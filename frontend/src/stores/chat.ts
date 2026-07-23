@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { conversationsService } from '@/api/modules/conversations'
 import { queryService } from '@/api/modules/query'
-import { logsService } from '@/api/modules/logs'
 import type { ConversationListItem, ConversationDetail, SessionTrace } from '@/api/types/api.types'
 
 export interface ChatMessage {
@@ -51,6 +50,7 @@ export const useChatStore = defineStore('chat', () => {
       const i = messages.value.findIndex((m) => m.id === aid)
       if (i >= 0) messages.value[i] = { ...messages.value[i], ...p }
     }
+    const calls: { key: string; name: string; summary?: string }[] = []
     try {
       await new Promise<void>((resolve, reject) => {
         queryService.executeStream(
@@ -58,6 +58,7 @@ export const useChatStore = defineStore('chat', () => {
           {
             onProgress: (e) => {
               const name = SUBAGENT_NAMES[e.subagent] || e.subagent
+              if (e.stage === 'done') calls.push({ key: e.subagent, name, summary: e.summary })
               patch({ progress: e.stage === 'start' ? `正在调用「${name}」子智能体…` : `「${name}」完成${e.summary ? '（' + e.summary + '）' : ''}` })
             },
             onDelta: (t) => patch({ content: (messages.value.find((m) => m.id === aid)?.content || '') + t }),
@@ -73,12 +74,19 @@ export const useChatStore = defineStore('chat', () => {
           },
         )
       })
-      // 流式完成后取详细 trace（决策路径面板）
-      try {
-        const trace = await logsService.trace(sessionId.value!)
+      // 用流式过程中收集的子智能体调用记录构建 trace（DB 里没有，就地构建填决策路径面板）
+      if (calls.length) {
+        const trace: SessionTrace = {
+          session_id: sessionId.value || '',
+          api_call: null,
+          master_decision: { decision_path: calls.map((c) => c.name) },
+          subagent_executions: calls.map((c) => ({ subagent_name: c.key, status: 'completed', result_summary: c.summary || '' })),
+          operator_calls: [],
+          llm_calls: [],
+        }
         const i = messages.value.findIndex((m) => m.id === aid)
         if (i >= 0) messages.value[i] = { ...messages.value[i], trace }
-      } catch { /* trace 非关键 */ }
+      }
     } catch (e: any) {
       error.value = e?.message || '查询失败'
     } finally {
