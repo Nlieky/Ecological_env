@@ -7,7 +7,9 @@
 import logging
 import time
 import requests
+import httpx
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from backend.models.query import QueryRequest, QueryResponse
 from backend.utils.loggers import generate_session_id, log_master_decision
 from backend.core.config import settings
@@ -191,6 +193,32 @@ def execute_query(request: QueryRequest):
                 "detail": str(e)
             }
         )
+
+
+@router.post("/query/stream", tags=["查询"])
+async def query_stream(request: QueryRequest):
+    """流式查询（SSE）：透传 agent 服务 /query/stream 的事件流。
+
+    事件同 agent 服务：progress（子智能体调用进度）/ delta（最终回答逐字）/ done / error。
+    用 httpx.AsyncClient 流式转发（async，不阻塞后端事件循环）。
+    """
+    session_id = request.session_id or generate_session_id()
+
+    async def proxy():
+        timeout = httpx.Timeout(AGENT_TIMEOUT, connect=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream(
+                "POST",
+                f"{AGENT_SERVICE_URL}/query/stream",
+                json={"query": request.query, "session_id": session_id},
+            ) as resp:
+                if resp.status_code != 200:
+                    yield 'data: {"type":"error","message":"Agent服务返回 %d"}\n\n' % resp.status_code
+                    return
+                async for chunk in resp.aiter_text():
+                    yield chunk
+
+    return StreamingResponse(proxy(), media_type="text/event-stream")
 
 
 @router.get("/query/capabilities", tags=["查询"])

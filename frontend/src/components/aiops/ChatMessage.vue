@@ -3,7 +3,10 @@
     <div class="role">{{ msg.role === 'user' ? '👤 运维员' : '🤖 主智能体' }}</div>
     <div v-if="msg.role === 'user'" class="bubble user">{{ msg.content }}</div>
     <div v-else class="bubble assistant">
-      <MarkdownRenderer :content="msg.content" />
+      <div v-if="msg.streaming && msg.progress" class="prog">⏳ {{ msg.progress }}</div>
+      <MarkdownRenderer v-if="!msg.streaming && msg.content" :content="msg.content" />
+      <div v-else-if="msg.content" class="stream-text">{{ msg.content }}<span class="cur">▋</span></div>
+      <div v-else-if="msg.streaming" class="stream-text muted">主智能体思考中…</div>
       <div v-if="msg.trace" class="cards">
         <DecisionFlow :trace="msg.trace" />
         <SubAgentChips :trace="msg.trace" />
@@ -29,4 +32,9 @@ defineProps<{ msg: ChatMessage }>()
 .user { background: var(--primary); color: #fff; border-radius: 12px 12px 4px 12px }
 .assistant { background: #fff; border: 1px solid var(--brd); border-radius: 12px 12px 12px 4px; box-shadow: 0 1px 3px rgba(0,0,0,.04) }
 .cards { margin-top: 12px; border-left: 3px solid var(--primary); padding-left: 12px; display: flex; flex-direction: column; gap: 8px }
+.prog { font-size: 12.5px; color: var(--primary); background: var(--primary-soft, #eef2ff); border-radius: 8px; padding: 7px 11px; margin-bottom: 9px }
+.stream-text { white-space: pre-wrap; word-break: break-word; font-size: 13.5px; line-height: 1.7 }
+.stream-text.muted { color: var(--text-muted) }
+.cur { animation: blink 1s step-start infinite; color: var(--primary); margin-left: 1px }
+@keyframes blink { 50% { opacity: 0 } }
 </style>

@@ -5,8 +5,7 @@
       <div class="chdr"><span class="ttl">AI 智能助手</span><span class="mdl">ctgu-vlm · 主智能体</span></div>
       <div class="body">
         <ChatMessage v-for="m in chat.messages" :key="m.id" :msg="m" />
-        <div v-if="chat.loading" class="thinking">主智能体思考中…(同步查询约 15-60s)</div>
-        <div v-if="!chat.messages.length && !chat.loading" class="empty">向主智能体提问,例如:最近出水COD是否超标?</div>
+        <div v-if="!chat.messages.length" class="empty">向主智能体提问,例如:最近出水COD是否超标?</div>
       </div>
       <ChatComposer />
     </section>

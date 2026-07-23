@@ -38,6 +38,45 @@ except ImportError:
     read_result = bridge_module.read_result
 
 
+# ── 流式进度通道 ──────────────────────────────────────────────
+# /query/stream 端点跑 run_conversation 时，把当前请求的 queue.Queue 设到这里；
+# _call_subagent_handler 被（ThreadPoolExecutor 线程）调用时读取它，push 进度事件。
+# 靠 start_agent 的 _agent_lock 串行化保证：同一时刻只有一个 run_conversation 在跑，
+# 故模块全局安全（contextvars 不会透传到 executor 线程，故用模块全局而非 contextvar）。
+_current_progress_queue = None
+
+
+def _emit_progress(subagent: str, stage: str, summary: str = None):
+    """向当前流式请求的队列 push 进度事件（非流式时队列为 None，no-op）。"""
+    if _current_progress_queue is None:
+        return
+    evt = {"type": "progress", "subagent": subagent, "stage": stage}
+    if summary:
+        evt["summary"] = summary
+    try:
+        _current_progress_queue.put(evt)
+    except Exception:
+        pass
+
+
+def _summarize_result(result) -> str:
+    """从子智能体结果里抽一句摘要（异常数/违规判定/数据条数等），给进度事件用。"""
+    try:
+        r = result.get("result") if isinstance(result, dict) else None
+        if isinstance(r, dict):
+            if "anomalies" in r:
+                return f"{len(r.get('anomalies') or [])} 个异常"
+            if "has_violation" in r:
+                return f"违规={r.get('has_violation')}, 嫌疑={r.get('suspicion_level')}"
+            if "effluent" in r:
+                return f"进出水各 {len(r.get('effluent') or [])} 条"
+            if isinstance(r.get("alert"), dict):
+                return f"预警={r['alert'].get('level_cn', r['alert'].get('level'))}"
+    except Exception:
+        pass
+    return ""
+
+
 def register_orchestrator_tools(agent):
     """将orchestrator工具注册到AIAgent实例（hermes-agent兼容版本）
 
@@ -150,8 +189,11 @@ def _call_subagent_handler(*args, **kwargs) -> str:
             # 回退：使用kwargs作为参数
             params = kwargs
 
-        # 调用原始函数
+        # 调用原始函数（向流式队列吐进度）
+        subagent_name = params.get('subagent_name') or params.get('name') or 'unknown'
+        _emit_progress(subagent_name, 'start')
         result = call_subagent(**params)
+        _emit_progress(subagent_name, 'done', _summarize_result(result))
         # 确保返回字符串格式（hermes-agent要求）
         if isinstance(result, dict):
             return json.dumps(result, ensure_ascii=False)

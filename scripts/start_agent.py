@@ -17,6 +17,7 @@ from typing import Dict, Any
 from datetime import datetime
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -111,6 +112,8 @@ class AgentService:
                 spec.loader.exec_module(tool_reg_module)
 
                 tool_reg_module.register_orchestrator_tools(self.master_agent)
+                # 保留 tool_registration 模块引用，供 /query/stream 设置进度队列
+                self._tool_reg = tool_reg_module
                 logger.info("✅ Orchestrator工具注册成功")
             except Exception as e:
                 logger.warning(f"⚠️ Orchestrator工具注册失败: {e}")
@@ -351,6 +354,67 @@ def query(request: QueryRequest):
             status_code=500,
             detail=result.get("error", "查询失败")
         )
+
+
+@app.post("/query/stream")
+def query_stream(request: QueryRequest):
+    """流式查询（SSE）：实时返回 子智能体调用进度 + 最终回答逐字。
+
+    事件（data: {json}\\n\\n）：
+      {"type":"progress","subagent":"...","stage":"start|done","summary":"..."}
+      {"type":"delta","text":"..."}   最终回答逐字
+      {"type":"done","content":"...","session_id":"..."}
+      {"type":"error","message":"..."}
+    保留 /query（阻塞）向后兼容；进度经 tool_registration 模块级 _current_progress_queue
+    （靠 _agent_lock 串行化保证安全），逐字经 run_conversation 的 stream_callback。
+    """
+    import queue as _q
+    import json as _json
+    q = _q.Queue()
+    session_id = request.session_id or f"session_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    tool_reg = getattr(agent_service, "_tool_reg", None)
+
+    def worker():
+        # 挂队列到 tool_registration 模块全局，让 call_subagent handler（在 executor 线程）吐进度
+        if tool_reg is not None:
+            tool_reg._current_progress_queue = q
+        if not agent_service._agent_lock.acquire(timeout=agent_service._agent_lock_timeout):
+            q.put({"type": "error", "message": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"})
+            return
+        try:
+            history = agent_service.session_histories.get(session_id)
+            result = agent_service.master_agent.run_conversation(
+                user_message=request.query,
+                conversation_history=history,
+                task_id=session_id,
+                stream_callback=lambda text: q.put({"type": "delta", "text": text}),
+            )
+            if isinstance(result, dict) and "messages" in result:
+                agent_service.session_histories[session_id] = result["messages"]
+            content = result.get("final_response", str(result)) if isinstance(result, dict) else (str(result) if result else "")
+            q.put({"type": "done", "content": content, "session_id": session_id})
+        except Exception as e:
+            logger.error(f"流式查询失败: {e}")
+            q.put({"type": "error", "message": str(e)})
+        finally:
+            if tool_reg is not None:
+                tool_reg._current_progress_queue = None
+            agent_service._agent_lock.release()
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def gen():
+        while True:
+            try:
+                evt = q.get(timeout=1.0)
+            except Exception:
+                yield ": keepalive\n\n"  # 队列空（还在跑），SSE 注释行防连接 idle
+                continue
+            yield f"data: {_json.dumps(evt, ensure_ascii=False)}\n\n"
+            if evt.get("type") in ("done", "error"):
+                break
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 def main():
