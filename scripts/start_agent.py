@@ -11,6 +11,7 @@ import sys
 import logging
 import time
 import uuid
+import threading
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
@@ -29,6 +30,9 @@ load_dotenv()
 # 切断对系统 HERMES_HOME（可能指向 D:\Hermes 旧 home）的依赖：显式重定向到项目根，
 # 使 hermes 的 env_loader 加载本项目 .env，而非 D:\Hermes\.env。
 os.environ['HERMES_HOME'] = str(project_root)
+# pipeline 现已确定性+快（~30-60s），total_timeout 从 2400s 降回 300s（服务级上限）。
+# 必须在 import AIAgent（触发 conversation_loop 加载、读取默认值）之前设置。
+os.environ.setdefault('HERMES_TOTAL_TIMEOUT', '300')
 
 from shared.framework.hermes_agent.run_agent import AIAgent
 
@@ -67,6 +71,10 @@ class AgentService:
         # 查询缓存：提升性能
         self.query_cache: Dict[str, Dict] = {}
         self.cache_duration = 300  # 5分钟缓存
+        # master_agent 是单例共享，run_conversation 会改它的内部状态（messages/session_id），
+        # 并发查询会串台。用锁串行化对 master_agent 的访问（配合 /query 走线程池）。
+        self._agent_lock = threading.Lock()
+        self._agent_lock_timeout = 300  # 排队超过 5 分钟直接返回"忙"，不无限等
 
     def initialize(self):
         """初始化主智能体实例"""
@@ -148,12 +156,11 @@ class AgentService:
         import re
         query_lower = query.lower()
 
-        # 常见查询快速响应
+        # 只保留纯问候/感谢的整句匹配；去掉"状态|运行|帮助|功能"等会误命中
+        # 真实查询（如"出水运行数据""指标功能"）的正则，避免抢答。
         quick_responses = {
-            r'你好|介绍|是谁': "我是废水监测系统的智能助手。我可以帮您查询监测数据、检测异常、判定违规和生成预警。请告诉我您的具体需求。",
-            r'状态|健康|运行': "系统运行正常。主智能体服务在线，数据监测功能正常，子智能体调用就绪。",
-            r'帮助|功能|能做什么': "我可以：\n1. 查询实时监测数据\n2. 检测水质异常\n3. 判定违规类型\n4. 生成预警报告\n5. 提供处置建议",
-            r'谢谢|感谢': "不客气！如果您还有其他问题，请随时提问。"
+            r'^(你好|您好|hi|hello|介绍一下你自己|你是谁|你是)!*$': "我是废水监测系统的智能助手。我可以帮您查询监测数据、检测异常、判定违规和生成预警。请告诉我您的具体需求。",
+            r'^(谢谢|感谢|多谢)!*$': "不客气！如果您还有其他问题，请随时提问。"
         }
 
         for pattern, response in quick_responses.items():
@@ -207,12 +214,17 @@ class AgentService:
 
             logger.info(f"处理查询: session={session_id}, query={query[:50]}...")
 
-            # 调用主智能体，传递会话历史
-            result = self.master_agent.run_conversation(
-                user_message=query,
-                conversation_history=conversation_history,
-                task_id=session_id
-            )
+            # 调用主智能体（加锁串行化，避免并发查询串台；排队超时直接返回"忙"）
+            if not self._agent_lock.acquire(timeout=self._agent_lock_timeout):
+                return {"success": False, "error": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"}
+            try:
+                result = self.master_agent.run_conversation(
+                    user_message=query,
+                    conversation_history=conversation_history,
+                    task_id=session_id
+                )
+            finally:
+                self._agent_lock.release()
 
             # 更新会话历史（保存完整的对话）
             if "messages" in result:
@@ -315,14 +327,12 @@ async def status():
 
 
 @app.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest):
+def query(request: QueryRequest):
     """执行查询
 
-    Args:
-        request: 查询请求，包含query内容
-
-    Returns:
-        QueryResponse: 查询响应
+    说明：用 sync def（而非 async def）。process_query 内部 run_conversation 是阻塞的
+    （完整 pipeline ~30-60s）。若用 async def 直接调，会冻住整个事件循环，导致 /health、
+    /status 及其它查询全部卡住。sync def 由 FastAPI 自动丢进线程池执行，事件循环保持畅通。
     """
     result = agent_service.process_query(
         query=request.query,
