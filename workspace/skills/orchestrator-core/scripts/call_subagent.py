@@ -273,12 +273,14 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
         python_exe = sys.executable
         print(f"[DEBUG] Using Python: {python_exe}", file=sys.stderr, flush=True)
 
-        # 调用子智能体的 entry.py（统一入口点，避免命名冲突）
-        # 子智能体自身是一次完整 AIAgent 会话（多轮 LLM + skill 探索），ctgu-vlm 单次调用又慢，
+        # 调用共享的 subagent_entry.py（一份标准化入口，靠 HERMES_HOME/SUBAGENT_NAME 环境变量
+        # 区分是哪个子智能体；不再每个子智能体目录各放一份 entry.py）。
+        # 子智能体自身是一次完整 AIAgent 会话（多轮 LLM），ctgu-vlm 单次调用又慢，
         # 实测异常检测子智能体曾 >300s。默认 600s（可由 SUBAGENT_TIMEOUT 覆盖）。
         subagent_timeout = int(os.getenv('SUBAGENT_TIMEOUT', '600'))
+        shared_entry = Path(__file__).parent / "subagent_entry.py"
         result = subprocess.run(
-            [python_exe, 'entry.py'],
+            [python_exe, str(shared_entry)],
             env=env,
             capture_output=True,
             text=True,

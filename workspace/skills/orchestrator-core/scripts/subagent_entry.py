@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""rule-reasoning 子智能体入口（LLM 驱动）。
+"""子智能体共享入口（标准化接口，实现 interfaces/subagent_protocol.md）。
 
 设计：子智能体是独立 LLM 智能体——LLM 读自己的技能说明(SKILL.md)、据任务选择并调用
-对应脚本，脚本（调 shared 算子/知识）干真正的数据处理，结果写回公共会话区。本脚本只
-负责与主智能体的通信协议。
+对应脚本，脚本（调 shared 算子/知识）干真正的数据处理，结果写回公共会话区。
+
+**共享入口**：本脚本只有一份，由 call_subagent 以 subprocess 启动；通过环境变量定位
+"是哪个子智能体"：
+  - HERMES_HOME = 该子智能体目录（身份 SOUL/AGENTS/MEMORY + skills/ 从这里读）
+  - SUBAGENT_NAME = 子智能体名（兜底从目录名推）
+  - SESSION_DIR = 公共会话区（task.json / *_result.json）
+不再为每个子智能体复制一份 entry.py（旧设计 4 份重复，DRY 问题）。
 
 防瞎逛（早期 LLM 子智能体会 skill_view/terminal 乱翻几十轮）：SKILL.md 预加载进 prompt
 （不用 skill_view 翻）+ 仅开 terminal 工具（无法 skill_view/memory 探索）+ 低迭代上限。
@@ -17,9 +23,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-AGENT_DIR = Path(__file__).parent.resolve()
+# === 步骤 1: 子智能体目录由 call_subagent 通过 HERMES_HOME 传入 ===
+AGENT_DIR = Path(os.environ.get("HERMES_HOME", ".")).resolve()
 os.environ['HERMES_HOME'] = str(AGENT_DIR)
-project_root = AGENT_DIR.parent.parent
+DEFAULT_SUBAGENT_NAME = AGENT_DIR.name.removesuffix("-agent")  # 目录名兜底，如 anomaly-detection-agent→anomaly-detection
+
+# === 步骤 2: 导入 Hermes AIAgent（与主智能体同款路径） ===
+project_root = AGENT_DIR.parent.parent  # subagents/<name> → ... → 项目根
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 try:
@@ -28,6 +38,7 @@ except ImportError as e:
     print(f"[ERROR] Failed to import Hermes AIAgent: {e}", file=sys.stderr)
     sys.exit(1)
 
+# === 步骤 3: 配置日志 ===
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     handlers=[logging.StreamHandler(sys.stdout)], force=True)
@@ -35,13 +46,13 @@ sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 logger = logging.getLogger(__name__)
 
+# === 步骤 4: 结果文件名（与 call_subagent.py 一致） ===
 RESULT_FILE_NAMES = {
     "anomaly-detection": "anomaly_result.json",
     "multi-dimensional-data-perception": "data_result.json",
     "rule-reasoning": "rule_reasoning_result.json",
     "disposition-execution": "disposition_result.json",
 }
-DEFAULT_SUBAGENT_NAME = "rule-reasoning"
 
 
 def load_task(session_dir: Optional[str]) -> Optional[Dict[str, Any]]:
@@ -70,6 +81,7 @@ def write_result(session_dir: str, result: Dict[str, Any], filename: str) -> boo
 
 
 def _preload_skill_md() -> str:
+    """读该子智能体的 SKILL.md，预加载给 LLM（避免它 skill_view 乱翻）。"""
     for p in AGENT_DIR.glob("skills/*/SKILL.md"):
         try:
             return p.read_text(encoding="utf-8")
@@ -108,7 +120,7 @@ def _read_script_result(session_dir, result_filename):
 def run_subagent() -> Dict[str, Any]:
     session_dir = os.getenv('SESSION_DIR')
     subagent_name = os.getenv('SUBAGENT_NAME', DEFAULT_SUBAGENT_NAME)
-    logger.info(f"[START] 子智能体={subagent_name} SESSION_DIR={session_dir}")
+    logger.info(f"[START] 子智能体={subagent_name} SESSION_DIR={session_dir} HERMES_HOME={AGENT_DIR}")
 
     task = load_task(session_dir)
     if not task:
