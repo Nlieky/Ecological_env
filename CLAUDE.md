@@ -14,7 +14,7 @@
 本项目采用Hermes Agent框架（NousResearch/hermes-agent）实现LLM驱动的智能体架构：
 
 - **主智能体**（workspace/）：使用Hermes AIAgent类，负责意图识别、任务编排、对话管理
-- **4个子智能体**（subagents/）：**确定性脚本执行器**——`entry.py` 直接跑 canonical 脚本（不经 LLM 会话），通过 subprocess 启动
+- **4个子智能体**（subagents/）：每个是独立的 Hermes AIAgent 实例（**LLM 驱动**），通过 subprocess 启动
 - **三库一体**（shared/）：operators（算子库）、data（数据库）、knowledge（知识库）统一在shared/目录
 
 ### 子智能体调用规范
@@ -22,9 +22,9 @@
 主智能体通过**编排工具**调用子智能体（`tool_registration.py` 把 4 个编排工具灌进 `agent.tools`，并精简为只留这 4 个）：
 - **调用方式**：主智能体 LLM 调 `call_subagent(subagent_name, task)` → `call_subagent.py` subprocess 跑子智能体 `entry.py`
 - **LLM 驱动**：主智能体按 `workspace/AGENTS.md` 顶部的"编排铁律"决定调哪些子智能体、什么顺序
-- **确定性执行**：子智能体 `entry.py` **直接跑 canonical 脚本**（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition），**不经 LLM 会话**（早期 LLM 会话会让 ctgu-vlm 用 terminal/execute_code 瞎逛几十轮、极慢；2026-07-23 改为脚本直跑，4 个合计 ~25s）
+- **LLM 驱动执行**：子智能体 `entry.py` 起一个 AIAgent 会话，LLM 读**预加载的 SKILL.md** 选+调对应脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition），脚本再调 shared 算子/知识处理数据。**防瞎逛**（早期 LLM 会用 terminal 瞎逛几十轮）：SKILL.md 预加载进 prompt（不用 skill_view 翻）+ `enabled_toolsets` 仅 `["terminal"]`（去掉 skills/memory 等探索工具）+ `max_iterations=4` + 收紧 prompt。一轮完整研判 ~2 分钟（LLM 驱动的代价）
 - **通信机制**：通过共享 `sessions/<session>/` 目录传 task.json + 各 `*_result.json`（链式：规则读异常结果、处置读规则结果）
-- **身份文件**：主智能体加载 7 个身份文件；子智能体脚本直跑、不经 LLM，运行时不实际加载身份文件
+- **身份文件**：主智能体加载 7 个身份文件；子智能体加载自己的 SOUL/AGENTS/MEMORY（3 个）
 
 ### Hermes框架特性
 
@@ -260,7 +260,7 @@ LLM_MODEL=ctgu-vlm
 - AGENTS.md: Usage instructions and responsibilities
 - MEMORY.md: Professional long-term memory
 
-注意：子智能体目录保留 3 个身份文件（SOUL.md, AGENTS.md, MEMORY.md）作文档；但 2026-07-23 起子智能体改为**脚本直跑、不经 LLM 会话**，运行时不实际加载这些身份文件。
+注意：子智能体（subagents/{agent}/）加载 3 个身份文件（SOUL.md, AGENTS.md, MEMORY.md）。
 
 ---
 
@@ -353,8 +353,8 @@ The system detects 4 types of violations:
   - ① **原生引擎** `shared/framework/hermes-agent/`（vendored upstream v0.16.0，editable 安装，gitignore，`scripts/vendor_hermes.py --src D:\Hermes\hermes-agent` 复现）。`agent/`(conversation_loop/system_prompt/tools 等)、顶层 `run_agent`/`hermes_constants` 都解析到这里——这是真正在跑的引擎。
   - ② **定制层** `shared/framework/hermes_agent/`（下划线，7 个活文件）：薄壳 AIAgent(`run_agent.py`，forward `run_conversation` 到原生 loop) + `agent_init.py` + **`identity_loader.py`（唯一真定制：读全部身份文件，原生只读 SOUL.md）** + process_bootstrap.py/utils.py。早期 ~1 万行的死代码 fork（slim conversation_loop、下划线 system_prompt/prompt_builder/hermes_constants/runtime_cwd）已于 2026-07-23 删除。
   - ③ **overlays** `shared/framework/hermes-overlays/`（3 个，全功能必需）：`agent_init.py` + `run_agent.py`（身份定制，转发到下划线 agent_init）、`tools/orchestrator_tool.py`（编排桥）。orchestrator 工具运行时由 `tool_registration.py` 以 `override=True` 注册（correct schema + bridge），覆盖 vendored 自带的损坏版。
-  - **身份加载（2026-07-23 修好，之前是坏的）**：原生 system_prompt 只读 SOUL.md；通过 `vendor_hermes.py` 的 PATCH 给原生 `agent/system_prompt.py` 接了 20 行——按 `_identity_path`(主智能体) / `HERMES_HOME`(子智能体) 加载目录里全部身份文件。主智能体读 7 个。（子智能体现为脚本直跑、不经 LLM，不实际加载身份。）
+  - **身份加载（2026-07-23 修好，之前是坏的）**：原生 system_prompt 只读 SOUL.md；通过 `vendor_hermes.py` 的 PATCH 给原生 `agent/system_prompt.py` 接了 20 行——按 `_identity_path`(主智能体) / `HERMES_HOME`(子智能体) 加载目录里全部身份文件。主智能体读 7 个、子智能体读 3 个（SOUL/AGENTS/MEMORY）。
   - **主智能体工具精简（2026-07-23）**：`tool_registration.py` 注册 4 个编排工具后，把 `agent.tools` 过滤成只剩这 4 个（call_subagent/list_subagents/create_session/read_result），移除 skill_view/skill_manage/memory/terminal 等会让主智能体跑偏的工具——砍后编排可靠性 3/3。
-  - **确定性子智能体（2026-07-23）**：`subagents/*/entry.py` 直接跑 canonical 脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition），**不经 LLM 会话**（早期 LLM 会话让 ctgu-vlm 瞎逛几十轮、极慢）。4 个合计 ~25s，结果经 `sessions/` 共享目录链式传递。
+  - **LLM 驱动子智能体（2026-07-23 改回 + 防瞎逛）**：`subagents/*/entry.py` 起 AIAgent 会话，LLM 读预加载的 SKILL.md 选+调对应 canonical 脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition）。**防瞎逛**（早期 ctgu-vlm 会用 terminal/skill_view 瞎逛几十轮）：SKILL.md 预加载进 prompt（不用 skill_view 翻）+ `enabled_toolsets` 仅 `["terminal"]`（去掉 skills/memory 等探索工具）+ `max_iterations=4` + 收紧 prompt。一轮完整研判 ~2 分钟，结果经 `sessions/` 共享目录链式传递。
   - **超时**：`shared/framework/hermes_agent/agent/conversation_loop.py` 的 total/tool/llm_timeout 改 env 驱动（`HERMES_TOTAL_TIMEOUT` 等，默认 2400/300/120）；`call_subagent.py` 的 `SUBAGENT_TIMEOUT` 默认 600s。
   - **仍待办（不影响运行）**：下划线 `run_agent.py`(5358行)/`agent_init.py`(1763行) 仍是从原生拷的大 fork，瘦身 = 切原生 AIAgent（要改 start_agent.py + entry.py 的 import，有风险，单独工作流）。
