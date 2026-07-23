@@ -1,103 +1,174 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""anomaly-detection 子智能体 - 入口（确定性：直接跑 canonical 脚本）。
+"""anomaly-detection 子智能体入口（LLM 驱动）。
 
-该子智能体的工作是确定性的（多算子异常检测），直接运行 canonical 脚本即可，不需要 LLM 会话。
-早期版本起完整 AIAgent 会话，导致 ctgu-vlm 用 terminal/execute_code 瞎逛几十轮、上下文滚到数万
-token，一轮研判十几分钟。改为直接跑脚本后秒级完成。本脚本只负责与主智能体的通信协议。
+设计：子智能体是独立 LLM 智能体——LLM 读自己的技能说明(SKILL.md)、据任务选择并调用
+对应脚本，脚本（调 shared 算子/知识）干真正的数据处理，结果写回公共会话区。本脚本只
+负责与主智能体的通信协议。
+
+防瞎逛（早期 LLM 子智能体会 skill_view/terminal 乱翻几十轮）：SKILL.md 预加载进 prompt
+（不用 skill_view 翻）+ 仅开 terminal 工具（无法 skill_view/memory 探索）+ 低迭代上限。
 """
 import json
 import logging
 import os
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Any, Optional
 
 AGENT_DIR = Path(__file__).parent.resolve()
-PROJECT_ROOT = AGENT_DIR.parent.parent
+os.environ['HERMES_HOME'] = str(AGENT_DIR)
+project_root = AGENT_DIR.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+try:
+    from shared.framework.hermes_agent.run_agent import AIAgent
+except ImportError as e:
+    print(f"[ERROR] Failed to import Hermes AIAgent: {e}", file=sys.stderr)
+    sys.exit(1)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s - %(message)s',
-                    stream=sys.stdout, force=True)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    handlers=[logging.StreamHandler(sys.stdout)], force=True)
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 logger = logging.getLogger(__name__)
 
-DEFAULT_SUBAGENT_NAME = "anomaly-detection"
 RESULT_FILE_NAMES = {
     "anomaly-detection": "anomaly_result.json",
     "multi-dimensional-data-perception": "data_result.json",
     "rule-reasoning": "rule_reasoning_result.json",
     "disposition-execution": "disposition_result.json",
 }
-# 该子智能体的 canonical 脚本（确定性算子，不经 LLM）
-CANONICAL_SCRIPT = AGENT_DIR / "skills" / "anomaly-detection-core" / "scripts" / "run_anomaly_detection_simple.py"
-SCRIPT_TIMEOUT = 300
+DEFAULT_SUBAGENT_NAME = "anomaly-detection"
 
 
-def load_task(session_dir):
+def load_task(session_dir: Optional[str]) -> Optional[Dict[str, Any]]:
     if not session_dir:
         return None
     task_file = Path(session_dir) / "task.json"
     if not task_file.exists():
         return None
     try:
-        return json.loads(task_file.read_text(encoding="utf-8"))
+        return json.loads(task_file.read_text(encoding='utf-8'))
     except Exception as e:
         logger.error(f"[LOAD] task 解析失败: {e}")
         return None
 
 
-def run_canonical_script(session_dir, subagent_name):
-    """直接运行 canonical 脚本（不经 LLM 会话）。"""
-    env = os.environ.copy()
-    env["SESSION_DIR"] = session_dir or ""
-    env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
-    cmd = [sys.executable, str(CANONICAL_SCRIPT)]
-    if subagent_name == "multi-dimensional-data-perception":
-        cmd += ["--hours", "24"]
-    elif session_dir:
-        cmd += ["--session-dir", session_dir]
-    logger.info(f"[RUN] {CANONICAL_SCRIPT.name} {' '.join(cmd[2:])}")
+def write_result(session_dir: str, result: Dict[str, Any], filename: str) -> bool:
     try:
-        r = subprocess.run(cmd, cwd=str(AGENT_DIR), env=env, capture_output=True,
-                           text=True, encoding="utf-8", errors="replace", timeout=SCRIPT_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        logger.error(f"[RUN] 脚本超时 ({SCRIPT_TIMEOUT}s)")
-        return -1
-    if r.returncode != 0:
-        logger.error(f"[RUN] 脚本失败 exit={r.returncode} stderr={(r.stderr or '')[-400:]}")
-    else:
-        logger.info(f"[RUN] 脚本完成")
-    return r.returncode
+        result_file = Path(session_dir).resolve() / filename
+        with open(result_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        logger.info(f"[WRITE] 已写入结果: {result_file}")
+        return True
+    except Exception as e:
+        logger.error(f"[WRITE] 写入结果失败: {e}")
+        return False
 
 
-def main():
-    session_dir = os.getenv("SESSION_DIR")
-    subagent_name = os.getenv("SUBAGENT_NAME", DEFAULT_SUBAGENT_NAME)
+def _preload_skill_md() -> str:
+    for p in AGENT_DIR.glob("skills/*/SKILL.md"):
+        try:
+            return p.read_text(encoding="utf-8")
+        except Exception:
+            continue
+    return ""
+
+
+def _read_script_result(session_dir, result_filename):
+    if not session_dir:
+        return None
+    session_path = Path(session_dir).resolve()
+    candidates = [session_path / result_filename]
+    try:
+        candidates += list(session_path.glob("*_result.json"))
+    except Exception:
+        pass
+    seen = set()
+    for p in candidates:
+        key = str(p)
+        if key in seen or not p.exists():
+            continue
+        seen.add(key)
+        try:
+            loaded = json.loads(p.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        if not isinstance(loaded, dict) or loaded.get("status") == "failed":
+            continue
+        inner = loaded.get("result")
+        if isinstance(inner, dict) or "data" in loaded or "statistics" in loaded:
+            return loaded
+    return None
+
+
+def run_subagent() -> Dict[str, Any]:
+    session_dir = os.getenv('SESSION_DIR')
+    subagent_name = os.getenv('SUBAGENT_NAME', DEFAULT_SUBAGENT_NAME)
     logger.info(f"[START] 子智能体={subagent_name} SESSION_DIR={session_dir}")
 
     task = load_task(session_dir)
-    task_id = (task or {}).get("task_id", "unknown")
+    if not task:
+        error_result = {"task_id": "unknown", "status": "failed",
+                        "error": "Failed to load task", "timestamp": datetime.now().isoformat()}
+        if session_dir:
+            write_result(session_dir, error_result, RESULT_FILE_NAMES.get(subagent_name, "result.json"))
+        return error_result
+    task_id = task.get('task_id', 'unknown')
 
-    rc = run_canonical_script(session_dir, subagent_name)
+    skill_md = _preload_skill_md()
+    user_message = (
+        f"任务：{task.get('task', '')}\n\n"
+        f"以下是你（{subagent_name} 子智能体）的技能说明，请严格按它执行：\n"
+        f"---\n{skill_md}\n---\n\n"
+        "执行要求：\n"
+        "- 第一步就用 terminal 工具运行上述技能指定的脚本（如 `python skills/.../xxx.py`），"
+        "不要 skills_list/skill_view/memory 等探索。\n"
+        "- 脚本跑完、确认产出了结果文件即可停止，不要多做。"
+    )
 
-    result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
-    result_file = Path(session_dir) / result_filename if session_dir else None
-    if result_file and result_file.exists():
-        try:
-            result = json.loads(result_file.read_text(encoding="utf-8"))
-        except Exception as e:
-            result = {"task_id": task_id, "status": "failed", "error": f"结果解析失败: {e}"}
-    else:
-        result = {"task_id": task_id, "status": "failed",
-                  "error": f"脚本未产出 {result_filename} (exit={rc})"}
+    try:
+        llm_base_url = os.environ.get('LLM_BASE_URL') or os.environ.get('OPENAI_BASE_URL')
+        llm_api_key = os.environ.get('LLM_API_KEY') or os.environ.get('OPENAI_API_KEY')
+        llm_model = os.environ.get('LLM_MODEL', 'LongCat-2.0')
+        if not llm_api_key:
+            raise ValueError("LLM_API_KEY 或 OPENAI_API_KEY 环境变量未设置")
 
-    result["task_id"] = task_id
-    if result_file:
-        result_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-        logger.info(f"[WRITE] {result_file}")
+        logger.info(f"[LLM] 开始处理任务: {task_id}")
+        agent = AIAgent(
+            base_url=llm_base_url, api_key=llm_api_key, model=llm_model,
+            load_soul_identity=True, skip_context_files=False, skip_memory=False,
+            enabled_toolsets=["terminal"], session_id=task_id, max_iterations=4,
+        )
+        response = agent.run_conversation(user_message)
+        logger.info(f"[LLM] 任务完成")
+
+        result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
+        result = _read_script_result(session_dir, result_filename)
+        if result is None:
+            result = response.get('final_response', response)
+            logger.info(f"[LLM] 未找到脚本结构化结果，回退 final_response")
+        else:
+            logger.info(f"[LLM] 回传脚本结构化结果")
+
+    except Exception as e:
+        logger.error(f"[LLM] 执行失败: {e}", exc_info=True)
+        result = {"task_id": task_id, "status": "failed", "error": str(e),
+                  "timestamp": datetime.now().isoformat()}
+
+    if session_dir:
+        result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
+        if not isinstance(result, dict):
+            result = {"task_id": task_id, "status": "completed", "result": result,
+                      "timestamp": datetime.now().isoformat()}
+        result["task_id"] = task_id
+        write_result(session_dir, result, result_filename)
     return result
 
 
 if __name__ == "__main__":
-    _r = main()
+    _r = run_subagent()
     sys.exit(0 if (isinstance(_r, dict) and _r.get("status") != "failed") else 1)
