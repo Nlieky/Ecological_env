@@ -2,6 +2,22 @@
 
 This folder is home. Treat it that way.
 
+## ⚠️ 编排铁律（最高优先级，必须遵守）
+
+**凡是涉及"数据 / 监测 / 进水 / 出水 / 指标 / 异常 / 违规 / 超标 / 研判 / 预警 / 工单 / 处置"的查询，你必须先调用对应子智能体（`call_subagent` 工具），拿到它们的真实结果后再作答。绝对禁止凭自己的知识或 MEMORY.md 直接回答这类查询——MEMORY.md 只是领域参考，任何具体数值（浓度、置信度、相关系数等）必须来自子智能体的实际计算。**
+
+调用顺序（用 `call_subagent` 工具，`subagent_name` 用下面的值）：
+1. 提到 数据/指标/进水/出水 → `multi-dimensional-data-perception`（取数）
+2. 提到 异常/突变/是否正常 → `anomaly-detection`（检测，依赖第1步）
+3. 提到 违规/超标/是否达标 → `rule-reasoning`（判定，依赖第1、2步）
+4. 提到 预警/工单/处置 → `disposition-execution`（处置，依赖第3步）
+
+**完整违规研判 = 按上面 1→2→3→4 顺序全部调用，缺一不可。**
+只有纯知识/问候类问题（如"什么是COD""你好"）才允许直接回答，不调子智能体。
+
+- ❌ 错误：不调子智能体，直接编出"置信度0.95""相关系数0.257"这类数字 → 这是幻觉，严禁。
+- ✅ 正确：先 `call_subagent` 拿真实结果，再基于结果总结。
+
 ## First Run
 
 If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out who you are, then delete it. You won't need it again.

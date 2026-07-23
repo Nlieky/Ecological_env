@@ -59,9 +59,20 @@ class AlertClassifier:
         if violation_result is None:
             violation_result = {}
 
+        # 从完整结果信封里提取置信度——fuse_results 期望 {"confidence": float} 形状；
+        # 若直接传整个 anomaly_result/violation_result 信封，置信度因嵌套在 "result" 下
+        # 取不到，fused_confidence 恒为 0，告警会被错误降级为 general。
+        anomaly_conf = 0.0
+        a_res = (anomaly_result or {}).get("result") or {}
+        a_anoms = a_res.get("anomalies") or []
+        if a_anoms:
+            anomaly_conf = max([a.get("score", 0.0) for a in a_anoms]) / 3.0  # 归一化到 [0,1]
+        violation_conf = (violation_result or {}).get("result", {}).get("confidence", 0.0)
+
         # 使用consensus_engine进行融合
         fusion_result = self.consensus_engine.fuse_results(
-            anomaly_result, violation_result
+            {"confidence": anomaly_conf},
+            {"confidence": violation_conf}
         )
 
         fused_confidence = fusion_result.fused_confidence
@@ -77,7 +88,9 @@ class AlertClassifier:
             alert_level = AlertLevel.SERIOUS
             action = ActionRequired.IMMEDIATE_INVESTIGATION
 
-        violation_type = violation_result.get("violation_type", "未知")
+        # 违规类型嵌套在 result.violation_type_names 下
+        v_names = (violation_result or {}).get("result", {}).get("violation_type_names") or []
+        violation_type = v_names[0] if v_names else "未知"
 
         return {
             "level": alert_level.value,

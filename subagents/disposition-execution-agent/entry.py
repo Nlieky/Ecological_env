@@ -1,255 +1,103 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""disposition-execution 子智能体 - 入口（确定性：直接跑 canonical 脚本）。
+
+该子智能体的工作是确定性的（融合共识 + 预警分级 + 工单生成，均为代码），直接运行 canonical
+脚本即可，不需要 LLM 会话。早期版本起完整 AIAgent 会话导致 ctgu-vlm 瞎逛、极慢；改为直接跑脚本后
+秒级完成。本脚本只负责与主智能体的通信协议。
 """
-disposition-execution 子智能体 - 统一入口点
-
-原则：能由 LLM 做的就不要用硬编码脚本做。
-此脚本只处理与主智能体的通信协议。
-
-使用方式：
-    由主智能体通过 subprocess 调用，环境变量设置：
-    - HERMES_HOME: 子智能体目录
-    - SESSION_DIR: 会话目录
-    - SUBAGENT_NAME: 子智能体名称
-"""
-
 import json
 import logging
 import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
 
-# === 步骤 1: 设置 HERMES_HOME ===
 AGENT_DIR = Path(__file__).parent.resolve()
-os.environ['HERMES_HOME'] = str(AGENT_DIR)
+PROJECT_ROOT = AGENT_DIR.parent.parent
 
-# === 步骤 2: 导入 Hermes AIAgent（与主智能体同款路径） ===
-project_root = AGENT_DIR.parent.parent  # 项目根目录
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-try:
-    from shared.framework.hermes_agent.run_agent import AIAgent
-except ImportError as e:
-    print(f"[ERROR] Failed to import Hermes AIAgent: {e}", file=sys.stderr)
-    sys.exit(1)
-
-# === 步骤 3: 配置日志 ===
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ],
-    force=True
-)
-sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s - %(message)s',
+                    stream=sys.stdout, force=True)
 logger = logging.getLogger(__name__)
 
-# === 步骤 4: 定义结果文件名（与 call_subagent.py 一致） ===
+DEFAULT_SUBAGENT_NAME = "disposition-execution"
 RESULT_FILE_NAMES = {
     "anomaly-detection": "anomaly_result.json",
     "multi-dimensional-data-perception": "data_result.json",
-    "rule-reasoning": "rule_result.json",
-    "disposition-execution": "disposition_result.json"
+    "rule-reasoning": "rule_reasoning_result.json",
+    "disposition-execution": "disposition_result.json",
 }
+# 该子智能体的 canonical 脚本（确定性研判处置，不经 LLM）
+CANONICAL_SCRIPT = AGENT_DIR / "skills" / "disposition-execution-core" / "scripts" / "run_disposition.py"
+SCRIPT_TIMEOUT = 300
 
 
-def load_task(session_dir: Optional[str]) -> Optional[Dict[str, Any]]:
-    """从会话目录加载任务"""
+def load_task(session_dir):
     if not session_dir:
-        logger.warning("[LOAD] SESSION_DIR 环境变量未设置")
         return None
-
-    session_path = Path(session_dir).resolve()
-    task_file = session_path / "task.json"
+    task_file = Path(session_dir) / "task.json"
     if not task_file.exists():
-        logger.error(f"[LOAD] 任务文件不存在: {task_file}")
         return None
-
     try:
-        with open(task_file, 'r', encoding='utf-8') as f:
-            task = json.load(f)
-        logger.info(f"[LOAD] 已加载任务: {task.get('task_id', 'unknown')}")
-        return task
+        return json.loads(task_file.read_text(encoding="utf-8"))
     except Exception as e:
-        logger.error(f"[LOAD] 加载任务失败: {e}")
+        logger.error(f"[LOAD] task 解析失败: {e}")
         return None
 
 
-def write_result(session_dir: str, result: Dict[str, Any], filename: str) -> bool:
-    """将结果写入会话目录"""
+def run_canonical_script(session_dir, subagent_name):
+    """直接运行 canonical 脚本（不经 LLM 会话）。"""
+    env = os.environ.copy()
+    env["SESSION_DIR"] = session_dir or ""
+    env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    cmd = [sys.executable, str(CANONICAL_SCRIPT)]
+    if subagent_name == "multi-dimensional-data-perception":
+        cmd += ["--hours", "24"]
+    elif session_dir:
+        cmd += ["--session-dir", session_dir]
+    logger.info(f"[RUN] {CANONICAL_SCRIPT.name} {' '.join(cmd[2:])}")
     try:
-        session_path = Path(session_dir).resolve()
-        result_file = session_path / filename
-
-        with open(result_file, 'w', encoding='utf-8') as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-
-        logger.info(f"[WRITE] 已写入结果: {result_file}")
-        return True
-    except Exception as e:
-        logger.error(f"[WRITE] 写入结果失败: {e}")
-        return False
-
-
-def build_user_message(task: Dict[str, Any]) -> str:
-    """构建用户消息"""
-    task_description = task.get('task', '')
-    context = task.get('context', {})
-
-    if context:
-        context_str = json.dumps(context, ensure_ascii=False, indent=2)
-        return f"""任务：{task_description}
-
-上下文信息：
-```json
-{context_str}
-```
-
-请处理此任务并返回结果。"""
+        r = subprocess.run(cmd, cwd=str(AGENT_DIR), env=env, capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", timeout=SCRIPT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        logger.error(f"[RUN] 脚本超时 ({SCRIPT_TIMEOUT}s)")
+        return -1
+    if r.returncode != 0:
+        logger.error(f"[RUN] 脚本失败 exit={r.returncode} stderr={(r.stderr or '')[-400:]}")
     else:
-        return task_description
+        logger.info(f"[RUN] 脚本完成")
+    return r.returncode
 
 
-def _read_script_result(session_dir, result_filename):
-    """读取 skill 脚本在会话目录里写的结构化结果。
+def main():
+    session_dir = os.getenv("SESSION_DIR")
+    subagent_name = os.getenv("SUBAGENT_NAME", DEFAULT_SUBAGENT_NAME)
+    logger.info(f"[START] 子智能体={subagent_name} SESSION_DIR={session_dir}")
 
-    SKILL.md 要求子智能体"只调用脚本、传递结果，不要生成报告"。脚本（如 get_data.py）
-    会把结构化 dict 写到 *_result.json。本函数优先取 result_filename，兜底扫描会话目录
-    其它 *_result.json。区分脚本结构化产物 vs LLM 文字报告的判据：顶层 result 是 dict、
-    或顶层含 data/statistics 视为结构化；result 是 str 视为 LLM 文字报告（跳过）。
-    返回 dict 或 None。
-    """
-    if not session_dir:
-        return None
-    session_path = Path(session_dir).resolve()
-    candidates = [session_path / result_filename]
-    try:
-        candidates += list(session_path.glob("*_result.json"))
-    except Exception:
-        pass
-    seen = set()
-    for p in candidates:
-        key = str(p)
-        if key in seen or not p.exists():
-            continue
-        seen.add(key)
-        try:
-            loaded = json.loads(p.read_text(encoding='utf-8'))
-        except Exception:
-            continue
-        if not isinstance(loaded, dict) or loaded.get("status") == "failed":
-            continue
-        inner = loaded.get("result")
-        if isinstance(inner, dict) or "data" in loaded or "statistics" in loaded:
-            return loaded
-    return None
-
-
-def run_subagent() -> Dict[str, Any]:
-    """子智能体主入口"""
-    session_dir = os.getenv('SESSION_DIR')
-    subagent_name = os.getenv('SUBAGENT_NAME', 'disposition-execution')
-
-    logger.info(f"[START] 启动子智能体: {subagent_name}")
-    logger.info(f"[START] HERMES_HOME: {os.environ.get('HERMES_HOME')}")
-    logger.info(f"[START] SESSION_DIR: {session_dir}")
-
-    # 1. 读取任务
     task = load_task(session_dir)
-    if not task:
-        error_result = {
-            "task_id": "unknown",
-            "status": "failed",
-            "error": "Failed to load task",
-            "timestamp": datetime.now().isoformat()
-        }
-        if session_dir:
-            result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
-            write_result(session_dir, error_result, result_filename)
-        return error_result
+    task_id = (task or {}).get("task_id", "unknown")
 
-    task_id = task.get('task_id', 'unknown')
+    rc = run_canonical_script(session_dir, subagent_name)
 
-    # 2. 启动 AIAgent
-    try:
-        user_message = build_user_message(task)
+    result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
+    result_file = Path(session_dir) / result_filename if session_dir else None
+    if result_file and result_file.exists():
+        try:
+            result = json.loads(result_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            result = {"task_id": task_id, "status": "failed", "error": f"结果解析失败: {e}"}
+    else:
+        result = {"task_id": task_id, "status": "failed",
+                  "error": f"脚本未产出 {result_filename} (exit={rc})"}
 
-        logger.info(f"[LLM] 开始处理任务: {task_id}")
-
-        # 获取 LLM 配置
-        llm_base_url = os.environ.get('LLM_BASE_URL') or os.environ.get('OPENAI_BASE_URL')
-        llm_api_key = os.environ.get('LLM_API_KEY') or os.environ.get('OPENAI_API_KEY')
-        llm_model = os.environ.get('LLM_MODEL', 'LongCat-2.0')
-
-        if not llm_api_key:
-            raise ValueError("LLM_API_KEY 或 OPENAI_API_KEY 环境变量未设置")
-
-        agent = AIAgent(
-            base_url=llm_base_url,
-            api_key=llm_api_key,
-            model=llm_model,
-            load_soul_identity=True,
-            skip_context_files=False,
-            skip_memory=False,
-            enabled_toolsets=["skills", "terminal"],
-            session_id=task_id,
-            max_iterations=10
-        )
-
-        response = agent.run_conversation(user_message)
-        logger.info(f"[LLM] 任务完成")
-
-        # 优先回传 skill 脚本写的结构化结果（SKILL.md：只调用脚本、传递结果，不要生成报告）。
-        # 找不到结构化产物时才回退到 LLM 的 final_response（文字）。
-        result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
-        result = _read_script_result(session_dir, result_filename)
-        if result is None:
-            result = response.get('final_response', response)
-            logger.info(f"[LLM] 未找到脚本结构化结果，回退 final_response")
-        else:
-            logger.info(f"[LLM] 回传脚本结构化结果")
-
-    except Exception as e:
-        logger.error(f"[LLM] 执行失败: {e}", exc_info=True)
-        result = {
-            "task_id": task_id,
-            "status": "failed",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
-    # 3. 写入结果
-    if session_dir:
-        result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
-
-        # 如果结果不是 dict，包装一下
-        if not isinstance(result, dict):
-            result = {
-                "task_id": task_id,
-                "status": "completed",
-                "result": result,
-                "timestamp": datetime.now().isoformat()
-            }
-
-        # 强制对齐 task_id：脚本/子智能体自带的 task_id 可能与 call_subagent 写入 task.json 的
-        # 不一致（格式/生成方式不同）→ call_subagent 的防串台校验会报 "Task ID mismatch"。
-        result["task_id"] = task_id
-
-        write_result(session_dir, result, result_filename)
-
+    result["task_id"] = task_id
+    if result_file:
+        result_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.info(f"[WRITE] {result_file}")
     return result
 
 
 if __name__ == "__main__":
-    result = run_subagent()
-
-    # 返回适当的退出码
-    if isinstance(result, dict) and result.get("status") == "failed":
-        sys.exit(1)
-    else:
-        sys.exit(0)
+    _r = main()
+    sys.exit(0 if (isinstance(_r, dict) and _r.get("status") != "failed") else 1)

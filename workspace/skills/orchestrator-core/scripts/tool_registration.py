@@ -41,6 +41,18 @@ except ImportError:
 def register_orchestrator_tools(agent):
     """将orchestrator工具注册到AIAgent实例（hermes-agent兼容版本）
 
+    只有下面两层注册是真正生效的（2026-07-21 端到端验证）：
+      1. 把 4 个 schema 灌进 agent.tools —— conversation_loop 只读 agent.tools
+         喂给 LLM（completion(tools=agent.tools)）。不灌这里 LLM 看不到工具。
+      2. 以 override=True 覆盖注册到 hermes 全局 tools.registry —— dispatch 走全局
+         registry，用项目签名正确的 handler 取代 vendored 自带的损坏版
+         tools/orchestrator_tool.py。
+
+    历史上还有第三层 agent.tool_registry.register(ToolEntry(...))，但
+    agent.tool_registry 在整个 framework 里没有任何读取方（grep 零命中），
+    且 vendored ToolEntry 签名已变（要求 toolset/check_fn/requires_env/
+    is_async/description/emoji），旧调用必然失败靠回退兜住——纯死代码，已删。
+
     Args:
         agent: AIAgent实例
     """
@@ -48,9 +60,7 @@ def register_orchestrator_tools(agent):
     if not hasattr(agent, 'tools') or agent.tools is None:
         agent.tools = []
 
-    # 关键：把 4 个 orchestrator 工具 schema 灌进 agent.tools。
-    # conversation_loop 只读 agent.tools 喂给 LLM（completion(tools=agent.tools)），
-    # 不读 tool_registry。不灌这里 LLM 就看不到工具、永远不会发起 call_subagent。
+    # 第 1 层：把 4 个 orchestrator 工具 schema 灌进 agent.tools。
     _ORCH_SCHEMAS = [
         {"type": "function", "function": {
             "name": "call_subagent",
@@ -81,10 +91,20 @@ def register_orchestrator_tools(agent):
         if s['function']['name'] not in existing:
             agent.tools.append(s)
 
-    # 覆盖注册到 hermes 全局 registry：vendored hermes 自带的 tools/orchestrator_tool.py
-    # 是项目早年塞进 hermes 目录的、多处损坏的桥接（handler 签名错、_get_subagent_tools
-    # 指错模块、schema 双层包裹致 LLM 400）。这里用本项目签名正确、走 bridge、schema 正确
-    # 的 handler 以 override=True 覆盖那 4 个工具，让 dispatch 真正走通。
+    # 砍掉所有非编排工具：主智能体只保留这 4 个编排工具（call_subagent/list_subagents/
+    # create_session/read_result），移除 skill_view/skill_manage/skills_list/memory/
+    # browser_*/terminal/execute_code 等会让它跑偏去翻技能/记忆/跑终端的分心工具。
+    # 主智能体职责是编排+综合，子智能体结果经 call_subagent 回传，不需要其它工具。
+    _ORCH_NAMES = {s['function']['name'] for s in _ORCH_SCHEMAS}
+    before_n = len(agent.tools)
+    agent.tools = [t for t in agent.tools if isinstance(t, dict)
+                   and t.get('function', {}).get('name') in _ORCH_NAMES]
+    print(f"主智能体工具精简：{before_n} → {len(agent.tools)}（仅保留编排工具，移除分心工具）")
+
+    # 第 2 层：覆盖注册到 hermes 全局 registry。vendored hermes 自带的
+    # tools/orchestrator_tool.py 是多处损坏的桥接（handler 签名错、schema 双层包裹
+    # 致 LLM 400），这里用本项目签名正确、走 bridge、schema 正确的 handler 以
+    # override=True 覆盖，让 dispatch 真正走通。
     try:
         from tools.registry import registry as _hg
         _OVR = [
@@ -101,158 +121,6 @@ def register_orchestrator_tools(agent):
         print(f"已覆盖注册 {len(_OVR)} 个 orchestrator 工具到 hermes 全局 registry")
     except Exception as _e:
         print(f"⚠ orchestrator 全局 registry 覆盖失败: {_e}")
-
-    # 导入桥接模块
-    try:
-        from workspace.skills.orchestrator_core_bridge import (
-            call_subagent,
-            list_subagents,
-            create_session,
-            read_result
-        )
-    except ImportError:
-        import importlib.util
-        bridge_path = Path(__file__).parents[4] / "workspace" / "skills" / "orchestrator_core_bridge.py"
-        spec = importlib.util.spec_from_file_location("orchestrator_core_bridge", bridge_path)
-        bridge_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(bridge_module)
-
-        call_subagent = bridge_module.call_subagent
-        list_subagents = bridge_module.list_subagents
-        create_session = bridge_module.create_session
-        read_result = bridge_module.read_result
-
-    # 使用hermes-agent的工具注册系统
-    try:
-        from tools.registry import ToolEntry
-
-        # 注册工具到hermes-agent的注册表
-        tools_to_register = [
-            ToolEntry(
-                name="call_subagent",
-                handler=_call_subagent_handler,
-                schema={
-                    "type": "function",
-                    "function": {
-                        "name": "call_subagent",
-                        "description": "调用指定的子智能体执行任务。可用子智能体：multi-dimensional-data-perception(数据感知)、anomaly-detection(异常检测)、rule-reasoning(规则推理)、disposition-execution(处置执行)",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "subagent_name": {
-                                    "type": "string",
-                                    "enum": ["multi-dimensional-data-perception", "anomaly-detection", "rule-reasoning", "disposition-execution"],
-                                    "description": "子智能体名称"
-                                },
-                                "task": {"type": "string", "description": "具体任务描述"},
-                                "context": {"type": "string", "description": "前置结果（可选）"}
-                            },
-                            "required": ["subagent_name", "task"]
-                        }
-                    }
-                }
-            ),
-            ToolEntry(
-                name="list_subagents",
-                handler=_list_subagents_handler,
-                schema={
-                    "type": "function",
-                    "function": {
-                        "name": "list_subagents",
-                        "description": "列出所有可用的子智能体及其功能",
-                        "parameters": {"type": "object", "properties": {}, "required": []}
-                    }
-                }
-            ),
-            ToolEntry(
-                name="create_session",
-                handler=_create_session_handler,
-                schema={
-                    "type": "function",
-                    "function": {
-                        "name": "create_session",
-                        "description": "创建新的会话目录用于子智能体通信",
-                        "parameters": {"type": "object", "properties": {}, "required": []}
-                    }
-                }
-            ),
-            ToolEntry(
-                name="read_result",
-                handler=_read_result_handler,
-                schema={
-                    "type": "function",
-                    "function": {
-                        "name": "read_result",
-                        "description": "读取子智能体的执行结果文件",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "result_file": {"type": "string", "description": "结果文件名"}
-                            },
-                            "required": ["result_file"]
-                        }
-                    }
-                }
-            )
-        ]
-
-        # 注册工具
-        for tool_entry in tools_to_register:
-            agent.tool_registry.register(tool_entry)
-
-        print(f"已注册 {len(tools_to_register)} 个orchestrator工具到hermes-agent注册表")
-
-    except Exception as e:
-        print(f"使用hermes-agent注册表失败: {e}，回退到传统方式")
-        # 回退：直接注册处理函数到agent的工具注册表
-        try:
-            if hasattr(agent, 'tool_registry'):
-                # 直接注册处理函数
-                agent.tool_registry.register_by_name(
-                    "call_subagent",
-                    _call_subagent_handler,
-                    {"type": "function", "function": {
-                        "name": "call_subagent",
-                        "description": "调用指定的子智能体执行任务"
-                    }}
-                )
-                agent.tool_registry.register_by_name(
-                    "list_subagents",
-                    _list_subagents_handler,
-                    {"type": "function", "function": {
-                        "name": "list_subagents",
-                        "description": "列出所有可用的子智能体"
-                    }}
-                )
-                agent.tool_registry.register_by_name(
-                    "create_session",
-                    _create_session_handler,
-                    {"type": "function", "function": {
-                        "name": "create_session",
-                        "description": "创建新的会话目录用于子智能体通信"
-                    }}
-                )
-                agent.tool_registry.register_by_name(
-                    "read_result",
-                    _read_result_handler,
-                    {"type": "function", "function": {
-                        "name": "read_result",
-                        "description": "读取子智能体的执行结果文件"
-                    }}
-                )
-                print(f"已注册 4 个orchestrator工具到工具注册表（回退模式）")
-        except Exception as e2:
-            print(f"工具注册表注册也失败: {e2}，使用最小化方式")
-            # 最小化回退：至少确保工具在工具列表中
-            if not hasattr(agent, 'tools'):
-                agent.tools = []
-
-            # 添加工具名称到valid_tool_names
-            if not hasattr(agent, 'valid_tool_names'):
-                agent.valid_tool_names = set()
-
-            agent.valid_tool_names.update(['call_subagent', 'list_subagents', 'create_session', 'read_result'])
-            print(f"已添加工具名称到valid_tool_names（最小化模式）")
 
 
 # Hermes-agent兼容的工具处理器（灵活签名以兼容多种调用方式）

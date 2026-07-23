@@ -26,6 +26,10 @@ sys.path.insert(0, str(project_root))
 # 加载环境变量
 load_dotenv()
 
+# 切断对系统 HERMES_HOME（可能指向 D:\Hermes 旧 home）的依赖：显式重定向到项目根，
+# 使 hermes 的 env_loader 加载本项目 .env，而非 D:\Hermes\.env。
+os.environ['HERMES_HOME'] = str(project_root)
+
 from shared.framework.hermes_agent.run_agent import AIAgent
 
 # 配置日志
@@ -84,10 +88,10 @@ class AgentService:
                 load_soul_identity=True
             )
 
-            # 设置最大迭代次数为10（性能优化）
+            # 设置最大迭代次数为15（4子智能体pipeline需要更多轮次）
             if hasattr(self.master_agent, 'max_iterations'):
-                self.master_agent.max_iterations = 10
-                logger.info("✅ 设置最大迭代次数为10（性能优化）")
+                self.master_agent.max_iterations = 15
+                logger.info("✅ 设置最大迭代次数为15")
 
             # 注册orchestrator工具到AIAgent
             try:

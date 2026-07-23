@@ -65,7 +65,7 @@ def get_session_files(session_path: str) -> dict:
         "task": session / "task.json",
         "data_result": session / "data_result.json",
         "anomaly_result": session / "anomaly_result.json",
-        "rule_result": session / "rule_result.json",
+        "rule_result": session / "rule_reasoning_result.json",
         "disposition_result": session / "disposition_result.json",
         "final_response": session / "final_response.json",
     }

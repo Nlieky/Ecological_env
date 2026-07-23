@@ -14,17 +14,17 @@
 本项目采用Hermes Agent框架（NousResearch/hermes-agent）实现LLM驱动的智能体架构：
 
 - **主智能体**（workspace/）：使用Hermes AIAgent类，负责意图识别、任务编排、对话管理
-- **4个子智能体**（subagents/）：每个都是独立的Hermes AIAgent实例，通过subprocess启动
+- **4个子智能体**（subagents/）：**确定性脚本执行器**——`entry.py` 直接跑 canonical 脚本（不经 LLM 会话），通过 subprocess 启动
 - **三库一体**（shared/）：operators（算子库）、data（数据库）、knowledge（知识库）统一在shared/目录
 
 ### 子智能体调用规范
 
-主智能体通过**自定义工具集**调用子智能体：
-- **调用方式**：通过 `workspace/skills/orchestrator-core/scripts/subagent_tools.py` 工具集
-- **LLM 驱动**：主智能体通过 LLM 理解任务并动态决定调用哪些子智能体
-- **上下文隔离**：每个子智能体通过 subprocess 启动，获得独立的会话目录
-- **通信机制**：通过 `sessions/` 目录共享 task.json 和 result.json
-- **身份文件加载**：每个子智能体加载自己的 SOUL.md、AGENTS.md、MEMORY.md
+主智能体通过**编排工具**调用子智能体（`tool_registration.py` 把 4 个编排工具灌进 `agent.tools`，并精简为只留这 4 个）：
+- **调用方式**：主智能体 LLM 调 `call_subagent(subagent_name, task)` → `call_subagent.py` subprocess 跑子智能体 `entry.py`
+- **LLM 驱动**：主智能体按 `workspace/AGENTS.md` 顶部的"编排铁律"决定调哪些子智能体、什么顺序
+- **确定性执行**：子智能体 `entry.py` **直接跑 canonical 脚本**（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition），**不经 LLM 会话**（早期 LLM 会话会让 ctgu-vlm 用 terminal/execute_code 瞎逛几十轮、极慢；2026-07-23 改为脚本直跑，4 个合计 ~25s）
+- **通信机制**：通过共享 `sessions/<session>/` 目录传 task.json + 各 `*_result.json`（链式：规则读异常结果、处置读规则结果）
+- **身份文件**：主智能体加载 7 个身份文件；子智能体脚本直跑、不经 LLM，运行时不实际加载身份文件
 
 ### Hermes框架特性
 
@@ -38,7 +38,7 @@
 
 Wastewater false discharge monitoring system based on a patent architecture using 6 layers: human-computer interaction, data collection, master agent, task orchestration, sub-agent, and data support layers. The system uses a Large Language Model (LLM) as a core coordinator that reads master/sub-agent identity files and calls pre-developed scripts from four sub-agents.
 
-**当前状态**：后端API已完成，前端界面尚未开发。
+**当前状态**：后端 API 完成；前端框架完成(Phase 0-3A)，部分页面待填充(Phase B)；智能体 pipeline 已跑通(2026-07-23)。
 
 ---
 
@@ -246,20 +246,21 @@ LLM_MODEL=ctgu-vlm
 
 ### Identity Files
 
-**Master Agent** (workspace/):
+**Master Agent** (workspace/, 7 个身份文件，启动时全加载):
 - IDENTITY.md: Identity card
-- AGENTS.md: Workspace rules, conventions
 - SOUL.md: Personality and tone
+- AGENTS.md: Workspace rules, conventions（含"编排铁律"）
 - MEMORY.md: Long-term memory
 - USER.md: User information
 - TOOLS.md: Environment-specific notes
+- HEARTBEAT.md: Periodic tasks
 
 **Sub-Agents** (subagents/{agent}/):
 - SOUL.md: Identity and personality
 - AGENTS.md: Usage instructions and responsibilities
 - MEMORY.md: Professional long-term memory
 
-注意：子智能体只需要 3 个身份文件（SOUL.md, AGENTS.md, MEMORY.md），不需要 IDENTITY.md、TOOLS.md、USER.md 等主智能体文件。
+注意：子智能体目录保留 3 个身份文件（SOUL.md, AGENTS.md, MEMORY.md）作文档；但 2026-07-23 起子智能体改为**脚本直跑、不经 LLM 会话**，运行时不实际加载这些身份文件。
 
 ---
 
@@ -344,4 +345,12 @@ The system detects 4 types of violations:
 - **实时数据为历史数据模拟**：当前无真实传感器接入，`/api/v1/monitoring/realtime` 等接口返回的是 `data/*.csv` 历史数据的最新行（截至 2024-12-31），用于打通"采集→主智能体→子智能体→报告"全链路。接入真实数据源后，替换 `backend/services/monitoring_data_loader.py` 的取数逻辑即可，上下游接口不变。
 - **对话历史持久化**：`/api/query` 在拿到 Agent 响应后，会把用户提问 + Agent 回答写入 `conversations` / `conversation_messages` 表（以 `session_id` 作为 `conversation_id`，同一 session 的多轮问答追加到同一条对话）。前端可通过 `/api/v1/conversations` 及 `/api/v1/conversations/{id}`（含 messages）读取真实问答。Hermes 框架自身另有 session DB（`_persist_session`）与 `workspace/MEMORY.md`（长期领域知识），与本表的对话历史是分离的存储。
 - **前端界面尚未开发**，当前只有后端 API
-- **Hermes 框架本地化现状（2026-07-21）**：`D:\Hermes\hermes-agent` 已退役为**代码依赖**——hermes 以 editable 安装指向项目内 vendored 副本 `shared/framework/hermes-agent/`（gitignore，用 `scripts/vendor_hermes.py --src <源>` 复现，overlay 在 `shared/framework/hermes-overlays/`）。`tools/`、`conversation_loop` 等重头戏解析到 vendored。**但** `run_agent`/`agent_init` 这层定制仍在 `shared/framework/hermes_agent/`（下划线旧部分副本）——因为这套定制是个**相互依赖的子系统**（run_agent→agent_init→identity_loader→…，且 identity_loader 等文件只存在于该副本、不在上游 hermes），无法只 fold 几个文件；而整个副本含精简版 conversation_loop（会让子智能体丢 terminal），又不能整体覆盖。所以旧副本暂保留（运行时 `start_agent.py` 等仍 `from shared.framework.hermes_agent.run_agent`）。彻底合并需要解耦这套定制子系统（单独工作流）。orchestrator 工具由 `tool_registration.py` 的 override 注册（correct schema + bridge），覆盖 vendored 自带的损坏版 `tools/orchestrator_tool.py`。
+- **Hermes 框架本地化现状（2026-07-23，已清理 + 修通）**：三层干净结构。
+  - ① **原生引擎** `shared/framework/hermes-agent/`（vendored upstream v0.16.0，editable 安装，gitignore，`scripts/vendor_hermes.py --src D:\Hermes\hermes-agent` 复现）。`agent/`(conversation_loop/system_prompt/tools 等)、顶层 `run_agent`/`hermes_constants` 都解析到这里——这是真正在跑的引擎。
+  - ② **定制层** `shared/framework/hermes_agent/`（下划线，7 个活文件）：薄壳 AIAgent(`run_agent.py`，forward `run_conversation` 到原生 loop) + `agent_init.py` + **`identity_loader.py`（唯一真定制：读全部身份文件，原生只读 SOUL.md）** + process_bootstrap.py/utils.py。早期 ~1 万行的死代码 fork（slim conversation_loop、下划线 system_prompt/prompt_builder/hermes_constants/runtime_cwd）已于 2026-07-23 删除。
+  - ③ **overlays** `shared/framework/hermes-overlays/`（3 个，全功能必需）：`agent_init.py` + `run_agent.py`（身份定制，转发到下划线 agent_init）、`tools/orchestrator_tool.py`（编排桥）。orchestrator 工具运行时由 `tool_registration.py` 以 `override=True` 注册（correct schema + bridge），覆盖 vendored 自带的损坏版。
+  - **身份加载（2026-07-23 修好，之前是坏的）**：原生 system_prompt 只读 SOUL.md；通过 `vendor_hermes.py` 的 PATCH 给原生 `agent/system_prompt.py` 接了 20 行——按 `_identity_path`(主智能体) / `HERMES_HOME`(子智能体) 加载目录里全部身份文件。主智能体读 7 个。（子智能体现为脚本直跑、不经 LLM，不实际加载身份。）
+  - **主智能体工具精简（2026-07-23）**：`tool_registration.py` 注册 4 个编排工具后，把 `agent.tools` 过滤成只剩这 4 个（call_subagent/list_subagents/create_session/read_result），移除 skill_view/skill_manage/memory/terminal 等会让主智能体跑偏的工具——砍后编排可靠性 3/3。
+  - **确定性子智能体（2026-07-23）**：`subagents/*/entry.py` 直接跑 canonical 脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition），**不经 LLM 会话**（早期 LLM 会话让 ctgu-vlm 瞎逛几十轮、极慢）。4 个合计 ~25s，结果经 `sessions/` 共享目录链式传递。
+  - **超时**：`shared/framework/hermes_agent/agent/conversation_loop.py` 的 total/tool/llm_timeout 改 env 驱动（`HERMES_TOTAL_TIMEOUT` 等，默认 2400/300/120）；`call_subagent.py` 的 `SUBAGENT_TIMEOUT` 默认 600s。
+  - **仍待办（不影响运行）**：下划线 `run_agent.py`(5358行)/`agent_init.py`(1763行) 仍是从原生拷的大 fork，瘦身 = 切原生 AIAgent（要改 start_agent.py + entry.py 的 import，有风险，单独工作流）。

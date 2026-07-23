@@ -76,6 +76,56 @@ def apply_overlays() -> int:
     return n
 
 
+# 对 vendored 文件的小修正（避免为单行改动而把整文件复制进 overlay 锁死上游更新）。
+# 每个 entry: (相对路径, 原文片段, 新文片段)，首次匹配替换；未匹配则告警。
+PATCHES = [
+    # 内网部署连不上 openrouter.ai，fetch_model_metadata 同步拉取会阻塞启动 ~12s。
+    # context_length 已由本地 vLLM 的 /v1/models(portal) 提供，OpenRouter fallback 仅作降级。
+    ("agent/model_metadata.py",
+     "requests.get(OPENROUTER_MODELS_URL, timeout=10,",
+     "requests.get(OPENROUTER_MODELS_URL, timeout=1,  # 10→1: 内网不可达 openrouter.ai"),
+     ),
+    # 定制：原生 system_prompt 只读 SOUL.md；这里在 SOUL 加载后接一段，按 _identity_path
+    # (主智能体) 或 HERMES_HOME (子智能体) 加载目录里实际存在的身份文件——主智能体 7 个、
+    # 子智能体 3 个。加载器在 shared/framework/hermes_agent/agent/identity_loader.py。
+    ("agent/system_prompt.py",
+     "    if not _soul_loaded:\n        # Fallback to hardcoded identity\n        stable_parts.append(DEFAULT_AGENT_IDENTITY)",
+     "    if not _soul_loaded:\n        # Fallback to hardcoded identity\n        stable_parts.append(DEFAULT_AGENT_IDENTITY)\n\n"
+     "    # ── 定制：加载自定义路径下的全部身份文件（原生仅读 SOUL.md）────────────\n"
+     "    # 主智能体经 identity_path=workspace → agent._identity_path；子智能体经 HERMES_HOME\n"
+     "    # 指向各自目录。加载器按目录里实际存在的文件读 → 主智能体 7 个、子智能体 3 个自然区分。\n"
+     "    try:\n"
+     "        import os as _os\n"
+     "        from pathlib import Path as _Path\n"
+     "        _id_path = getattr(agent, '_identity_path', None)\n"
+     "        if not _id_path and _os.environ.get('HERMES_HOME'):\n"
+     "            _id_path = _Path(_os.environ['HERMES_HOME'])\n"
+     "        if _id_path:\n"
+     "            from shared.framework.hermes_agent.agent.identity_loader import load_identity_files_from_path\n"
+     "            _id_content = load_identity_files_from_path(_id_path)\n"
+     "            if _id_content:\n"
+     "                stable_parts.append(_id_content)\n"
+     "    except Exception:\n        pass"),
+]
+
+
+def apply_patches() -> int:
+    n = 0
+    for rel, old, new in PATCHES:
+        f = DST / rel
+        if not f.exists():
+            print(f"[vendor] patch skip (file missing): {rel}")
+            continue
+        text = f.read_text(encoding="utf-8")
+        if old not in text:
+            print(f"[vendor] ⚠ patch no-match (上游可能已改写法): {rel}")
+            continue
+        f.write_text(text.replace(old, new, 1), encoding="utf-8")
+        n += 1
+        print(f"[vendor] patch: {rel}")
+    return n
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=r"D:\Hermes\hermes-agent", help="hermes-agent 源目录")
@@ -85,7 +135,8 @@ def main() -> None:
         raise SystemExit(f"source not found: {src}")
     copy_runtime(src)
     n = apply_overlays()
-    print(f"[vendor] done. overlays applied: {n}. vendored at {DST}")
+    np = apply_patches()
+    print(f"[vendor] done. overlays applied: {n}, patches applied: {np}. vendored at {DST}")
 
 
 if __name__ == "__main__":

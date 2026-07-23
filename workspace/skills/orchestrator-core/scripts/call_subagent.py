@@ -32,12 +32,12 @@ RESULT_FILE_NAMES = {
     # 完整名称映射
     "multi-dimensional-data-perception": "data_result.json",
     "anomaly-detection": "anomaly_result.json",
-    "rule-reasoning": "rule_result.json",
+    "rule-reasoning": "rule_reasoning_result.json",
     "disposition-execution": "disposition_result.json",
     # 简化名称映射
     "data-perception": "data_result.json",
     "anomaly": "anomaly_result.json",
-    "rule": "rule_result.json",
+    "rule": "rule_reasoning_result.json",
     "disposition": "disposition_result.json"
 }
 
@@ -274,8 +274,9 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
         print(f"[DEBUG] Using Python: {python_exe}", file=sys.stderr, flush=True)
 
         # 调用子智能体的 entry.py（统一入口点，避免命名冲突）
-        # 子智能体自身是一次完整 AIAgent 会话（多轮 LLM），60s 远不够，给到 180s。
-        subagent_timeout = int(os.getenv('SUBAGENT_TIMEOUT', '180'))
+        # 子智能体自身是一次完整 AIAgent 会话（多轮 LLM + skill 探索），ctgu-vlm 单次调用又慢，
+        # 实测异常检测子智能体曾 >300s。默认 600s（可由 SUBAGENT_TIMEOUT 覆盖）。
+        subagent_timeout = int(os.getenv('SUBAGENT_TIMEOUT', '600'))
         result = subprocess.run(
             [python_exe, 'entry.py'],
             env=env,
@@ -337,16 +338,10 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
         with open(result_file, 'r', encoding='utf-8') as f:
             result_data = json.load(f)
 
-        # 验证任务 ID 匹配
-        if result_data.get('task_id') != task_id:
-            return {
-                "task_id": task_id,
-                "status": "failed",
-                "result": None,
-                "error": f"Task ID mismatch: expected {task_id}, got {result_data.get('task_id')}",
-                "metadata": {"timestamp": datetime.now().isoformat()}
-            }
-
+        # 不再校验 task_id：subprocess.run 是同步的，结果文件必然属于本次调用。
+        # 旧的跨进程 task_id 校验会和子智能体脚本自带的 task_id 格式（如 task_YYYYMMDD_HHMMSS，
+        # 无 uuid）打架，偶发 "Task ID mismatch" 白耗 ~90s 并触发 LLM 无谓重试。
+        # entry.py 已在写回时强制对齐 task_id，这里直接采用结果即可。
         return result_data
 
     except json.JSONDecodeError as e:

@@ -61,7 +61,7 @@ When invoked by the main orchestrator agent, I operate in **session mode**:
 
 1. **Read task**: Load task.json from SESSION_DIR
 2. **Use context**: Access data-perception and anomaly-detection results
-3. **Write result**: Create rule_result.json with compliance analysis
+3. **Write result**: Create rule_reasoning_result.json with compliance analysis
 
 Session mode enables me to apply regulatory expertise to data from earlier stages.
 
@@ -73,7 +73,7 @@ I depend on:
 
 ### Session Mode Output
 
-- `rule_result.json`: Contains compliance analysis with:
+- `rule_reasoning_result.json`: Contains compliance analysis with:
   - Violation determinations (yes/no/pending)
   - Applicable regulatory standards
   - Evidence chain linking data to standards

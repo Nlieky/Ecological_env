@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 RESULT_FILE_NAMES = {
     "anomaly-detection": "anomaly_result.json",
     "multi-dimensional-data-perception": "data_result.json",
-    "rule-reasoning": "rule_result.json",
+    "rule-reasoning": "rule_reasoning_result.json",
     "disposition-execution": "disposition_result.json"
 }
 
