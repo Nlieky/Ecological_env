@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from backend.models.query import QueryRequest, QueryResponse
 from backend.utils.loggers import generate_session_id, log_master_decision
 from backend.core.config import settings
+from backend.services.conversation_service import ConversationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -18,6 +19,9 @@ router = APIRouter()
 # Agent服务配置（从settings读取）
 AGENT_SERVICE_URL = settings.AGENT_SERVICE_URL
 AGENT_TIMEOUT = settings.AGENT_TIMEOUT
+
+# 对话历史服务：把 /api/query 的真实问答落入 conversations 表
+conversation_service = ConversationService()
 
 
 def check_agent_service() -> bool:
@@ -31,24 +35,21 @@ def check_agent_service() -> bool:
 
 
 @router.post("/query", tags=["查询"])
-async def execute_query(request: QueryRequest):
+def execute_query(request: QueryRequest):
     """
     执行自然语言查询 - 转发到Agent服务
 
     **架构**：
     FastAPI → HTTP转发 → Agent服务(localhost:8642) → AIAgent(主智能体)
 
+    说明：用 sync def（而非 async def）。内部 requests.post 转发是阻塞的（完整
+    pipeline ~30-60s）。async def 直接调会冻住后端事件循环，导致 /api/health、
+    /metrics、/api/logs 等全部卡住。sync def 由 FastAPI 自动丢进线程池，事件循环畅通。
+
     **Agent服务处理**：
     1. 主智能体通过LLM理解意图
     2. 根据需要调用子智能体（通过orchestrator-core工具）
     3. 整合结果并返回
-
-    **返回的响应包含**：
-    - content: LLM 生成的最终回答
-    - session_id: 会话ID
-    - timestamp: 响应时间戳
-    - success: 是否成功
-    - error: 错误信息（如果失败）
     """
     start_time = time.time()
 
@@ -99,29 +100,50 @@ async def execute_query(request: QueryRequest):
                 }
             )
 
+        # 提取响应内容与最终 session_id（前端可据此回查对话历史）
+        content = agent_data.get("content", "")
+        final_session_id = agent_data.get("session_id", session_id)
+
         # 计算耗时
         total_latency_ms = (time.time() - start_time) * 1000
 
         # 记录主智能体决策
         try:
             log_master_decision(
-                session_id=session_id,
+                session_id=final_session_id,
                 user_query=request.query,
                 intent="query",
                 decision_path=["Agent转发"],
                 subagents_called=[],
-                reasoning_summary=f"查询完成，返回 {len(agent_data.get('content', ''))} 字符",
+                reasoning_summary=f"查询完成，返回 {len(content)} 字符",
                 total_latency_ms=total_latency_ms
             )
         except Exception as log_error:
             logger.warning(f"Failed to log master decision: {log_error}")
 
-        logger.info(f"查询完成: session={session_id}, 耗时={time.time() - start_time:.2f}s")
+        # 把真实问答写入对话历史表，使 /api/v1/conversations 能展示本次问答。
+        # 用 final_session_id 作为 conversation_id：同一 session 的多轮问答
+        # 追加到同一条对话。持久化失败不影响查询结果返回（仅记录告警）。
+        try:
+            conversation_service.record_exchange(
+                conversation_id=final_session_id,
+                user_query=request.query,
+                assistant_response=content,
+                tool_call_info={
+                    "source": "agent_service",
+                    "forwarded": True,
+                    "latency_ms": total_latency_ms,
+                },
+            )
+        except Exception as persist_error:
+            logger.warning(f"Failed to persist conversation exchange: {persist_error}")
+
+        logger.info(f"查询完成: session={final_session_id}, 耗时={time.time() - start_time:.2f}s")
 
         # 返回标准格式的响应
         return QueryResponse(
-            content=agent_data.get("content", ""),
-            session_id=agent_data.get("session_id", session_id),
+            content=content,
+            session_id=final_session_id,
             timestamp=agent_data.get("timestamp", ""),
             chartData=None,
             decision_path=[],
