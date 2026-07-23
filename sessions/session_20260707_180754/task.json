@@ -1,7 +1,0 @@
-{
-  "task_id": "task_20260707180808_574067d9",
-  "task": "获取最近24小时出水数据，包括流量、排放量、pH值、化学需氧量(COD)、总氮(TN)、氨氮(NH3-N)、总磷(TP)、悬浮物(SS)等指标",
-  "context": {},
-  "output_format": "json",
-  "timeout": 300
-}

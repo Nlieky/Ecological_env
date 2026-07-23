@@ -1,7 +1,0 @@
-{
-  "task_id": "task_20260715113011_cc6118c5",
-  "task": "获取最近一周（7天）的进水和出水监测数据。包括pH值、COD、TN、NH3-N、TP、SS、流量等指标。数据路径: E:/project/Ecological_env/data/pollution_water_in.csv 和 E:/project/Ecological_env/data/pollution_water_out.csv",
-  "context": {},
-  "output_format": "json",
-  "timeout": 300
-}

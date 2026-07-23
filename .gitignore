@@ -55,3 +55,11 @@ grafana/prom_data/
 
 # vendored hermes（脚本生成，不入库；用 scripts/vendor_hermes.py 复现）
 shared/framework/hermes-agent/
+
+# Hermes 子智能体运行时产物（脚本/会话写出，可随时重生成，不入库）
+subagents/*/skills/.usage.json
+subagents/*/skills/.usage.json.lock
+subagents/*/.skills_prompt_snapshot.json
+subagents/*/cache/
+subagents/*/*_result.json
+subagents/*/smoke_q*.json

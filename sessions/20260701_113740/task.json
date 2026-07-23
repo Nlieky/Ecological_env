@@ -1,7 +1,0 @@
-{
-  "task_type": "anomaly_detection",
-  "data_file": "E:/project/Ecological_env/sessions/20260701_113740/recent_24h_effluent.csv",
-  "target_column": "化学需氧量浓度（毫克/升）",
-  "time_range": "最近 24 小时",
-  "data_type": "出水"
-}

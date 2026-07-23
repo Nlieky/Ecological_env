@@ -1,1 +1,0 @@
-{"task": "获取最近24小时出水COD数据", "context": {"session_id": "session_20260715_143823", "hours": 24, "target": "effluent", "indicators": ["COD"]}}

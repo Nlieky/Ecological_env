@@ -26,7 +26,9 @@ EXCLUDE_DIRS = {
     "scripts", "plans", "__pycache__", ".git", ".github",
 }
 EXCLUDE_SUFFIXES = (".egg-info",)
-EXCLUDE_FILES = {".gitignore", ".gitattributes"}
+# 安全：绝不把源树里的密钥/凭证文件拷进 vendored 树（曾发生过把 D:\Hermes 的
+# LongCat .env 一起 vendor 进来、密钥散落在项目里的事故）。
+EXCLUDE_FILES = {".gitignore", ".gitattributes", ".env", ".env.local", "auth.json"}
 
 
 def _make_ignore(src_resolved: Path):
