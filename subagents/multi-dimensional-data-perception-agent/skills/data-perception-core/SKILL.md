@@ -29,16 +29,20 @@ python skills/data-perception-core/scripts/get_data.py --hours 168
 
 ## 执行流程
 
-1. **识别时间参数**
-   - "最近24小时" → hours=24
-   - "最近48小时" → hours=48
-   - "本周" → days=7
-   - "昨天" → days=1
-   - 默认24小时
+1. **先从用户查询识别时间范围，换算成 `--hours`（数据为小时级，1 条/小时）。这一步不能漏，也不能偷懒默认 24：**
+   - "最近 N 小时" → `--hours N`
+   - "最近 N 天 / N 日" → `--hours N×24`（如 3 天 → `--hours 72`）
+   - "本周 / 一周 / 7 天" → `--hours 168`
+   - "本月" → `--hours 720`
+   - "昨天" → `--hours 24`
+   - 明确日期 → `--start "YYYY-MM-DD HH:MM:SS" --end "..."`
+   - **用户完全没提任何时间** → 才用 `--hours 24`
 
-2. **调用脚本**
+   ⚠️ 换算后必须把数值带进命令——一周就写 `--hours 168`，**不要照抄下面示例里的 24**。
+
+2. **调用脚本**（用第 1 步算出的数值；下面以"一周"为例）
    ```bash
-   python skills/data-perception-core/scripts/get_data.py --hours 24
+   python skills/data-perception-core/scripts/get_data.py --hours 168
    ```
 
 3. **确认执行完成**

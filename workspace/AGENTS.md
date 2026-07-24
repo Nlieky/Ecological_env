@@ -20,6 +20,13 @@
 
 子智能体之间通过公共会话区 `sessions/<session>/` 链式传递结果（`data_result.json` → `anomaly_result.json` → `rule_reasoning_result.json` → `disposition_result.json`），用 `context` 参数把前序结果交给后续子智能体。
 
+### ⏱️ 时间范围必须透传（常见坑）
+
+用户提到的**时间范围必须原样传给数据感知子智能体**，不许默认 24 小时：
+
+- 调 `multi-dimensional-data-perception` 时，**任务描述里写明换算后的小时数**（如"一周"→ 任务里写"获取最近 168 小时（一周）的进出水数据"），让数据感知 LLM 据此用 `--hours 168`。
+- **若用户的时间范围与上一轮不同，视为全新查询**——重新走完整 1→2→3→4 链路，**不要引用/复用上一轮的结果**（例如上一轮问"24 小时"、这轮问"一周"，必须按一周重新取数研判，不能说"上一轮已经查过"）。
+
 ## Session Startup
 
 优先用运行时注入的启动上下文。它通常已包含 `AGENTS.md`、`SOUL.md`、`IDENTITY.md`、`USER.md`，以及主会话时的 `MEMORY.md`。除非用户明确要求或上下文缺了你需要的东西，否则不要手动重读启动文件。
