@@ -179,6 +179,24 @@ class AgentService:
 
         return None
 
+    def _fresh_session_dir(self) -> str:
+        """为本次查询分配一个独立的 session 目录。
+
+        一次查询内的 4 个子智能体(data→anomaly→rule→disposition)共享这一个目录做
+        链式传递；但【跨查询不复用】。之前 SESSION_DIR 写进进程级 os.environ、被
+        所有查询共享，导致上一次查询的 *_result.json 残留污染本次（典型：问"一周"
+        却读到上次"24小时"的结果）。这里在每次查询开头强制换新目录。
+        这是 scratch 中转通道的隔离，不影响 ①对话历史/④Hermes session DB/⑤MEMORY.md
+        这些正当记忆（它们仍按 session_id / 框架机制各自保留）。
+        """
+        sessions_root = project_root / "sessions"
+        sessions_root.mkdir(parents=True, exist_ok=True)
+        sd = sessions_root / f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+        sd.mkdir(parents=True, exist_ok=True)
+        os.environ['SESSION_DIR'] = str(sd)
+        logger.info(f"[session] 新查询 session 目录: {sd}")
+        return str(sd)
+
     def process_query(self, query: str, session_id: str = None) -> Dict[str, Any]:
         """处理查询请求 - 性能优化版"""
         import time
@@ -192,12 +210,13 @@ class AgentService:
             if quick_result:
                 return quick_result
 
-            # 2. 缓存检查（性能优化）
-            cached_result = self._check_cache(query)
-            if cached_result:
-                cached_result['cached'] = True
-                cached_result['timestamp'] = datetime.now().isoformat()
-                return cached_result
+            # 2. 缓存已禁用：编排链路非确定性 + 数据会变，缓存会把上次(可能错的)结果固化
+            #    （典型：重复问"一周"一直返回上次因 session 复用拿到的"24小时"）。
+            # cached_result = self._check_cache(query)
+            # if cached_result:
+            #     cached_result['cached'] = True
+            #     cached_result['timestamp'] = datetime.now().isoformat()
+            #     return cached_result
 
             # 3. 正常处理流程
             if not self.master_agent:
@@ -221,6 +240,7 @@ class AgentService:
             if not self._agent_lock.acquire(timeout=self._agent_lock_timeout):
                 return {"success": False, "error": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"}
             try:
+                self._fresh_session_dir()  # 本次查询用独立 session 目录，杜绝跨查询结果复用
                 result = self.master_agent.run_conversation(
                     user_message=query,
                     conversation_history=conversation_history,
@@ -253,8 +273,8 @@ class AgentService:
                 "quick_response": False
             }
 
-            # 更新缓存（仅缓存成功的响应）
-            self._update_cache(query, response)
+            # 缓存已禁用（见上方说明），不再 _update_cache
+            # self._update_cache(query, response)
 
             return response
 
@@ -382,6 +402,7 @@ def query_stream(request: QueryRequest):
             q.put({"type": "error", "message": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"})
             return
         try:
+            agent_service._fresh_session_dir()  # 本次查询用独立 session 目录，杜绝跨查询结果复用
             history = agent_service.session_histories.get(session_id)
             result = agent_service.master_agent.run_conversation(
                 user_message=request.query,
