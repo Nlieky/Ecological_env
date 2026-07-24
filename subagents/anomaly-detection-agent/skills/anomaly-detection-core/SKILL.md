@@ -13,7 +13,7 @@ description: 异常检测和违规模式识别。**触发条件**：当用户提
 
 1. **调用脚本**
    ```bash
-   python skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py
+   python "$HERMES_HOME/skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py"
    ```
 
 2. **确认执行完成**
@@ -81,13 +81,13 @@ description: 异常检测和违规模式识别。**触发条件**：当用户提
 
 ```bash
 # 使用默认参数（最近24小时）
-python skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py
+python "$HERMES_HOME/skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py"
 
 # 指定时间范围（小时）
-python skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py --hours 48
+python "$HERMES_HOME/skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py" --hours 48
 
 # 指定数据源
-python skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py --data-dir <path>
+python "$HERMES_HOME/skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py" --data-dir <path>
 ```
 
 ## 输出路径

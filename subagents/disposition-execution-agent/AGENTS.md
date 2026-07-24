@@ -22,7 +22,7 @@
 ## Canonical 脚本
 
 ```bash
-python skills/disposition-execution-core/scripts/run_disposition.py
+python "$HERMES_HOME/skills/disposition-execution-core/scripts/run_disposition.py"
 # --session-dir <path>  指定会话目录
 ```
 

@@ -13,7 +13,7 @@ description: 预警分级和处置执行。**触发条件**：当用户提到"�
 
 1. **调用脚本**
    ```bash
-   python skills/disposition-execution-core/scripts/run_disposition.py
+   python "$HERMES_HOME/skills/disposition-execution-core/scripts/run_disposition.py"
    ```
 
 2. **确认执行完成**
@@ -109,10 +109,10 @@ WO-YYYYMMDD-序号-随机后缀
 
 ```bash
 # 使用默认路径
-python skills/disposition-execution-core/scripts/run_disposition.py
+python "$HERMES_HOME/skills/disposition-execution-core/scripts/run_disposition.py"
 
 # 指定会话目录
-python skills/disposition-execution-core/scripts/run_disposition.py --session-dir <path>
+python "$HERMES_HOME/skills/disposition-execution-core/scripts/run_disposition.py" --session-dir <path>
 ```
 
 ## 输出路径

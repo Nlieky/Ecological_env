@@ -13,7 +13,7 @@ description: 规则推理和违规判定。**触发条件**：当用户查询提
 
 1. **调用脚本**
    ```bash
-   python skills/rule-reasoning-core/scripts/run_rule_reasoning.py
+   python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py"
    ```
 
 2. **确认执行完成**
@@ -93,13 +93,13 @@ description: 规则推理和违规判定。**触发条件**：当用户查询提
 
 ```bash
 # 使用默认路径
-python skills/rule-reasoning-core/scripts/run_rule_reasoning.py
+python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py"
 
 # 指定异常检测结果路径
-python skills/rule-reasoning-core/scripts/run_rule_reasoning.py --anomaly-result <path>
+python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py" --anomaly-result <path>
 
 # 指定会话目录
-python skills/rule-reasoning-core/scripts/run_rule_reasoning.py --session-dir <path>
+python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py" --session-dir <path>
 ```
 
 ## 输出路径

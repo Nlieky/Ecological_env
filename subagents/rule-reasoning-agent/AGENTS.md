@@ -22,7 +22,7 @@
 ## Canonical 脚本
 
 ```bash
-python skills/rule-reasoning-core/scripts/run_rule_reasoning.py
+python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py"
 # --anomaly-result <path>  指定异常检测结果
 # --session-dir <path>     指定会话目录
 ```

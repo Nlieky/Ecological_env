@@ -22,7 +22,7 @@
 ## Canonical 脚本
 
 ```bash
-python skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py --hours 24
+python "$HERMES_HOME/skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py" --hours 24
 ```
 
 - `--hours N`：时间范围（默认 24）

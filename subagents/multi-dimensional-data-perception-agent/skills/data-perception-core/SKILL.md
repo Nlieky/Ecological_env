@@ -29,7 +29,7 @@ description: 获取监测数据。**触发条件**：用户提到"数据"、"进
 
 例：任务"获取最近一周的进出水数据" →
 ```bash
-python skills/data-perception-core/scripts/get_data.py --hours 168
+python "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --hours 168
 ```
 
 ## 执行流程
