@@ -49,6 +49,24 @@ def load_identity_files_from_path(identity_path: Path) -> Optional[str]:
         except Exception as e:
             logger.debug(f"Could not read identity file {file_path}: {e}")
 
+    # 主智能体编排技能预加载：若 identity_path 下有 skills/orchestrator-core/SKILL.md
+    # （只主智能体 workspace 有此路径，子智能体没有 → 天然只对主智能体生效），把全文
+    # （剥掉 YAML frontmatter）拼进身份内容，让主智能体读 skill 来决策子智能体调用。
+    # 这段内容经 vendored system_prompt.py 的 patch 进入系统提示词 stable tier（持久）。
+    skill_path = identity_path / "skills" / "orchestrator-core" / "SKILL.md"
+    if skill_path.exists():
+        try:
+            raw = skill_path.read_text(encoding="utf-8").strip()
+            # 剥掉开头 YAML frontmatter（--- name: ... --- 段）
+            if raw.startswith("---"):
+                chunks = raw.split("---", 2)
+                if len(chunks) >= 3:
+                    raw = chunks[2].strip()
+            if raw:
+                parts.append(f"## 主智能体编排技能（orchestrator-core/SKILL.md）\n\n{raw}")
+        except Exception as e:
+            logger.debug(f"Could not read orchestrator skill {skill_path}: {e}")
+
     if not parts:
         return None
 
