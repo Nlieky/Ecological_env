@@ -12,7 +12,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from backend.models.query import QueryRequest, QueryResponse
-from backend.utils.loggers import generate_session_id, log_master_decision
+from backend.utils.loggers import generate_session_id, log_master_decision, log_subagent_execution
 from backend.core.config import settings
 from backend.services.conversation_service import ConversationService
 
@@ -212,6 +212,9 @@ async def query_stream(request: QueryRequest):
         final_content = ""
         final_session_id = session_id
         had_done = False
+        sub_starts = {}            # subagent -> 开始时间
+        subagent_executions = []   # [{subagent_name, execution_time_ms, status, summary}]
+        decision_order = []        # 按调用顺序去重的子智能体名
         buf = ""
         timeout = httpx.Timeout(AGENT_TIMEOUT, connect=10.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -239,25 +242,69 @@ async def query_stream(request: QueryRequest):
                             evt = json.loads(payload)
                         except Exception:
                             continue
-                        if evt.get("type") == "done":
+                        etype = evt.get("type")
+                        if etype == "progress":
+                            sub = evt.get("subagent")
+                            stage = evt.get("stage")
+                            if sub and stage == "start":
+                                sub_starts[sub] = time.time()
+                                if sub not in decision_order:
+                                    decision_order.append(sub)
+                            elif sub and stage == "done":
+                                start_ts = sub_starts.pop(sub, None)
+                                latency = (time.time() - start_ts) * 1000 if start_ts else None
+                                subagent_executions.append({
+                                    "subagent_name": sub,
+                                    "execution_time_ms": latency,
+                                    "status": "success",
+                                    "summary": evt.get("summary", ""),
+                                })
+                        elif etype == "done":
                             final_content = evt.get("content", "")
                             final_session_id = evt.get("session_id", session_id)
                             had_done = True
-        # 流结束：把真实问答写入对话历史（与 /query 一致）
-        if had_done and final_content:
+        # 流结束：落对话历史 + 追踪明细（与 /query 一致，失败仅告警）
+        if had_done:
+            total_latency_ms = (time.time() - start_time) * 1000
+            if final_content:
+                try:
+                    conversation_service.record_exchange(
+                        conversation_id=final_session_id,
+                        user_query=request.query,
+                        assistant_response=final_content,
+                        tool_call_info={
+                            "source": "agent_service_stream",
+                            "forwarded": True,
+                            "latency_ms": total_latency_ms,
+                        },
+                    )
+                except Exception as persist_error:
+                    logger.warning(f"Failed to persist stream conversation exchange: {persist_error}")
+            # 追踪：真实 decision_path/subagents + 每个子智能体执行明细，供 /logs/trace/{id} 展示
             try:
-                conversation_service.record_exchange(
-                    conversation_id=final_session_id,
+                log_master_decision(
+                    session_id=final_session_id,
                     user_query=request.query,
-                    assistant_response=final_content,
-                    tool_call_info={
-                        "source": "agent_service_stream",
-                        "forwarded": True,
-                        "latency_ms": (time.time() - start_time) * 1000,
-                    },
+                    intent="query",
+                    decision_path=decision_order,
+                    subagents_called=decision_order,
+                    reasoning_summary=f"流式查询完成，调用 {len(decision_order)} 个子智能体",
+                    total_latency_ms=total_latency_ms,
                 )
-            except Exception as persist_error:
-                logger.warning(f"Failed to persist stream conversation exchange: {persist_error}")
+            except Exception as e:
+                logger.warning(f"Failed to log master decision (stream): {e}")
+            for ex in subagent_executions:
+                try:
+                    log_subagent_execution(
+                        session_id=final_session_id,
+                        subagent_name=ex["subagent_name"],
+                        input_params={},
+                        output_result={"summary": ex.get("summary", "")},
+                        execution_time_ms=ex.get("execution_time_ms") or 0.0,
+                        status=ex.get("status", "success"),
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to log subagent execution: {e}")
 
     return StreamingResponse(proxy(), media_type="text/event-stream")
 
