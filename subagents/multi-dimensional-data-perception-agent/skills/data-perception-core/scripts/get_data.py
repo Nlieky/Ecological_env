@@ -134,50 +134,6 @@ def get_data_by_range(file_path, start_time, end_time):
         return []
 
 
-def _infer_hours_from_task():
-    """从 SESSION_DIR/task.json 的任务描述里确定性推断时间范围（小时）。
-
-    LLM（ctgu-vlm）不一定可靠地把"一周"换成 --hours 168（时灵时不灵），这里做
-    确定性兜底：只要任务描述里提到时间范围，就按规则换算。LLM 显式传了 --hours/--days
-    时优先用显式值；没传时才走这里。
-    """
-    import re
-    sd = os.environ.get('SESSION_DIR')
-    if not sd:
-        return None
-    try:
-        tj = Path(sd) / "task.json"
-        if not tj.exists():
-            return None
-        data = json.load(open(tj, encoding='utf-8'))
-        text = (data.get("task") or "")
-        if isinstance(text, dict):
-            text = json.dumps(text, ensure_ascii=False)
-        text = str(text).strip()
-        if not text:
-            return None
-    except Exception:
-        return None
-
-    # 明确数字：N 小时 / N 天
-    m = re.search(r'(\d+)\s*小时', text)
-    if m:
-        return int(m.group(1))
-    m = re.search(r'(\d+)\s*(?:天|日)', text)
-    if m:
-        return int(m.group(1)) * 24
-    # 中文范围词
-    if re.search(r'两 ?周|14\s*天', text):
-        return 336
-    if re.search(r'一 ?周|本 ?周|七 ?天|7\s*天|近 ?一 ?周', text):
-        return 168
-    if re.search(r'本 ?月|一 ?个 ?月|近 ?一 ?个 ?月|30\s*天', text):
-        return 720
-    if re.search(r'昨', text):
-        return 24
-    return None
-
-
 def main():
     parser = argparse.ArgumentParser(description='获取监测数据')
     parser.add_argument('--hours', type=int, help='最近N小时')
@@ -191,14 +147,7 @@ def main():
 
     # 计算时间范围
     hours_back = None
-    # 优先从任务描述确定性推断：LLM 不一定可靠地把"一周"换成 --hours 168（时灵时不灵），
-    # 故只要任务里提到时间范围，就以任务为准——覆盖 LLM 可能传错的 --hours/--days。
-    inferred = _infer_hours_from_task()
-    if inferred:
-        hours_back = inferred
-        if args.hours or args.days:
-            print(f"[推断] 任务描述含时间范围，以任务为准（{inferred} 小时），忽略 --hours/--days")
-    elif args.hours:
+    if args.hours:
         hours_back = args.hours
     elif args.days:
         hours_back = args.days * 24
