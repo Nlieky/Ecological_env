@@ -292,6 +292,23 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
 
         duration = time.time() - start_time
 
+        # 可观测性：把子智能体 subprocess 的【完整 stdout+stderr】落盘到固定目录
+        # sessions/_subagent_traces/<task_id>_<subagent>.log（不依赖 session 路由——
+        # 此前写到 session 目录，失败时 session 串了就找不到，导致失败是黑盒）。
+        # 无论成败都写，便于看清 LLM 敲了啥命令、脚本回了啥/为何报错。
+        try:
+            trace_dir = Path(session_dir).resolve().parent / "_subagent_traces"
+            trace_dir.mkdir(parents=True, exist_ok=True)
+            trace_file = trace_dir / f"{task_id}_{subagent_name}.log"
+            trace_file.write_text(
+                f"=== {subagent_name} | task_id={task_id} | duration={duration:.1f}s | "
+                f"returncode={result.returncode} ===\n"
+                f"--- STDOUT ---\n{result.stdout or '(空)'}\n"
+                f"--- STDERR ---\n{result.stderr or '(空)'}\n",
+                encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
         if result.returncode != 0:
             return {
                 "task_id": task_id,

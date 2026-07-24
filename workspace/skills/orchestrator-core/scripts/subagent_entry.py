@@ -151,7 +151,7 @@ def run_subagent() -> Dict[str, Any]:
         agent = AIAgent(
             base_url=llm_base_url, api_key=llm_api_key, model=llm_model,
             load_soul_identity=True, skip_context_files=False, skip_memory=False,
-            enabled_toolsets=["terminal"], session_id=task_id, max_iterations=4,
+            enabled_toolsets=["terminal"], session_id=task_id, max_iterations=6,
         )
         response = agent.run_conversation(user_message)
         logger.info(f"[LLM] 任务完成")
