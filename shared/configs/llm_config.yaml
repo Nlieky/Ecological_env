@@ -6,12 +6,12 @@
 # 本文件包含非敏感的模型配置、提示词、工具定义等
 
 # ==================== 自定义 LLM 服务器配置 ====================
-# 使用美团 LongCat 模型 API
+# 使用本地部署的 ctgu-vlm 模型（OpenAI 兼容 API）
 custom_llm_server:
   enabled: true
-  base_url: "https://api.longcat.chat/openai/v1"
+  base_url: "http://172.16.12.41:30000/v1"
   api_key: ""  # 从环境变量 LLM_API_KEY 读取
-  model_name: "LongCat-2.0"  # 美团 LongCat 模型
+  model_name: "ctgu-vlm"  # 本地部署模型
 
   # API 格式类型
   api_format: "openai_compatible"  # openai_compatible, anthropic_compatible, custom
@@ -27,19 +27,19 @@ custom_llm_server:
 models:
   # 主模型（用于意图识别、任务分解、调度决策）
   primary:
-    name: "LongCat-2.0"  # 美团 LongCat 模型
+    name: "ctgu-vlm"  # 本地部署模型
     max_tokens: 4096
     temperature: 0.7
 
   # 快速模型（用于简单查询）
   fast:
-    name: "LongCat-2.0"  # 与主模型相同
+    name: "ctgu-vlm"  # 与主模型相同
     max_tokens: 2048
     temperature: 0.5
 
   # 分析模型（用于复杂分析）
   analysis:
-    name: "LongCat-2.0"  # 与主模型相同
+    name: "ctgu-vlm"  # 与主模型相同
     max_tokens: 8192
     temperature: 0.7
 
@@ -49,11 +49,11 @@ prompts:
   master_agent_system: |
     你是废水虚假排放智能监测系统的主智能体，负责协调4个专业子智能体的工作。
 
-    ## 4个子智能体（专利定义）
-    1. multi-dimensional-data-perception-agent - 数据治理子智能体（数据获取、时序对齐、清洗质控）
-    2. anomaly-detection-agent - 特征与关系分析子智能体（特征提取、相关性分析）
-    3. anomaly-detection-agent - 异常检测子智能体（异常检测、违规识别）
-    4. rule-reasoning-agent - 规则推理子智能体（法规匹配、工艺校验）
+    ## 4个子智能体
+    1. multi-dimensional-data-perception-agent - 多维数据感知（数据获取、时序对齐、清洗标准化）
+    2. anomaly-detection-agent - 异常检测（boundary/constant/spike/trend/point 5类异常 + 置信度）
+    3. rule-reasoning-agent - 规则推理（法规匹配、工艺校验、违规判定）
+    4. disposition-execution-agent - 研判预警与处置（融合共识、一般/较重/严重三级预警、工单）
 
     ## 核心能力
     - 意图识别：理解用户查询的真实意图
@@ -102,38 +102,12 @@ prompts:
     4. 后续行动（如需要）
 
 # ==================== 工具定义 ====================
-tools:
-  # 主智能体可用的脚本工具
-  master_agent_scripts:
-    - name: "task_structuring"
-      module: "workspace.skills.orchestrator_core.scripts.task_structuring"
-      description: "任务结构化"
-      when: "需要将任务请求转换为标准化格式"
-
-    - name: "task_flow_generation"
-      module: "workspace.skills.orchestrator_core.scripts.task_flow_generation"
-      description: "任务流生成"
-      when: "需要根据依赖关系生成执行流程"
-
-    - name: "resource_matching"
-      module: "workspace.skills.orchestrator_core.scripts.resource_matching"
-      description: "资源匹配"
-      when: "需要将任务匹配到合适的子智能体"
-
-    - name: "execution_control"
-      module: "workspace.skills.orchestrator_core.scripts.execution_control"
-      description: "执行控制"
-      when: "需要实际执行任务"
-
-    - name: "cross_domain_analyzer"
-      module: "workspace.skills.orchestrator_core.scripts.cross_domain_analyzer"
-      description: "跨领域分析"
-      when: "需要对比分析进水和出水数据"
-
-    - name: "result_reuse"
-      module: "workspace.skills.orchestrator_core.scripts.result_reuse"
-      description: "结果复用判决"
-      when: "接收到查询时先判断是否可复用历史结果"
+# 注：早期设计曾在此列出 task_structuring / task_flow_generation / resource_matching /
+# execution_control / cross_domain_analyzer / result_reuse 等编排脚本，但这些脚本从未实现——
+# 编排实际由主智能体 LLM 按 AGENTS.md「编排铁律」实时推理完成。
+# 真正的编排脚本在 workspace/skills/orchestrator-core/scripts/（call_subagent / subagent_entry /
+# tool_registration / subagent_manager / create_session / cleanup_sessions 等）。
+tools: {}
 
 # ==================== 缓存配置 ====================
 cache:

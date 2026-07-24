@@ -306,5 +306,4 @@ def get_system_state() -> Dict[str, Any]:
 ### 8.2 相关文档
 
 - [子智能体通信协议](subagent_protocol.md)
-- [技能接口规范](skill_interface.md)
 - [错误码定义](error_codes.md)
