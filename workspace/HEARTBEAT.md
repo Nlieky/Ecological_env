@@ -1,14 +1,7 @@
-```markdown
 # Keep this file empty (or with only comments) to skip heartbeat API calls.
 
-# Task scheduling is handled by scripts, not by heartbeat polling.
-# Periodic tasks include:
-# - Sub-agent health checks (每小时)
-# - Daily monitoring reports (每日08:00)
-# - Weekly summary reports (每周一08:00)
-# - Monthly analysis reports (每月1日08:00)
-```
-
-## Related
-
-- [Heartbeat config](/gateway/config-agents)
+# 本系统的周期任务由脚本调度，不走 heartbeat 轮询：
+# - 子智能体健康检查（每小时）
+# - 每日监测报告（每日 08:00）
+# - 每周汇总报告（每周一 08:00）
+# - 每月分析报告（每月 1 日 08:00）
