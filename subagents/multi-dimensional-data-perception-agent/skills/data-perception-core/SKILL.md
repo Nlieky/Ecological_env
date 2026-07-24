@@ -40,6 +40,8 @@ python skills/data-perception-core/scripts/get_data.py --hours 168
 
    ⚠️ 换算后必须把数值带进命令——一周就写 `--hours 168`，**不要照抄下面示例里的 24**。
 
+   💡 兜底：即便你忘了传 `--hours`、或传错，`get_data.py` 会**自己从任务描述(task.json)里确定性解析**时间范围（一周→168、3天→72、本月→720…），以任务描述为准。所以**务必把用户的时间词原样写进任务描述**（如"获取最近一周…"），脚本会兜住。
+
 2. **调用脚本**（用第 1 步算出的数值；下面以"一周"为例）
    ```bash
    python skills/data-perception-core/scripts/get_data.py --hours 168
