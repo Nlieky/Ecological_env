@@ -91,29 +91,27 @@ def _preload_skill_md() -> str:
 
 
 def _read_script_result(session_dir, result_filename):
+    """只读本子智能体自己的结果文件。
+
+    缺失/无效时返回 None——**不再 glob 其他 *_result.json 顶替**。
+    旧实现会 glob 全部 *_result.json 并返回第一个像样的，导致某子智能体没跑出
+    自己结果时（典型：处置 LLM 没跑 run_disposition.py），静默把异常/数据结果
+    当成它的结果返回，把"失败"伪装成"成功"。改为只认自己的文件，失败就让它失败。
+    """
     if not session_dir:
         return None
-    session_path = Path(session_dir).resolve()
-    candidates = [session_path / result_filename]
+    p = Path(session_dir).resolve() / result_filename
+    if not p.exists():
+        return None
     try:
-        candidates += list(session_path.glob("*_result.json"))
+        loaded = json.loads(p.read_text(encoding='utf-8'))
     except Exception:
-        pass
-    seen = set()
-    for p in candidates:
-        key = str(p)
-        if key in seen or not p.exists():
-            continue
-        seen.add(key)
-        try:
-            loaded = json.loads(p.read_text(encoding='utf-8'))
-        except Exception:
-            continue
-        if not isinstance(loaded, dict) or loaded.get("status") == "failed":
-            continue
-        inner = loaded.get("result")
-        if isinstance(inner, dict) or "data" in loaded or "statistics" in loaded:
-            return loaded
+        return None
+    if not isinstance(loaded, dict) or loaded.get("status") == "failed":
+        return None
+    inner = loaded.get("result")
+    if isinstance(inner, dict) or "data" in loaded or "statistics" in loaded:
+        return loaded
     return None
 
 
@@ -161,8 +159,16 @@ def run_subagent() -> Dict[str, Any]:
         result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
         result = _read_script_result(session_dir, result_filename)
         if result is None:
-            result = response.get('final_response', response)
-            logger.info(f"[LLM] 未找到脚本结构化结果，回退 final_response")
+            # 脚本没产出自己的结果文件——通常是 LLM 子智能体没跑 canonical 脚本（防瞎逛）。
+            # 标记 failed 让失败可见，主智能体可据此重试或如实告知用户；不再用 LLM 文本
+            # 伪装成结构化结果，更不能抄别的步骤的结果。
+            final_text = response.get('final_response', '') if isinstance(response, dict) else str(response)
+            logger.warning(f"[WARN] 脚本未产出 {result_filename}（LLM 可能没跑脚本），标记 failed")
+            result = {"task_id": task_id, "status": "failed",
+                      "error": f"subagent did not produce {result_filename}; "
+                               f"LLM likely did not run its canonical script",
+                      "final_response": final_text,
+                      "timestamp": datetime.now().isoformat()}
         else:
             logger.info(f"[LLM] 回传脚本结构化结果")
 

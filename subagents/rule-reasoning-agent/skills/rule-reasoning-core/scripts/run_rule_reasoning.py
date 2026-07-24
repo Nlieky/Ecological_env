@@ -173,6 +173,116 @@ def compute_correlation_results(dataframes: Dict[str, pd.DataFrame]) -> Dict[str
     return correlation_results
 
 
+# 指标中文名 → 法规库英文键（regulation_matcher 的 limits 用 COD/TN/AN/TP/pH）
+INDICATOR_MAP = {
+    "化学需氧量": "COD", "cod": "COD",
+    "总氮": "TN", "tn": "TN",
+    "氨氮": "AN", "nh3-n": "AN", "nh3n": "AN", "an": "AN",
+    "总磷": "TP", "tp": "TP",
+    "ph值": "pH", "ph": "pH",
+    "悬浮物": "SS", "ss": "SS",
+}
+
+
+def _map_indicator(raw) -> str:
+    """中文指标名 → 英文法规键；映射不到则原样返回。"""
+    if not raw:
+        return ""
+    s = str(raw)
+    low = s.lower()
+    for key, eng in INDICATOR_MAP.items():
+        if key.lower() in low:
+            return eng
+    return s
+
+
+def normalize_anomalies(anomalies):
+    """把异常检测产出的异常归一化成规则模块期望的字段。
+
+    真实 anomaly 字段：indicator(中文) / type(boundary|constant|spike|trend|point) /
+    score / value / timestamp ...；而 regulation_matcher / expert_reasoner 读的是
+    indicator(英文 COD/TN/..) 和 pattern。这里补齐映射，并保留全部原始字段。
+    """
+    out = []
+    for a in anomalies or []:
+        if not isinstance(a, dict):
+            continue
+        atype = a.get("type") or a.get("pattern") or ""
+        try:
+            score = float(a.get("score", 0) or 0)
+        except (TypeError, ValueError):
+            score = 0.0
+        norm = dict(a)
+        norm["indicator"] = _map_indicator(a.get("indicator", ""))
+        norm["pattern"] = atype
+        norm["type"] = atype
+        norm["score"] = score
+        if not a.get("severity"):
+            norm["severity"] = "high" if score > 1.0 else ("medium" if score > 0.5 else "low")
+        out.append(norm)
+    return out
+
+
+def build_evidence_points(anomalies, regulation_matches, process_validation, reasoning_result):
+    """聚合各模块产出，生成可读的证据链（替代原来硬编码的空 []）。"""
+    points = []
+
+    # 1. 法规违规证据
+    for v in (regulation_matches or {}).get("violations", []):
+        points.append({
+            "category": "regulation",
+            "indicator": v.get("indicator"),
+            "regulation": v.get("regulation"),
+            "regulation_code": v.get("regulation_code"),
+            "violation_type": v.get("violation_type"),
+            "article": v.get("article"),
+            "penalty": v.get("penalty"),
+            "evidence": v.get("evidence", ""),
+        })
+
+    # 2. 工艺机理违背证据
+    pv = process_validation or {}
+    pv_list = pv.get("violations", [])
+    if isinstance(pv_list, list):
+        for mv in pv_list:
+            points.append({"category": "process_mechanism", **(mv if isinstance(mv, dict) else {"detail": mv})})
+    if pv.get("violations_count", 0) > 0 and not pv_list:
+        points.append({"category": "process_mechanism",
+                       "violations_count": pv.get("violations_count"),
+                       "mechanism_compliance": pv.get("mechanism_compliance")})
+
+    # 3. 专家匹配的造假模式
+    for p in (reasoning_result or {}).get("matched_patterns", []):
+        points.append({
+            "category": "expert_pattern",
+            "pattern": p.get("name"),
+            "pattern_key": p.get("pattern_key"),
+            "match_score": p.get("match_score"),
+            "confidence": p.get("confidence"),
+            "suspicion_level": p.get("suspicion_level"),
+        })
+
+    # 4. 历史相似案例
+    for c in (reasoning_result or {}).get("matched_cases", []):
+        points.append({"category": "similar_case", "case": c.get("name"),
+                       "similarity": c.get("similarity"), "conclusion": c.get("conclusion")})
+
+    # 5. 数据层证据：分数最高的几个异常点
+    top = sorted(anomalies or [], key=lambda a: a.get("score", 0), reverse=True)[:5]
+    for a in top:
+        points.append({
+            "category": "anomaly",
+            "indicator": a.get("indicator"),
+            "type": a.get("type"),
+            "value": a.get("value"),
+            "timestamp": a.get("timestamp"),
+            "score": a.get("score"),
+            "expected_range": a.get("expected_range"),
+        })
+
+    return points
+
+
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='规则推理和违规判定')
@@ -208,7 +318,8 @@ def main():
             raise ValueError("异常检测结果无效或未完成")
 
         anomalies = anomaly_result.get("result", {}).get("anomalies", [])
-        logger.info(f"[LOAD] 加载了 {len(anomalies)} 个异常点")
+        anomalies = normalize_anomalies(anomalies)
+        logger.info(f"[LOAD] 加载了 {len(anomalies)} 个异常点（已归一化：indicator→COD/TN/..，type→pattern）")
 
         if not anomalies:
             logger.warning("[LOAD] 没有异常点，无需进行规则推理")
@@ -312,8 +423,9 @@ def main():
                     "violation_type_names": [p.get("name", p.get("pattern_key", ""))
                                             for p in reasoning_result.get("matched_patterns", [])],
 
-                    # 证据点
-                    "evidence_points": [],
+                    # 证据点（聚合法规/工艺/专家/案例/数据层证据）
+                    "evidence_points": build_evidence_points(
+                        anomalies, regulation_matches, process_validation, reasoning_result),
                     "anomaly_count": len(anomalies),
 
                     # 各模块结果
