@@ -4,6 +4,7 @@
 重构后：通过HTTP请求转发到Agent服务(localhost:8642)
 不再直接创建AIAgent实例，Agent服务独立运行
 """
+import json
 import logging
 import time
 import requests
@@ -197,14 +198,21 @@ def execute_query(request: QueryRequest):
 
 @router.post("/query/stream", tags=["查询"])
 async def query_stream(request: QueryRequest):
-    """流式查询（SSE）：透传 agent 服务 /query/stream 的事件流。
+    """流式查询（SSE）：透传 agent 服务 /query/stream 的事件流，并在结束时把问答落入对话历史。
 
     事件同 agent 服务：progress（子智能体调用进度）/ delta（最终回答逐字）/ done / error。
     用 httpx.AsyncClient 流式转发（async，不阻塞后端事件循环）。
+    透传的同时缓冲解析 SSE，捕获 done 事件的完整回答；流结束后调 record_exchange
+    落库（与 /query 行为一致），使 /api/v1/conversations 能展示流式问答。落库失败仅告警。
     """
     session_id = request.session_id or generate_session_id()
+    start_time = time.time()
 
     async def proxy():
+        final_content = ""
+        final_session_id = session_id
+        had_done = False
+        buf = ""
         timeout = httpx.Timeout(AGENT_TIMEOUT, connect=10.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(
@@ -216,7 +224,40 @@ async def query_stream(request: QueryRequest):
                     yield 'data: {"type":"error","message":"Agent服务返回 %d"}\n\n' % resp.status_code
                     return
                 async for chunk in resp.aiter_text():
-                    yield chunk
+                    yield chunk  # 透传给前端
+                    # 同时缓冲、按行解析 SSE，提取最终回答
+                    buf += chunk
+                    while "\n" in buf:
+                        line, buf = buf.split("\n", 1)
+                        line = line.strip()
+                        if not line.startswith("data:"):
+                            continue
+                        payload = line[len("data:"):].strip()
+                        if not payload:
+                            continue
+                        try:
+                            evt = json.loads(payload)
+                        except Exception:
+                            continue
+                        if evt.get("type") == "done":
+                            final_content = evt.get("content", "")
+                            final_session_id = evt.get("session_id", session_id)
+                            had_done = True
+        # 流结束：把真实问答写入对话历史（与 /query 一致）
+        if had_done and final_content:
+            try:
+                conversation_service.record_exchange(
+                    conversation_id=final_session_id,
+                    user_query=request.query,
+                    assistant_response=final_content,
+                    tool_call_info={
+                        "source": "agent_service_stream",
+                        "forwarded": True,
+                        "latency_ms": (time.time() - start_time) * 1000,
+                    },
+                )
+            except Exception as persist_error:
+                logger.warning(f"Failed to persist stream conversation exchange: {persist_error}")
 
     return StreamingResponse(proxy(), media_type="text/event-stream")
 
