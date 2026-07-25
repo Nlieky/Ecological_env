@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # 数据文件路径
-DATA_DIR = Path("E:/project/Ecological_env/data")
+DATA_DIR = Path("E:/project/Ecological_env/shared/data")
 INFLUENT_FILE = DATA_DIR / "pollution_water_in.csv"
 EFFLUENT_FILE = DATA_DIR / "pollution_water_out.csv"
 

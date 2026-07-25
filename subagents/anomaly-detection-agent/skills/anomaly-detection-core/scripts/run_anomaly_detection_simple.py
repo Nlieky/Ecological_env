@@ -36,7 +36,7 @@ def load_recent_data(hours: int = 24) -> dict:
         # 方法2: 从脚本位置向上查找项目根目录（包含 data/ 目录的父目录）
         current_dir = Path(__file__).resolve().parent
         for _ in range(6):  # 向上查找最多6层
-            if (current_dir / "data" / "pollution_water_in.csv").exists():
+            if (current_dir / "shared" / "data" / "pollution_water_in.csv").exists():
                 base_dir = current_dir
                 break
             current_dir = current_dir.parent
@@ -44,7 +44,7 @@ def load_recent_data(hours: int = 24) -> dict:
             # 方法3: 使用固定的项目根目录（Windows路径）
             base_dir = Path("E:/project/Ecological_env")
 
-    data_dir = base_dir / "data"
+    data_dir = base_dir / "shared" / "data"
     inflow_file = data_dir / "pollution_water_in.csv"
     outflow_file = data_dir / "pollution_water_out.csv"
     

@@ -32,7 +32,7 @@ python "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --hours 24
 
 ## Responsibilities
 
-- 从 `data/pollution_water_in.csv`、`data/pollution_water_out.csv` 取数
+- 从 `shared/data/pollution_water_in.csv`、`shared/data/pollution_water_out.csv` 取数
 - 缺失值处理、异常值过滤、时间戳解析
 - 时序对齐（按 2h HRT 滞后）、字段标准化
 - 数据质量报告

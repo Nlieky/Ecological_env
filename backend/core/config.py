@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     CACHE_TTL_CONVERSATIONS: int = 3600
 
     # 数据源配置
-    DATA_SOURCE_PATH: str = "./data"
+    DATA_SOURCE_PATH: str = "./shared/data"
     AGENT_SERVICE_SYNC_INTERVAL: int = 300  # 秒
 
     # API配置

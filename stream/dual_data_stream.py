@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 # 配置
-DATA_DIR = Path('E:/project/Ecological_env/data')
+DATA_DIR = Path('E:/project/Ecological_env/shared/data')
 INFLUENT_FILE = 'pollution_water_in.csv'
 EFFLUENT_FILE = 'pollution_water_out.csv'
 API_ENDPOINT = 'http://localhost:5000/api/dual-stream'

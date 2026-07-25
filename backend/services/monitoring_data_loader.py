@@ -1,6 +1,6 @@
 """监测数据加载器
 
-从 ``data/pollution_water_in.csv``（进水）和 ``data/pollution_water_out.csv``（出水）
+从 ``shared/data/pollution_water_in.csv``（进水）和 ``shared/data/pollution_water_out.csv``（出水）
 加载真实监测数据，提供清洗、内存缓存和查询辅助函数，供 :class:`DataService` 使用。
 
 数据特征（实测）：

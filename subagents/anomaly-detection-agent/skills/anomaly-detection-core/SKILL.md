@@ -75,8 +75,8 @@ description: 异常检测和违规模式识别。**触发条件**：当用户提
 ## 输入要求
 
 脚本会自动从项目数据目录加载最近24小时的监测数据：
-- `data/pollution_water_in.csv` - 进水数据
-- `data/pollution_water_out.csv` - 出水数据
+- `shared/data/pollution_water_in.csv` - 进水数据
+- `shared/data/pollution_water_out.csv` - 出水数据
 
 ## 检测指标
 
