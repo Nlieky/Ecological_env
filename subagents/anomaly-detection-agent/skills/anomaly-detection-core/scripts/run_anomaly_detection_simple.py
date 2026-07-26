@@ -25,84 +25,100 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# ---------- InfluxDB 数据源(2026 真实报表)----------
+# InfluxDB 契约字段(英文)→ 原 CSV 中文列名(对齐 detect_anomalies 期望,零改动)
+_INFLUX_CN_FIELDS = {
+    "pH": "pH值", "COD": "化学需氧量浓度（毫克/升）", "TN": "总氮浓度（毫克/升）",
+    "AN": "氨氮浓度（毫克/升）", "TP": "总磷浓度（毫克/升）",
+    "flow": "流量（升/秒）", "discharge": "排放量（吨）",
+    "suspended_solids": "悬浮物浓度（毫克/升）",
+}
+_INFLUX_KEEP = ["pH", "COD", "TN", "AN", "TP", "flow", "discharge", "suspended_solids"]
+
+
+def _load_influx_env() -> None:
+    """轻量加载项目根 .env(不覆盖已有环境变量)。"""
+    env = Path(__file__).resolve().parents[5] / ".env"
+    if not env.exists():
+        return
+    for line in env.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip())
+
+
+def _fetch_influx_cn(client, bucket: str, data_type: str):
+    """从 InfluxDB 查一侧数据,pivot 成【中文列名】DataFrame(对齐原 CSV,detect_anomalies 零改动)。"""
+    keep = ", ".join([f'"{f}"' for f in _INFLUX_KEEP])
+    flux = (
+        f'from(bucket: "{bucket}") '
+        f'|> range(start: 0) '
+        f'|> filter(fn: (r) => r._measurement == "wastewater" and r.data_type == "{data_type}") '
+        f'|> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value") '
+        f'|> keep(columns: ["_time", {keep}])'
+    )
+    df = client.query_api().query_data_frame(flux)
+    if isinstance(df, list):
+        df = pd.concat([d for d in df if not d.empty], ignore_index=True) if df else pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    df["_time"] = pd.to_datetime(df["_time"], utc=True).dt.tz_localize(None)
+    df = df.rename(columns={"_time": "监测时间", **_INFLUX_CN_FIELDS})
+    # query_data_frame 附带 result/table 元数据列,只保留监测时间 + 中文指标列
+    keep_cn = ["监测时间"] + list(_INFLUX_CN_FIELDS.values())
+    df = df[[c for c in keep_cn if c in df.columns]]
+    for col in df.columns:
+        if col != "监测时间":
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df.sort_values("监测时间").reset_index(drop=True)
+
+
 def load_recent_data(hours: int = 24) -> dict:
-    """加载最近 N 小时的进水出水数据"""
-    # 数据目录 - 从项目根目录查找
-    # 方法1: 检查环境变量 PROJECT_ROOT
-    project_root = os.environ.get('PROJECT_ROOT')
-    if project_root:
-        base_dir = Path(project_root)
-    else:
-        # 方法2: 从脚本位置向上查找项目根目录（包含 data/ 目录的父目录）
-        current_dir = Path(__file__).resolve().parent
-        for _ in range(6):  # 向上查找最多6层
-            if (current_dir / "shared" / "data" / "pollution_water_in.csv").exists():
-                base_dir = current_dir
-                break
-            current_dir = current_dir.parent
-        else:
-            # 方法3: 使用固定的项目根目录（Windows路径）
-            base_dir = Path("E:/project/Ecological_env")
+    """从 InfluxDB 加载最近 N 小时数据(2026 真实报表)。
 
-    data_dir = base_dir / "shared" / "data"
-    inflow_file = data_dir / "pollution_water_in.csv"
-    outflow_file = data_dir / "pollution_water_out.csv"
-    
-    logger.info(f"加载最近{hours}小时数据...")
-    logger.info(f"数据目录：{data_dir}")
-    
-    if not inflow_file.exists():
-        logger.error(f"进水数据文件不存在：{inflow_file}")
-        return {"influent": [], "effluent": [], "influent_df": pd.DataFrame(), "effluent_df": pd.DataFrame()}
-    
-    if not outflow_file.exists():
-        logger.error(f"出水数据文件不存在：{outflow_file}")
-        return {"influent": [], "effluent": [], "influent_df": pd.DataFrame(), "effluent_df": pd.DataFrame()}
-    
+    返回结构与旧 CSV 版完全一致(influent_df/effluent_df/time_col_*),
+    列名为中文(对齐原 CSV),detect_anomalies 零改动。
+    旧版按 now-cutoff 过滤后 tail(24) 兜底,会取到 2024 末尾;新版直接取 InfluxDB 最新 N 条。
+    """
+    _load_influx_env()
+    url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
+    token = os.environ.get("INFLUXDB_TOKEN")
+    org = os.environ.get("INFLUXDB_ORG", "ecological_env")
+    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+
+    logger.info(f"加载最近{hours}小时数据(InfluxDB bucket={bucket})...")
+
+    if not token:
+        logger.error("INFLUXDB_TOKEN 未设置(环境变量或项目根 .env)")
+        return {"influent_df": pd.DataFrame(), "effluent_df": pd.DataFrame(),
+                "time_col_in": "监测时间", "time_col_out": "监测时间"}
+
     try:
-        df_in = pd.read_csv(inflow_file, encoding='utf-8-sig')
-        df_out = pd.read_csv(outflow_file, encoding='utf-8-sig')
-
-        # 解析时间列名称
-        time_col_in = '监测时间' if '监测时间' in df_in.columns else 'times'
-        time_col_out = '监测时间' if '监测时间' in df_out.columns else 'times'
-
-        # 转换所有可能的数值列为 numeric 类型
-        for col in df_in.columns:
-            if col != time_col_in:
-                df_in[col] = pd.to_numeric(df_in[col], errors='coerce')
-        for col in df_out.columns:
-            if col != time_col_out:
-                df_out[col] = pd.to_numeric(df_out[col], errors='coerce')
-
+        from influxdb_client import InfluxDBClient
+        client = InfluxDBClient(url=url, token=token, org=org, timeout=30_000)
+        df_in = _fetch_influx_cn(client, bucket, "influent")
+        df_out = _fetch_influx_cn(client, bucket, "effluent")
+        client.close()
         logger.info(f"读取数据成功：进水{len(df_in)}条，出水{len(df_out)}条")
     except Exception as e:
-        logger.error(f"读取数据文件失败：{e}")
-        return {"influent": [], "effluent": [], "influent_df": pd.DataFrame(), "effluent_df": pd.DataFrame()}
-    
-    df_in[time_col_in] = pd.to_datetime(df_in[time_col_in], errors='coerce')
-    df_out[time_col_out] = pd.to_datetime(df_out[time_col_out], errors='coerce')
-    
-    # 获取最近 24 小时数据
-    cutoff_time = datetime.now() - timedelta(hours=hours)
-    
-    df_in_recent = df_in[df_in[time_col_in] >= cutoff_time].copy()
-    df_out_recent = df_out[df_out[time_col_out] >= cutoff_time].copy()
-    
-    # 如果最近 24 小时没有数据，使用最新的数据
-    if len(df_in_recent) == 0:
-        df_in_recent = df_in.tail(24).copy()
-    if len(df_out_recent) == 0:
-        df_out_recent = df_out.tail(24).copy()
-    
+        logger.error(f"InfluxDB 读取失败：{e}")
+        return {"influent_df": pd.DataFrame(), "effluent_df": pd.DataFrame(),
+                "time_col_in": "监测时间", "time_col_out": "监测时间"}
+
+    df_in_recent = df_in.tail(hours).copy() if len(df_in) else df_in.copy()
+    df_out_recent = df_out.tail(hours).copy() if len(df_out) else df_out.copy()
+
     logger.info(f"进水数据：{len(df_in_recent)} 条记录")
     logger.info(f"出水数据：{len(df_out_recent)} 条记录")
-    
+
     return {
         "influent_df": df_in_recent,
         "effluent_df": df_out_recent,
-        "time_col_in": time_col_in,
-        "time_col_out": time_col_out
+        "time_col_in": "监测时间",
+        "time_col_out": "监测时间",
     }
 
 
@@ -135,10 +151,17 @@ def iqr_anomaly(values: np.ndarray, multiplier: float = 1.5) -> tuple:
 
 
 def isolation_forest_anomaly(values: np.ndarray, contamination: float = 0.1) -> tuple:
-    """孤立森林异常检测（简化实现）"""
+    """孤立森林异常检测（简化实现;真实数据含缺失,先用中位数填充 NaN）。"""
     try:
         from sklearn.ensemble import IsolationForest
-        X = values.reshape(-1, 1)
+        # 孤立森林不接受 NaN,用中位数填充(保持序列长度,不影响 index 对齐)
+        vals = np.asarray(values, dtype=float)
+        if np.isnan(vals).any():
+            med = np.nanmedian(vals)
+            if np.isnan(med):  # 全 NaN 的极端情况
+                med = 0.0
+            vals = np.where(np.isnan(vals), med, vals)
+        X = vals.reshape(-1, 1)
         iso_forest = IsolationForest(contamination=contamination, random_state=42, n_estimators=100)
         predictions = iso_forest.fit_predict(X)
         anomaly_mask = predictions == -1
@@ -148,36 +171,39 @@ def isolation_forest_anomaly(values: np.ndarray, contamination: float = 0.1) -> 
     except ImportError:
         logger.warning("sklearn 不可用，使用 Z-score 替代")
         return zscore_anomaly(values)
+    except Exception as e:
+        logger.warning(f"孤立森林检测失败，使用 Z-score 替代：{e}")
+        return zscore_anomaly(values)
 
 
 def detect_anomalies_in_series(values: np.ndarray, series_name: str) -> list:
     """对单个序列执行多算子异常检测"""
     anomalies = []
-    
+
     if len(values) < 5:
         logger.warning(f"{series_name} 数据点不足，跳过")
         return anomalies
-    
+
     # 算子 1: Z-score
     z_scores, z_mask = zscore_anomaly(values)
-    
+
     # 算子 2: IQR
     iqr_scores, iqr_mask = iqr_anomaly(values)
-    
+
     # 算子 3: 孤立森林（如果数据量足够）
     if len(values) >= 10:
         if_scores, if_mask = isolation_forest_anomaly(values)
     else:
         if_scores = np.zeros_like(values)
         if_mask = np.zeros(len(values), dtype=bool)
-    
+
     # 综合评分（简单平均）
     combined_scores = (z_scores + iqr_scores + if_scores) / 3.0
-    
+
     # 算子一致性：至少 2 个算子认为是异常
     vote_count = z_mask.astype(int) + iqr_mask.astype(int) + if_mask.astype(int)
     combined_mask = vote_count >= 2
-    
+
     # 收集异常点
     for idx in np.where(combined_mask)[0]:
         anomalies.append({
@@ -186,7 +212,7 @@ def detect_anomalies_in_series(values: np.ndarray, series_name: str) -> list:
             "votes": int(vote_count[idx]),
             "value": float(values[idx])
         })
-    
+
     return anomalies
 
 
@@ -194,35 +220,35 @@ def recognize_pattern(values: np.ndarray, idx: int) -> str:
     """识别异常模式类型"""
     if idx <= 0 or idx >= len(values) - 1:
         return "boundary"
-    
+
     # 检查是否为恒定值
     if np.std(values[max(0, idx-5):min(len(values), idx+6)]) < 1e-6:
         return "constant"
-    
+
     # 检查是否为突变（spike）
     left_diff = abs(values[idx] - values[idx-1])
     right_diff = abs(values[idx] - values[idx+1])
     local_std = np.std(values[max(0, idx-5):min(len(values), idx+6)])
-    
+
     if local_std > 1e-6 and (left_diff > 3 * local_std or right_diff > 3 * local_std):
         return "spike"
-    
+
     # 检查是否为趋势
     if idx >= 5:
         local_values = values[idx-5:idx+1]
         slope = np.polyfit(range(len(local_values)), local_values, 1)[0]
         if abs(slope) > 0.1 * np.std(local_values):
             return "trend"
-    
+
     return "point"
 
 
 def detect_anomalies(data: dict) -> dict:
     """执行异常检测"""
     logger.info("开始异常检测...")
-    
+
     all_anomalies = []
-    
+
     # 处理进水和出水数据
     for data_type in ["influent", "effluent"]:
         df = data.get(f"{data_type}_df")
@@ -231,36 +257,36 @@ def detect_anomalies(data: dict) -> dict:
             time_col = data.get("time_col_in", "监测时间")
         else:  # effluent
             time_col = data.get("time_col_out", "监测时间")
-        
+
         if df is None or len(df) == 0:
             logger.warning(f"{data_type} 数据为空，跳过")
             continue
-        
+
         # 确定要检测的指标（排除时间和非数值列）
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         exclude_cols = ['流量（升/秒）', '排放量（吨）']
         indicators = [col for col in numeric_cols if col not in exclude_cols]
-        
+
         logger.info(f"检测{data_type}指标：{indicators}")
-        
+
         # 对每个指标执行异常检测
         for indicator in indicators:
             values = df[indicator].values
-            
+
             if len(values) < 5:
                 logger.warning(f"{indicator} 数据点不足，跳过")
                 continue
-            
+
             # 检测异常
             anomalies = detect_anomalies_in_series(values, f"{data_type}_{indicator}")
-            
+
             # 添加元数据
             for anomaly in anomalies:
                 idx = anomaly["index"]
                 timestamp = df.iloc[idx][time_col] if time_col in df.columns else str(idx)
                 if isinstance(timestamp, pd.Timestamp):
                     timestamp = timestamp.isoformat()
-                
+
                 anomaly_entry = {
                     "data_type": data_type,
                     "indicator": indicator,
@@ -275,10 +301,10 @@ def detect_anomalies(data: dict) -> dict:
                     ]
                 }
                 all_anomalies.append(anomaly_entry)
-    
+
     # 按分数排序
     all_anomalies.sort(key=lambda x: x['score'], reverse=True)
-    
+
     # 生成摘要
     summary = {
         "total_anomalies": len(all_anomalies),
@@ -286,16 +312,16 @@ def detect_anomalies(data: dict) -> dict:
         "by_indicator": {},
         "by_type": {}
     }
-    
+
     for anomaly in all_anomalies:
         dt = anomaly['data_type']
         ind = anomaly['indicator']
         atype = anomaly['type']
-        
+
         summary['by_data_type'][dt] = summary['by_data_type'].get(dt, 0) + 1
         summary['by_indicator'][ind] = summary['by_indicator'].get(ind, 0) + 1
         summary['by_type'][atype] = summary['by_type'].get(atype, 0) + 1
-    
+
     return {
         "anomalies": all_anomalies,
         "summary": summary
@@ -307,20 +333,20 @@ def main():
     logger.info("=" * 60)
     logger.info("异常检测任务启动")
     logger.info("=" * 60)
-    
+
     task_id = f"anomaly_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
+
     try:
         # 1. 加载数据
         data = load_recent_data(hours=24)
-        
+
         if data['influent_df'] is None or len(data['influent_df']) == 0:
             if data['effluent_df'] is None or len(data['effluent_df']) == 0:
                 raise ValueError("未能加载到任何数据")
-        
+
         # 2. 执行异常检测
         detection_result = detect_anomalies(data)
-        
+
         # 3. 生成输出
         output = {
             "task_id": task_id,
@@ -356,7 +382,7 @@ def main():
 
         logger.info(f"任务完成：{task_id}")
         logger.info(f"检测到 {detection_result['summary']['total_anomalies']} 处异常")
-        
+
     except Exception as e:
         logger.error(f"任务失败：{e}", exc_info=True)
         output = {
