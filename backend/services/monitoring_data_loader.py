@@ -227,18 +227,36 @@ _SINGLETON: Optional[MonitoringDataset] = None
 _SINGLETON_LOCK = threading.Lock()
 
 
-def get_monitoring_data() -> MonitoringDataset:
-    """返回进程级单例 :class:`MonitoringDataset`。"""
+def get_monitoring_data():
+    """返回进程级单例数据集。
+
+    按 ``settings.MONITORING_DATA_SOURCE`` 选择后端:
+      - ``influxdb``(默认): :class:`~backend.services.influxdb_data_loader.InfluxDBMonitoringDataset`
+      - ``csv``: :class:`MonitoringDataset`(读 shared/data/*.csv,回退)
+
+    返回对象鸭子兼容同一接口,调用方(:mod:`backend.services.data_service` /
+    :mod:`backend.metrics.updater`)无需改动。
+    """
     global _SINGLETON
     if _SINGLETON is None:
         with _SINGLETON_LOCK:
             if _SINGLETON is None:
                 from backend.core.config import settings
-                project_root = Path(__file__).resolve().parents[2]
-                data_dir = Path(settings.DATA_SOURCE_PATH)
-                if not data_dir.is_absolute():
-                    data_dir = project_root / data_dir
-                if not data_dir.exists():
-                    data_dir = project_root / "data"
-                _SINGLETON = MonitoringDataset(data_dir)
+                backend = (settings.MONITORING_DATA_SOURCE or "").lower()
+                if backend == "influxdb" and settings.INFLUXDB_TOKEN:
+                    from backend.services.influxdb_data_loader import InfluxDBMonitoringDataset
+                    _SINGLETON = InfluxDBMonitoringDataset(
+                        url=settings.INFLUXDB_URL,
+                        token=settings.INFLUXDB_TOKEN,
+                        org=settings.INFLUXDB_ORG,
+                        bucket=settings.INFLUXDB_BUCKET,
+                    )
+                else:
+                    project_root = Path(__file__).resolve().parents[2]
+                    data_dir = Path(settings.DATA_SOURCE_PATH)
+                    if not data_dir.is_absolute():
+                        data_dir = project_root / data_dir
+                    if not data_dir.exists():
+                        data_dir = project_root / "data"
+                    _SINGLETON = MonitoringDataset(data_dir)
     return _SINGLETON

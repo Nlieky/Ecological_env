@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     DATA_SOURCE_PATH: str = "./shared/data"
     AGENT_SERVICE_SYNC_INTERVAL: int = 300  # 秒
 
+    # 监测数据后端: influxdb(读 InfluxDB monitoring-data)或 csv(读 shared/data/*.csv)
+    MONITORING_DATA_SOURCE: str = "influxdb"
+    # InfluxDB v2.7 配置(工业时序数据源,原生 Windows 二进制)
+    INFLUXDB_URL: str = "http://localhost:8086"
+    INFLUXDB_TOKEN: str = ""
+    INFLUXDB_ORG: str = "ecological_env"
+    INFLUXDB_BUCKET: str = "monitoring-data"
+
     # API配置
     API_V1_PREFIX: str = "/api/v1"
 
