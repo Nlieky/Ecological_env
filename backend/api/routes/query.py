@@ -133,7 +133,7 @@ def execute_query(request: QueryRequest):
                         session_id=final_session_id,
                         subagent_name=sc.get("subagent_name", ""),
                         input_params={},
-                        output_result={"summary": sc.get("summary", "")},
+                        output_result={"summary": sc.get("summary", ""), "skill_calls": sc.get("skill_calls", [])},
                         execution_time_ms=sc.get("execution_time_ms") or 0.0,
                         status=sc.get("status", "success"),
                     )

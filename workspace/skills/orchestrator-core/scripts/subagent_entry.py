@@ -108,6 +108,29 @@ def _read_script_result(session_dir, result_filename):
     return None
 
 
+def _extract_skill_calls(response) -> list:
+    """从 run_conversation 的 messages 提取 skill 工具调用(skill_view/skills_list/skill_manage)。
+    OpenAI 格式: assistant message.tool_calls=[{function:{name,arguments}}]。
+    """
+    if not isinstance(response, dict):
+        return []
+    skill_calls = []
+    for msg in response.get("messages", []):
+        if not isinstance(msg, dict) or msg.get("role") != "assistant":
+            continue
+        for tc in (msg.get("tool_calls") or []):
+            fn = (tc.get("function") or {}).get("name")
+            if fn not in ("skill_view", "skills_list", "skill_manage"):
+                continue
+            args_raw = (tc.get("function") or {}).get("arguments") or ""
+            try:
+                args = json.loads(args_raw) if isinstance(args_raw, str) else (args_raw or {})
+            except Exception:
+                args = {}
+            skill_calls.append({"tool": fn, "skill": args.get("name", "")})
+    return skill_calls
+
+
 def run_subagent() -> Dict[str, Any]:
     session_dir = os.getenv('SESSION_DIR')
     subagent_name = os.getenv('SUBAGENT_NAME', DEFAULT_SUBAGENT_NAME)
@@ -176,6 +199,7 @@ def run_subagent() -> Dict[str, Any]:
             result = {"task_id": task_id, "status": "completed", "result": result,
                       "timestamp": datetime.now().isoformat()}
         result["task_id"] = task_id
+        result["skill_calls"] = _extract_skill_calls(locals().get("response"))
         write_result(session_dir, result, result_filename)
     return result
 

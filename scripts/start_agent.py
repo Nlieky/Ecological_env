@@ -289,6 +289,7 @@ class AgentService:
                         "status": "success",
                         "summary": evt.get("summary", ""),
                         "execution_time_ms": int((time.time() - _s) * 1000) if _s else 0,
+                        "skill_calls": evt.get("skill_calls") or [],
                     })
 
             elapsed = time.time() - start_time

@@ -46,13 +46,15 @@ except ImportError:
 _current_progress_queue = None
 
 
-def _emit_progress(subagent: str, stage: str, summary: str = None):
-    """向当前流式请求的队列 push 进度事件（非流式时队列为 None，no-op）。"""
+def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=None):
+    """向当前请求的队列 push 进度事件（非流式时队列为 None，no-op）。"""
     if _current_progress_queue is None:
         return
     evt = {"type": "progress", "subagent": subagent, "stage": stage}
     if summary:
         evt["summary"] = summary
+    if skill_calls:
+        evt["skill_calls"] = skill_calls
     try:
         _current_progress_queue.put(evt)
     except Exception:
@@ -223,7 +225,8 @@ def _call_subagent_handler(*args, **kwargs) -> str:
         subagent_name = params.get('subagent_name') or params.get('name') or 'unknown'
         _emit_progress(subagent_name, 'start')
         result = call_subagent(**params)
-        _emit_progress(subagent_name, 'done', _summarize_result(result))
+        _sc = result.get("skill_calls") if isinstance(result, dict) else None
+        _emit_progress(subagent_name, 'done', _summarize_result(result), skill_calls=_sc)
         # 给主智能体回传精简版：去掉大数据数组（进/出水原始行），只留摘要+关键字段。
         # 完整结果已在 session 文件，下游子智能体从文件读；主智能体不该背原始数据
         # （一周 53K 会撑爆上下文/迭代预算）。需要细节时用 read_result 取。
