@@ -4,6 +4,9 @@
     <div class="chips">
       <span v-for="a in ALL" :key="a.key" class="chip" :class="{ on: isActive(a.key) }">
         <span class="dot"></span>{{ a.name }}<span class="lat">{{ isActive(a.key) ? '已调用' : '未调用' }}</span>
+        <template v-if="isActive(a.key)">
+          <span v-for="(sc, i) in skillsOf(execOf(a.key))" :key="i" class="skill">📖 {{ sc.skill || sc.tool }}</span>
+        </template>
       </span>
     </div>
     <div v-if="!executed.length" class="empty">暂无子智能体调用记录(agent 服务未回传)</div>
@@ -24,6 +27,14 @@ const executed = computed(() => props.trace.subagent_executions || [])
 function isActive(key: string) {
   return executed.value.some((e) => String(e.subagent_name || '').includes(key))
 }
+function execOf(key: string): any {
+  return executed.value.find((e) => String(e.subagent_name || '').includes(key))
+}
+function skillsOf(e: any): { tool: string; skill: string }[] {
+  let out = e?.output_result
+  if (typeof out === 'string') { try { out = JSON.parse(out) } catch { out = {} } }
+  return out && Array.isArray(out.skill_calls) ? out.skill_calls : []
+}
 </script>
 
 <style scoped>
@@ -36,5 +47,6 @@ function isActive(key: string) {
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted) }
 .on .dot { background: var(--success) }
 .lat { color: var(--text-muted); font-size: 10px }
+.skill { font-size: 10px; padding: 1px 6px; border-radius: 5px; background: #eef2ff; color: var(--primary); margin-left: 2px; white-space: nowrap }
 .empty { font-size: 11px; color: var(--text-muted); margin-top: 6px }
 </style>
