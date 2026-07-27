@@ -276,6 +276,7 @@ async def query_stream(request: QueryRequest):
                                     "execution_time_ms": latency,
                                     "status": "success",
                                     "summary": evt.get("summary", ""),
+                                    "skill_calls": evt.get("skill_calls") or [],
                                 })
                         elif etype == "done":
                             final_content = evt.get("content", "")
@@ -317,7 +318,7 @@ async def query_stream(request: QueryRequest):
                         session_id=final_session_id,
                         subagent_name=ex["subagent_name"],
                         input_params={},
-                        output_result={"summary": ex.get("summary", "")},
+                        output_result={"summary": ex.get("summary", ""), "skill_calls": ex.get("skill_calls", [])},
                         execution_time_ms=ex.get("execution_time_ms") or 0.0,
                         status=ex.get("status", "success"),
                     )
