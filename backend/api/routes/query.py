@@ -107,20 +107,38 @@ def execute_query(request: QueryRequest):
         content = agent_data.get("content", "")
         final_session_id = agent_data.get("session_id", session_id)
 
+        # 提取 trace（agent 服务回传的子智能体调用明细，供审计；阻塞 /query 此前没有）
+        trace = agent_data.get("trace") or {}
+        decision_path = trace.get("decision_path") or ["Agent转发"]
+        subagent_calls = trace.get("subagent_calls") or []
+
         # 计算耗时
         total_latency_ms = (time.time() - start_time) * 1000
 
-        # 记录主智能体决策
+        # 记录主智能体决策（用真实决策路径，不再写死 "Agent转发"）
         try:
             log_master_decision(
                 session_id=final_session_id,
                 user_query=request.query,
                 intent="query",
-                decision_path=["Agent转发"],
-                subagents_called=[],
-                reasoning_summary=f"查询完成，返回 {len(content)} 字符",
+                decision_path=decision_path,
+                subagents_called=decision_path,
+                reasoning_summary=f"查询完成，返回 {len(content)} 字符，调用 {len(subagent_calls)} 个子智能体",
                 total_latency_ms=total_latency_ms
             )
+            # 记录每个子智能体执行明细（与流式 query_stream 一致，审计页可见）
+            for sc in subagent_calls:
+                try:
+                    log_subagent_execution(
+                        session_id=final_session_id,
+                        subagent_name=sc.get("subagent_name", ""),
+                        input_params={},
+                        output_result={"summary": sc.get("summary", "")},
+                        execution_time_ms=sc.get("execution_time_ms") or 0.0,
+                        status=sc.get("status", "success"),
+                    )
+                except Exception as se:
+                    logger.warning(f"Failed to log subagent execution: {se}")
         except Exception as log_error:
             logger.warning(f"Failed to log master decision: {log_error}")
 

@@ -58,6 +58,7 @@ class QueryResponse(BaseModel):
     timestamp: str
     success: bool
     error: str = None
+    trace: dict = None  # 子智能体调用明细(decision_path + subagent_calls),供后端审计
 
 
 class AgentService:
@@ -239,6 +240,12 @@ class AgentService:
             # 调用主智能体（加锁串行化，避免并发查询串台；排队超时直接返回"忙"）
             if not self._agent_lock.acquire(timeout=self._agent_lock_timeout):
                 return {"success": False, "error": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"}
+            # 挂进度队列收集 call_subagent 调用（让阻塞 /query 也能回传子智能体 trace，供审计）
+            import queue as _q
+            _trace_q = _q.Queue()
+            _tool_reg = getattr(self, "_tool_reg", None)
+            if _tool_reg is not None:
+                _tool_reg._current_progress_queue = _trace_q
             try:
                 self._fresh_session_dir()  # 本次查询用独立 session 目录，杜绝跨查询结果复用
                 result = self.master_agent.run_conversation(
@@ -247,6 +254,8 @@ class AgentService:
                     task_id=session_id
                 )
             finally:
+                if _tool_reg is not None:
+                    _tool_reg._current_progress_queue = None
                 self._agent_lock.release()
 
             # 更新会话历史（保存完整的对话）
@@ -259,10 +268,33 @@ class AgentService:
             else:
                 content = str(result) if result else ""
 
-            elapsed = time.time() - start_time
-            logger.info(f"查询完成: session={session_id}, 耗时={elapsed:.2f}s, 消息数={len(result.get('messages', []))}")
+            # 从进度队列收集子智能体调用（与流式 query_stream 的 progress 解析一致）
+            _decision_order = []
+            _sub_starts = {}
+            _subagent_calls = []
+            while not _trace_q.empty():
+                evt = _trace_q.get_nowait()
+                if not isinstance(evt, dict) or evt.get("type") != "progress":
+                    continue
+                sub = evt.get("subagent")
+                stage = evt.get("stage")
+                if sub and stage == "start":
+                    _sub_starts[sub] = time.time()
+                    if sub not in _decision_order:
+                        _decision_order.append(sub)
+                elif sub and stage == "done":
+                    _s = _sub_starts.pop(sub, None)
+                    _subagent_calls.append({
+                        "subagent_name": sub,
+                        "status": "success",
+                        "summary": evt.get("summary", ""),
+                        "execution_time_ms": int((time.time() - _s) * 1000) if _s else 0,
+                    })
 
-            # 构建响应
+            elapsed = time.time() - start_time
+            logger.info(f"查询完成: session={session_id}, 耗时={elapsed:.2f}s, 消息数={len(result.get('messages', []))}, 子智能体={len(_subagent_calls)}")
+
+            # 构建响应（含 trace，供后端记录到审计）
             response = {
                 "success": True,
                 "content": content,
@@ -270,7 +302,11 @@ class AgentService:
                 "timestamp": datetime.now().isoformat(),
                 "message_count": len(result.get("messages", [])),
                 "cached": False,
-                "quick_response": False
+                "quick_response": False,
+                "trace": {
+                    "decision_path": _decision_order,
+                    "subagent_calls": _subagent_calls,
+                }
             }
 
             # 缓存已禁用（见上方说明），不再 _update_cache
@@ -367,7 +403,8 @@ def query(request: QueryRequest):
             content=result["content"],
             session_id=result["session_id"],
             timestamp=result["timestamp"],
-            success=True
+            success=True,
+            trace=result.get("trace")
         )
     else:
         raise HTTPException(
