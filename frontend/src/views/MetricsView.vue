@@ -28,9 +28,11 @@
         <span class="ct">{{ curMeta.label }}（{{ curMeta.desc }}）趋势 · 进水 vs 出水</span>
         <span class="cs">{{ records.length }} 个采样点</span>
       </div>
-      <div ref="chartEl" class="chart"></div>
-      <div v-if="loading" class="loading">加载中…</div>
-      <div v-else-if="!records.length" class="loading">该时间窗口无数据</div>
+      <div class="chart-wrap">
+        <div ref="chartEl" class="chart"></div>
+        <div v-if="loading" class="loading">加载中…</div>
+        <div v-else-if="!records.length" class="loading">该时间窗口无数据</div>
+      </div>
     </div>
   </div>
 </template>
@@ -108,7 +110,7 @@ function renderChart() {
 async function load() {
   loading.value = true
   try {
-    const r = await monitoringService.history({ time_range: timeWindow.value, page_size: 100 })
+    const r = await monitoringService.history({ time_range: timeWindow.value, page_size: 500 })
     records.value = r.records
   } catch { records.value = [] }
   finally { loading.value = false }
@@ -152,6 +154,7 @@ onBeforeUnmount(() => { chart?.dispose(); chart = null })
 .chart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px }
 .ct { font-size: 13px; font-weight: 700 }
 .cs { font-size: 11px; color: var(--text-muted) }
-.chart { width: 100%; height: 400px }
-.loading { position: absolute; inset: 40px 0 0 0; display: grid; place-items: center; color: var(--text-muted); font-size: 13px }
+.chart-wrap { position: relative; width: 100%; height: 400px }
+.chart { width: 100%; height: 100% }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); font-size: 13px }
 </style>
