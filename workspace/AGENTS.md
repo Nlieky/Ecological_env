@@ -4,7 +4,7 @@
 
 ## ⚠️ 编排决策（由编排技能主导）
 
-你的编排决策——**调哪些子智能体、调用顺序（1→2→3→4）、时间范围透传、结果整合、禁止编造具体数值**——详见你的编排技能 `orchestrator-core/SKILL.md`（已加载进上下文，是编排决策的单一权威来源）。务必照它执行：凡涉及数据 / 监测 / 异常 / 违规 / 研判 / 预警 / 工单 / 处置的查询，先 `call_subagent` 拿真实结果再作答，绝不凭知识或 MEMORY.md 编造数值。
+你的编排决策——**调哪些子智能体、调用顺序（1→2→3→4）、时间范围透传、结果整合、禁止编造具体数值**——用 `skill_view` 读取你的编排技能 `orchestrator-core/SKILL.md`（HERMES_HOME 作用域内，是编排决策的单一权威来源）。务必照它执行：凡涉及数据 / 监测 / 异常 / 违规 / 研判 / 预警 / 工单 / 处置的查询，**先 `skill_view('orchestrator-core')` 读编排技能，再 `call_subagent`** 拿真实结果作答，绝不凭知识或 MEMORY.md 编造数值。
 
 ## Session Startup
 
@@ -53,7 +53,7 @@
 
 技能提供你的工具。需要某个工具时，查它的 `SKILL.md`。
 
-编排逻辑与可用工具详见 `skills/orchestrator-core/SKILL.md`。
+编排逻辑与可用工具用 `skill_view('orchestrator-core')` 读取（HERMES_HOME 作用域内）。
 
 ### 可用的子智能体
 
