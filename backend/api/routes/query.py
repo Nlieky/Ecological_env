@@ -301,13 +301,16 @@ async def query_stream(request: QueryRequest):
                     logger.warning(f"Failed to persist stream conversation exchange: {persist_error}")
             # 追踪：真实 decision_path/subagents + 每个子智能体执行明细，供 /logs/trace/{id} 展示
             try:
+                # decision_order 靠 progress start 事件;若流式透传丢 start 导致空,
+                # 从 subagent_executions(done 事件,更可靠)反推调用顺序
+                _final_decision = decision_order or [ex.get("subagent_name", "") for ex in subagent_executions if ex.get("subagent_name")]
                 log_master_decision(
                     session_id=final_session_id,
                     user_query=request.query,
                     intent="query",
-                    decision_path=decision_order,
-                    subagents_called=decision_order,
-                    reasoning_summary=f"流式查询完成，调用 {len(decision_order)} 个子智能体",
+                    decision_path=_final_decision,
+                    subagents_called=_final_decision,
+                    reasoning_summary=f"流式查询完成，调用 {len(_final_decision)} 个子智能体",
                     total_latency_ms=total_latency_ms,
                 )
             except Exception as e:
