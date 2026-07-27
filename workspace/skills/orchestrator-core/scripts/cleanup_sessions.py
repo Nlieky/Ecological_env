@@ -21,8 +21,8 @@ def cleanup_sessions(days: int = 7) -> int:
         清理的会话数量
     """
     # 获取 workspace 根目录
-    current_dir = Path(__file__).parent.parent.parent.parent
-    state_dir = current_dir / "state"
+    current_dir = Path(__file__).parent.parent.parent.parent.parent
+    state_dir = current_dir / "sessions"
 
     if not state_dir.exists():
         return 0
@@ -44,9 +44,11 @@ def cleanup_sessions(days: int = 7) -> int:
 
         # 从目录名提取时间戳
         try:
-            # session_YYYYMMDD_HHMMSS
-            timestamp_str = item.name.replace('session_', '').replace('_', '')
-            session_time = datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
+            # session_YYYYMMDD_HHMMSS(可能带 hex 唯一后缀,如 session_20260727_102649_2c6a14)
+            m = re.search(r'session_(\d{8})_(\d{6})', item.name)
+            if not m:
+                continue
+            session_time = datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S")
 
             # 如果会话早于截止时间，删除
             if session_time < cutoff_time:
@@ -69,8 +71,8 @@ def main():
     print(f"Cleaned {count} sessions older than 30 days")
 
     # 列出当前会话目录
-    current_dir = Path(__file__).parent.parent.parent.parent
-    state_dir = current_dir / "state"
+    current_dir = Path(__file__).parent.parent.parent.parent.parent
+    state_dir = current_dir / "sessions"
 
     if state_dir.exists():
         sessions = list(state_dir.glob("session_*"))

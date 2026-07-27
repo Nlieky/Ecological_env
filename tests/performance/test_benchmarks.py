@@ -15,9 +15,14 @@ from datetime import datetime
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
+# orchestrator-core 是连字符目录,加 scripts 到 path 后直接 import 模块
+sys.path.insert(0, str(project_root / "workspace" / "skills" / "orchestrator-core" / "scripts"))
 
-from workspace.skills.orchestrator_core.scripts.create_session import create_session
-from workspace.skills.orchestrator_core.scripts.cleanup_sessions import list_sessions
+from create_session import create_session  # noqa: E402
+try:
+    from cleanup_sessions import list_sessions  # noqa: E402
+except ImportError:
+    list_sessions = None  # 旧函数已不在 cleanup_sessions;benchmark_* 非 pytest 默认跑
 
 
 def benchmark_session_creation(iterations: int = 100):

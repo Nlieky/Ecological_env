@@ -11,14 +11,16 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
-# Add workspace to path
+# orchestrator-core 目录是连字符(Python 不允许 from skills.orchestrator_core),
+# 把 scripts 目录加到 sys.path 后直接 import 模块
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "workspace"))
+_scripts = Path(__file__).parent.parent / "workspace" / "skills" / "orchestrator-core" / "scripts"
+sys.path.insert(0, str(_scripts))
 
-from skills.orchestrator_core.scripts.create_session import (
+from create_session import (  # noqa: E402
     create_session, get_session_files
 )
-from skills.orchestrator_core.scripts.schemas import (
+from schemas import (  # noqa: E402
     write_task_file, write_result_file, validate_task, validate_result
 )
 
