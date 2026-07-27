@@ -12,8 +12,10 @@
   - SESSION_DIR = 公共会话区（task.json / *_result.json）
 不再为每个子智能体复制一份 entry.py（旧设计 4 份重复，DRY 问题）。
 
-防瞎逛（早期 LLM 子智能体会 skill_view/terminal 乱翻几十轮）：SKILL.md 预加载进 prompt
-（不用 skill_view 翻）+ 仅开 terminal 工具（无法 skill_view/memory 探索）+ 低迭代上限。
+防瞎逛：靠 HERMES_HOME 作用域(skill_view 只翻该子智能体 skill,边界清晰,不会满库乱翻)
++ 开 skills/terminal 工具 + 低迭代上限。2026-07-27 验证 4/4 子智能体(LLM 用 hermes 原生
+skill_view 读 SKILL.md → terminal 跑脚本,2-3 次工具调用即完成,无一瞎逛)。
+预加载妥协(_preload_skill_md)已移除——根因是当年没设 HERMES_HOME 作用域,不是模型问题。
 """
 import json
 import logging
@@ -80,15 +82,6 @@ def write_result(session_dir: str, result: Dict[str, Any], filename: str) -> boo
         return False
 
 
-def _preload_skill_md() -> str:
-    """读该子智能体的 SKILL.md，预加载给 LLM（避免它 skill_view 乱翻）。"""
-    for p in AGENT_DIR.glob("skills/*/SKILL.md"):
-        try:
-            return p.read_text(encoding="utf-8")
-        except Exception:
-            continue
-    return ""
-
 
 def _read_script_result(session_dir, result_filename):
     """只读本子智能体自己的结果文件。
@@ -129,15 +122,15 @@ def run_subagent() -> Dict[str, Any]:
         return error_result
     task_id = task.get('task_id', 'unknown')
 
-    skill_md = _preload_skill_md()
+    # 【实验】不预加载 SKILL.md，让 LLM 用 hermes 原生 skills_list/skill_view 在
+    # HERMES_HOME 作用域下读自己的技能(验证「作用域清晰」能否消除瞎逛)
     user_message = (
         f"任务：{task.get('task', '')}\n\n"
-        f"以下是你（{subagent_name} 子智能体）的技能说明，请严格按它执行：\n"
-        f"---\n{skill_md}\n---\n\n"
-        "执行要求：\n"
-        "- 第一步就用 terminal 工具运行上述技能指定的脚本（如 `python skills/.../xxx.py`），"
-        "不要 skills_list/skill_view/memory 等探索。\n"
-        "- 脚本跑完、确认产出了结果文件即可停止，不要多做。"
+        f"你是 {subagent_name} 子智能体。执行步骤：\n"
+        "1. 用 skills_list 查看你的可用技能，用 skill_view 读取相关技能的 SKILL.md\n"
+        "2. 严格按 SKILL.md 的说明，用 terminal 运行其指定的脚本\n"
+        "3. 脚本产出结果文件后即停止\n"
+        "注意：技能已限定为你的作用域(只含与你相关的)，直接选用即可，不要反复翻阅。"
     )
 
     try:
@@ -151,7 +144,7 @@ def run_subagent() -> Dict[str, Any]:
         agent = AIAgent(
             base_url=llm_base_url, api_key=llm_api_key, model=llm_model,
             load_soul_identity=True, skip_context_files=False, skip_memory=False,
-            enabled_toolsets=["terminal"], session_id=task_id, max_iterations=6,
+            enabled_toolsets=["skills", "terminal"], session_id=task_id, max_iterations=6,
         )
         response = agent.run_conversation(user_message)
         logger.info(f"[LLM] 任务完成")
