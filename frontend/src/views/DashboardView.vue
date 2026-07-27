@@ -10,7 +10,11 @@
         <IndicatorMatrix :groups="groups" />
         <AnomalyList :groups="groups" />
       </div>
-      <div v-else class="loading">加载中…</div>
+      <div v-else-if="realtime.loading || isLoadingHistory" class="loading">加载中…</div>
+      <div v-else class="error">
+        ⚠ 数据加载失败（后端 / InfluxDB 可能未连接）
+        <button class="retry-btn" @click="retry">重试</button>
+      </div>
     </template>
     <PlantOverviewGrid v-else :plants="plants" />
   </div>
@@ -42,12 +46,20 @@ const groups = computed<IndicatorGroups | null>(() =>
   realtime.realtime && history.value ? buildIndicatorCells(realtime.realtime, history.value) : null,
 )
 
+const isLoadingHistory = ref(false)
 async function loadHistory() {
+  isLoadingHistory.value = true
   try {
     history.value = await monitoringService.history({ time_range: app.dashboardFilters.timeWindow, page_size: 100 })
   } catch {
     history.value = null
+  } finally {
+    isLoadingHistory.value = false
   }
+}
+function retry() {
+  void realtime.fetchRealtime()
+  void loadHistory()
 }
 async function loadPlants() {
   try { plants.value = await plantsService.list() } catch { plants.value = [] }
@@ -69,4 +81,7 @@ watch(() => app.dashboardFilters.timeWindow, () => void loadHistory())
 .seg button.on { color: #04121a; background: linear-gradient(135deg, var(--cyan), #5fb9ff); font-weight: 600; }
 .matrix-wrap { margin-top: 14px; }
 .loading { color: var(--text-muted); font-size: 13px; padding: 20px; }
+.error { color: var(--el-color-danger, #f56c6c); font-size: 13px; padding: 20px; display: flex; align-items: center; gap: 12px; }
+.retry-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--brd); background: var(--card-bg); color: var(--primary); font-size: 12px; cursor: pointer; font-family: inherit; }
+.retry-btn:hover { border-color: var(--primary); }
 </style>

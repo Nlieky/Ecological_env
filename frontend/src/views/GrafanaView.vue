@@ -17,8 +17,10 @@
 // 嵌入用 dashboard：stream_01（uid=wastewater-fixed，双数据流监控面板），kiosk=tv 隐藏顶栏。
 // 前提：Grafana 开启匿名 Viewer 访问 + allow_embedding（已验证：kiosk URL 200、无 X-Frame-Options）。
 // 若看不到图，点右上"新窗口打开"，或确认 Grafana/Prometheus(:9090)/后端(:8000) 都在跑。
-const GRAFANA_BASE = 'http://localhost:3000'
-const DASH_UID = 'wastewater-fixed'
+// 地址/UID 外置到 vite 环境变量（frontend/.env 的 VITE_GRAFANA_URL / VITE_GRAFANA_DASH_UID），
+// 默认 fallback 本地，部署时改 .env 即可，不用改代码。
+const GRAFANA_BASE = import.meta.env.VITE_GRAFANA_URL || 'http://localhost:3000'
+const DASH_UID = import.meta.env.VITE_GRAFANA_DASH_UID || 'wastewater-fixed'
 const dashUrl = `${GRAFANA_BASE}/d/${DASH_UID}/_?kiosk=tv`
 </script>
 
