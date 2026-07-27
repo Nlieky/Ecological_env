@@ -23,6 +23,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# 项目根(subagents/.../scripts/ 上 5 层),供 import shared.data.influxdb_query
+sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
+
 import pandas as pd
 from influxdb_client import InfluxDBClient
 
@@ -52,29 +55,11 @@ def _load_env() -> None:
         os.environ.setdefault(k.strip(), v.strip())
 
 
-def _fetch_df(client: InfluxDBClient, bucket: str, data_type: str) -> pd.DataFrame:
-    """查一侧数据,pivot 成宽表(timestamp 索引 + 各指标列),字段名按旧版重命名。"""
-    keep = ", ".join([f'"{f}"' for f in _KEEP_FIELDS])
-    flux = (
-        f'from(bucket: "{bucket}") '
-        f'|> range(start: 0) '
-        f'|> filter(fn: (r) => r._measurement == "{_MEASUREMENT}" '
-        f'  and r.data_type == "{data_type}") '
-        f'|> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value") '
-        f'|> keep(columns: ["_time", {keep}])'
-    )
-    df = client.query_api().query_data_frame(flux)
-    if isinstance(df, list):
-        df = pd.concat([d for d in df if not d.empty], ignore_index=True) if df else pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    df["_time"] = pd.to_datetime(df["_time"], utc=True).dt.tz_localize(None)
-    df = df.rename(columns={"_time": "timestamp", **_FIELD_RENAME}).set_index("timestamp").sort_index()
-    # query_data_frame 附带 result/table 元数据列,只保留契约输出字段
-    out_cols = [c for c in ["pH", "COD", "TN", "NH3-N", "TP", "flow_rate", "discharge_volume", "SS"]
-                if c in df.columns]
-    return df[out_cols] if out_cols else df
+def _fetch_df(client, bucket: str, data_type: str) -> pd.DataFrame:
+    """查一侧数据(委托共享模块)+ 重命名为旧 CSV 键名,下游零改动。"""
+    from shared.data.influxdb_query import fetch_wastewater_df, CANONICAL_FIELDS
+    df = fetch_wastewater_df(client, bucket, data_type, CANONICAL_FIELDS)
+    return df.rename(columns=_FIELD_RENAME)
 
 
 def _df_to_records(df: pd.DataFrame) -> list:

@@ -1,67 +1,59 @@
 version: '3.8'
 
+# 现状架构:backend(FastAPI 8000)+ agent(主智能体 8642)+ influxdb + prometheus + grafana
+# 注意:本文件已移除对已删除的 middleware/ 目录的引用。容器化部署(网络/卷/LLM 可达性)
+# 仍需按实际环境调优,这里只保证结构与现状一致。
+
 services:
-  # ========== 项目服务 ==========
-
-  # Web 界面
-  web:
+  # ========== 应用层 ==========
+  # 后端 FastAPI(监测 API + 查询透传)
+  backend:
     build: .
-    command: python -m middleware.web_interface
+    command: python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "8080:8080"
+      - "8000:8000"
+    env_file: .env
     environment:
-      - WEB_PORT=8080
-    volumes:
-      - ./data:/app/data
-      - ./middleware/static:/app/middleware/static
+      # 容器内通过服务名访问 InfluxDB,覆盖 .env 里的 localhost
+      - INFLUXDB_URL=http://influxdb:8086
     depends_on:
-      - query
-      - monitor
+      - influxdb
     restart: unless-stopped
-    networks:
-      - eco-net
+    networks: [eco-net]
 
-  # 查询接口
-  query:
+  # 主智能体 Agent 服务(LLM 编排)
+  agent:
     build: .
-    command: python middleware/query_interface.py
+    command: python scripts/start_agent.py
     ports:
-      - "5001:5001"
+      - "8642:8642"
+    env_file: .env
     environment:
-      - QUERY_PORT=5001
-    volumes:
-      - ./data:/app/data
-    restart: unless-stopped
-    networks:
-      - eco-net
-
-  # 监控服务（含 Prometheus 指标暴露）
-  monitor:
-    build: .
-    command: python middleware/app_orchestrator.py
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./data:/app/data
-    restart: unless-stopped
-    networks:
-      - eco-net
-
-  # 数据流服务（可选，用于发送模拟数据）
-  stream:
-    build: .
-    command: python stream/dual_data_stream.py
-    volumes:
-      - ./data:/app/data
+      - INFLUXDB_URL=http://influxdb:8086
     depends_on:
-      - monitor
+      - influxdb
     restart: unless-stopped
-    networks:
-      - eco-net
+    networks: [eco-net]
 
-  # ========== 监控服务 ==========
+  # ========== 数据支撑层 ==========
+  # InfluxDB 2.7(工业时序数据,measurement=wastewater)
+  influxdb:
+    image: influxdb:2.7
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
+      - DOCKER_INFLUXDB_INIT_ORG=ecological_env
+      - DOCKER_INFLUXDB_INIT_BUCKET=monitoring-data
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=influxdb-local-token
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    restart: unless-stopped
+    networks: [eco-net]
 
-  # Prometheus
+  # ========== 监控可视化 ==========
   prometheus:
     image: prom/prometheus:latest
     ports:
@@ -72,19 +64,15 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     restart: unless-stopped
-    networks:
-      - eco-net
+    networks: [eco-net]
 
-  # Grafana
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3001:3000"
+      - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -96,13 +84,13 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
-    networks:
-      - eco-net
+    networks: [eco-net]
 
 networks:
   eco-net:
     driver: bridge
 
 volumes:
+  influxdb-data:
   prometheus-data:
   grafana-data:

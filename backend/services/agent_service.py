@@ -32,7 +32,8 @@ class AgentService:
 
     def __init__(self):
         self.agent_cache: Dict[str, Any] = {}
-        self.project_dir = Path("E:/project/Ecological_env").resolve()
+        # 项目根 = backend/services/ 的上两层(不硬编码绝对路径,便于换机器/容器)
+        self.project_dir = Path(__file__).resolve().parents[2]
         self._ensure_correct_directory()
 
     def _ensure_correct_directory(self):

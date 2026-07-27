@@ -46,28 +46,9 @@ class InfluxDBMonitoringDataset:
     # ---------- 内部 ----------
 
     def _fetch(self, data_type: str, fields: List[str]) -> pd.DataFrame:
-        """查一侧数据,pivot 成宽表(time 索引 + 各指标列),返回按时间排序的 DataFrame。"""
-        keep_cols = ", ".join([f'"{f}"' for f in fields])
-        flux = (
-            f'from(bucket: "{self._bucket}") '
-            f'|> range(start: 0) '
-            f'|> filter(fn: (r) => r._measurement == "{_MEASUREMENT}" '
-            f'  and r.data_type == "{data_type}") '
-            f'|> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value") '
-            f'|> keep(columns: ["_time", {keep_cols}])'
-        )
-        df = self._query_api.query_data_frame(flux)
-        # 多 table 时拼接;query_data_frame 可能返回 DataFrame 或 list[DataFrame]
-        if isinstance(df, list):
-            df = pd.concat([d for d in df if not d.empty], ignore_index=True) if df else pd.DataFrame()
-        if df is None or df.empty:
-            return pd.DataFrame()
-        df = df.copy()
-        df["_time"] = pd.to_datetime(df["_time"], utc=True).dt.tz_localize(None)
-        df = df.rename(columns={"_time": "time"})
-        df = df.dropna(subset=["time"]).set_index("time").sort_index()
-        # pivot 可能残留 result/table 等辅助列,只保留契约字段中存在的
-        return df[[c for c in fields if c in df.columns]]
+        """查一侧数据(委托 shared.data.influxdb_query,避免查询逻辑重复)。"""
+        from shared.data.influxdb_query import fetch_wastewater_df
+        return fetch_wastewater_df(self._client, self._bucket, data_type, fields)
 
     def _load(self) -> None:
         if self._in is not None and self._out is not None:

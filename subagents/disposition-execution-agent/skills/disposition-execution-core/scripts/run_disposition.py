@@ -46,13 +46,13 @@ logger = logging.getLogger(__name__)
 
 
 def find_project_root() -> Path:
-    """查找项目根目录"""
+    """查找项目根目录(标志:同时含 shared/ 和 backend/)。"""
     current = Path(__file__).resolve()
-    for _ in range(6):  # 向上查找最多6层
-        if (current / "data").exists():
+    for _ in range(6):
+        if (current / "shared").exists() and (current / "backend").exists():
             return current
         current = current.parent
-    return Path("E:/project/Ecological_env")
+    return Path(__file__).resolve().parents[5]
 
 
 def load_anomaly_result(session_dir: Optional[Path] = None) -> Dict[str, Any]:
@@ -65,7 +65,6 @@ def load_anomaly_result(session_dir: Optional[Path] = None) -> Dict[str, Any]:
     # 默认路径
     project_root = find_project_root()
     search_paths.append(project_root / "subagents" / "anomaly-detection-agent" / "anomaly_result.json")
-    search_paths.append(Path("E:/project/Ecological_env/subagents/anomaly-detection-agent/anomaly_result.json"))
 
     for path in search_paths:
         if path.exists():
@@ -90,7 +89,6 @@ def load_violation_result(session_dir: Optional[Path] = None) -> Dict[str, Any]:
     # 默认路径
     project_root = find_project_root()
     search_paths.append(project_root / "subagents" / "rule-reasoning-agent" / "rule_reasoning_result.json")
-    search_paths.append(Path("E:/project/Ecological_env/subagents/rule-reasoning-agent/rule_reasoning_result.json"))
 
     for path in search_paths:
         if path.exists():
@@ -170,7 +168,7 @@ def main():
             session_dir = Path(args.session_dir)
         else:
             session_dir = Path(os.environ.get('SESSION_DIR',
-                                   f"E:/project/Ecological_env/sessions/session_{task_id}"))
+                                   str(find_project_root() / "sessions" / f"session_{task_id}")))
             session_dir.mkdir(parents=True, exist_ok=True)
 
         # 2. 加载输入数据
@@ -325,7 +323,7 @@ def main():
         }
 
         # 保存失败结果
-        session_dir = Path(args.session_dir) if args.session_dir else Path("E:/project/Ecological_env/subagents/disposition-execution-agent")
+        session_dir = Path(args.session_dir) if args.session_dir else Path(__file__).resolve().parents[3]
         output_file = session_dir / "disposition_result.json"
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)

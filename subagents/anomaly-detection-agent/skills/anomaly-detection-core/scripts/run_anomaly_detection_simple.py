@@ -13,6 +13,9 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# 项目根(subagents/.../scripts/ 上 5 层),供 import shared.data.influxdb_query
+sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -50,26 +53,12 @@ def _load_influx_env() -> None:
 
 
 def _fetch_influx_cn(client, bucket: str, data_type: str):
-    """从 InfluxDB 查一侧数据,pivot 成【中文列名】DataFrame(对齐原 CSV,detect_anomalies 零改动)。"""
-    keep = ", ".join([f'"{f}"' for f in _INFLUX_KEEP])
-    flux = (
-        f'from(bucket: "{bucket}") '
-        f'|> range(start: 0) '
-        f'|> filter(fn: (r) => r._measurement == "wastewater" and r.data_type == "{data_type}") '
-        f'|> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value") '
-        f'|> keep(columns: ["_time", {keep}])'
-    )
-    df = client.query_api().query_data_frame(flux)
-    if isinstance(df, list):
-        df = pd.concat([d for d in df if not d.empty], ignore_index=True) if df else pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    df["_time"] = pd.to_datetime(df["_time"], utc=True).dt.tz_localize(None)
-    df = df.rename(columns={"_time": "监测时间", **_INFLUX_CN_FIELDS})
-    # query_data_frame 附带 result/table 元数据列,只保留监测时间 + 中文指标列
-    keep_cn = ["监测时间"] + list(_INFLUX_CN_FIELDS.values())
-    df = df[[c for c in keep_cn if c in df.columns]]
+    """从 InfluxDB 查一侧(委托共享模块)+ 重命名为中文列名(对齐原 CSV,detect_anomalies 零改动)。"""
+    from shared.data.influxdb_query import fetch_wastewater_df, CANONICAL_FIELDS
+    df = fetch_wastewater_df(client, bucket, data_type, CANONICAL_FIELDS)
+    if df.empty:
+        return df
+    df = df.rename(columns=_INFLUX_CN_FIELDS).reset_index().rename(columns={"timestamp": "监测时间"})
     for col in df.columns:
         if col != "监测时间":
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -369,7 +358,7 @@ def main():
         if session_dir:
             output_file = Path(session_dir) / "anomaly_result.json"
         else:
-            output_file = Path("E:/project/Ecological_env/subagents/anomaly-detection-agent/anomaly_result.json")
+            output_file = Path(__file__).resolve().parents[3] / "anomaly_result.json"
 
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
@@ -400,7 +389,7 @@ def main():
         if session_dir:
             output_file = Path(session_dir) / "anomaly_result.json"
         else:
-            output_file = Path("E:/project/Ecological_env/subagents/anomaly-detection-agent/anomaly_result.json")
+            output_file = Path(__file__).resolve().parents[3] / "anomaly_result.json"
 
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 # 添加项目路径（仅在运行时可用）
-PROJECT_ROOT = Path("E:/project/Ecological_env").resolve()
+PROJECT_ROOT = Path(__file__).resolve().parents[4]  # shared/framework/hermes-overlays/tools/ → 项目根
 
 # 工具函数：延迟导入子智能体工具（从 bridge，它正确聚合了 4 个函数）
 def _get_subagent_tools():

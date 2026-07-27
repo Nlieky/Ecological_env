@@ -1,28 +1,24 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    curl \
+# 系统依赖(gcc/g++ 编译 scipy/sklearn 等;curl 健康检查)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制依赖文件（使用精简版本）
-COPY requirements-core.txt .
+# Python 依赖(用项目根 requirements.txt,不再用已删除的 requirements-core.txt)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements-core.txt
-
-# 复制整个项目
+# 项目代码
 COPY . .
 
-# 设置环境变量
-ENV PYTHONPATH=/app:/app/middleware:/app/subagents
+ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 8080 5001 5000
+# 后端(8000)+ 主智能体 Agent 服务(8642)
+EXPOSE 8000 8642
 
-# 默认启动 Web 服务（可被覆盖）
-CMD ["python", "-m", "middleware.web_interface"]
+# 默认起后端;docker-compose 里用 command 覆盖以起 agent 服务
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

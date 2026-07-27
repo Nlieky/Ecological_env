@@ -32,7 +32,8 @@ class RegulationMatcher:
         self.version = "2.0.0"
 
         # 法规库路径
-        self.regulations_dir = Path("E:/project/Ecological_env/shared/knowledge/regulations")
+        # 项目根 = 本脚本(subagents/.../scripts/)上 5 层
+        self.regulations_dir = Path(__file__).resolve().parents[5] / "shared" / "knowledge" / "regulations"
 
         # 加载法规规则
         self.regulations = self._load_regulations()
