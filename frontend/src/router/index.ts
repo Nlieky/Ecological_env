@@ -32,10 +32,8 @@ const router = createRouter({
           meta: { title: '链路追踪', group: '监控大屏' } },
         { path: 'datasources', component: () => import('@/views/DatasourcesView.vue'),
           meta: { title: '数据源', group: '监控大屏' } },
-        { path: 'alerts', component: Placeholder,
-          meta: { title: '告警中心', group: '监控大屏', phTitle: '告警中心',
-            phDesc: '告警事件汇总与处置',
-            phHint: 'Phase B 复用 /api/events' } },
+        { path: 'alerts', component: () => import('@/views/AlertCenterView.vue'),
+          meta: { title: '告警中心', group: '监控大屏' } },
         { path: 'grafana', component: () => import('@/views/GrafanaView.vue'),
           meta: { title: 'Grafana 大屏', group: '监控大屏' } },
         // ── 事件中心 ──

@@ -36,7 +36,22 @@ export const useChatStore = defineStore('chat', () => {
     try { const r = await conversationsService.list(page); conversations.value = r.data.conversations } catch {}
   }
   async function openConversation(id: string) {
-    try { const r = await conversationsService.detail(id); current.value = r.data } catch {}
+    loading.value = true
+    try {
+      const r = await conversationsService.detail(id)
+      current.value = r.data
+      sessionId.value = id
+      // 还原该会话的历史消息到聊天区(过滤 tool 中间步骤,只留 user/assistant 对话)
+      messages.value = (r.data?.messages || [])
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          id: nextId(),
+          role: m.role as 'user' | 'assistant',
+          content: m.content || '',
+          timestamp: m.timestamp || new Date().toISOString(),
+        }))
+    } catch { /* 拦截器已弹错 */ }
+    finally { loading.value = false }
   }
 
   async function sendQuery(query: string) {

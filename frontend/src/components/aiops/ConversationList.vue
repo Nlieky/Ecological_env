@@ -2,7 +2,7 @@
   <aside class="sess">
     <button class="newbtn" @click="$emit('new')">+ 新对话</button>
     <h4>历史会话</h4>
-    <div v-for="c in chat.conversations" :key="c.id" class="si" @click="chat.openConversation(c.id)">
+    <div v-for="c in chat.conversations" :key="c.id" class="si" :class="{active: chat.current?.id === c.id}" @click="chat.openConversation(c.id)">
       <div class="t">{{ c.title }}</div>
       <div class="m">{{ c.message_count }} 条</div>
     </div>
@@ -22,6 +22,7 @@ defineEmits<{ (e: 'new'): void }>()
 h4 { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; margin: 6px 6px 8px }
 .si { padding: 9px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 3px }
 .si:hover { background: #eef2ff }
+.si.active { background: #eef2ff; border-left: 3px solid var(--primary); font-weight: 600 }
 .t { font-size: 12.5px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .m { font-size: 10.5px; color: var(--text-muted); margin-top: 2px }
 .empty { color: var(--text-muted); font-size: 12px; padding: 10px }
