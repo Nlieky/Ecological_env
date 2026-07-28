@@ -24,10 +24,10 @@
 ## 数据流
 
 ```
-数据感知 get_data.py → build_chart(records, anomalies=None) → data_result.chartData
-异常检测 run_anomaly → build_chart(records, anomalies)      → anomaly_result.chartData
+数据感知 get_data.py → build_chart(records, anomalies=None) → data_result.result.chartData
+异常检测 run_anomaly → build_chart(records, anomalies)      → anomaly_result.result.chartData
         ↓
-后端 query.py → 收集本轮 chartData(异常检测的优先,带标注)→ QueryResponse.chartData
+后端 query.py → 收集本轮 chartData(异常检测的优先,带标注,从 *.result.chartData 读)→ QueryResponse.chartData
         ↓
 前端 ChatMessage → ECharts 渲染(每指标一个子图,垂直排列)
 ```
@@ -61,8 +61,8 @@ def build_chart_data(records: dict, indicators: list = None, anomalies: list = N
 | 文件 | 改动 |
 |---|---|
 | **新建 `shared/viz/build_chart.py`** | `build_chart_data()` 实现(records+anomalies → ECharts option 列表) |
-| **`get_data.py`** | 产出 data_result 后调 `build_chart_data(records, indicators, anomalies=None)`,存 `data_result.chartData` |
-| **`run_anomaly_detection_simple.py`** | 产出 anomaly_result 后调 `build_chart_data(records, indicators, anomalies)`,存 `anomaly_result.chartData` |
+| **`get_data.py`** | 产出 data_result 后调 `build_chart_data(records, indicators, anomalies=None)`,存 `result.chartData` |
+| **`run_anomaly_detection_simple.py`** | 产出 anomaly_result 后调 `build_chart_data(records, indicators, anomalies)`,存 `result.chartData` |
 | **`query.py`**(阻塞+流式) | 收集本轮 chartData(异常检测的优先)→ 塞进 `QueryResponse.chartData` |
 | **`ChatMessage.vue`** | 消息含 `chartData.charts` 时,每个用 ECharts 渲染(垂直排列) |
 

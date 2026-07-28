@@ -84,7 +84,7 @@
 |---|---|
 | `run_rule_reasoning.py` | 对接异常检测 5 类特征(替代 normalize_anomalies 的旧 type);调用各模块;嫌疑矩阵;输出 `missing_data` |
 | `regulation_matcher.py` | 法规匹配:排放标准阈值校验(`shared/knowledge/regulations/排放标准.md`) |
-| `process_validator.py` | 4 条工艺规则(资料判据:pH-COD/氨氮-总氮/质量平衡/多指标同步突降) |
+| `process_validator.py` | 4 条工艺规则(资料判据:pH-COD/氨氮-总氮/质量平衡/多指标同步突降);**质量平衡规则读 `data_result.metadata.hrt_hours` 做进水出水时间对齐**(数据感知标的 HRT) |
 | `expert_reasoner.py` | 专家经验 + 案例相似度(≥0.8 同类违规,佐证) |
 | `shared/knowledge/regulations/` | 排放标准 + 水污染防治法(对齐 HJ 915-2017 等) |
 | `shared/knowledge/violation_patterns/` | 4 类违规模式特征库(插瓶/拟合/稀释/逃避 ↔ 特征组合) |

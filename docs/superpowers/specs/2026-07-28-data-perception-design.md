@@ -62,6 +62,7 @@
   - `hrt_hours: 2`(HRT 标注)
   - `missing_points: [缺失时间点列表]`
 - **不清洗/不插值**:缺失值保留 `None`
+- **调 build_chart**(报告可视化,见可视化 spec):产出后调 `shared/viz/build_chart.build_chart_data(records, anomalies=None)` → 存 `result.chartData`(每指标一个 ECharts option,无异常标注)
 
 ### 5. `workspace/skills/orchestrator-core/scripts/subagent_entry.py`(全局,影响 4 子智能体)
 - **删**:自愈给命令机制(第二轮 `run_conversation` + `SUBAGENT_DEFAULT_CMD` 映射)

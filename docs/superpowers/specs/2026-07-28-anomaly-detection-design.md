@@ -72,7 +72,7 @@
 
 | 文件 | 改动 |
 |---|---|
-| **`run_anomaly_detection_simple.py`** | 删自实现的 zscore/iqr/IF,**改成调 `shared/operators/`**(5 特征算子 + isolation_forest + lstm_autoencoder);评分/可信度按资料公式;输出 `features` + `confidence` |
+| **`run_anomaly_detection_simple.py`** | 删自实现的 zscore/iqr/IF,**改成调 `shared/operators/`**(5 特征算子 + isolation_forest + lstm_autoencoder);评分/可信度按资料公式;输出 `features` + `confidence`;调 `build_chart(records, anomalies)` → `result.chartData`(带异常 markPoint,见可视化 spec) |
 | **`shared/operators/specialized/constant_detector.py`** | 去 `violation_type`,只输出 `{is_constant, std, score}` |
 | **`shared/operators/specialized/change_point_detector.py`** | 确认输出突变特征 + 分数(去违规判定,如有) |
 | **`shared/operators/specialized/forgery_detector.py`** | 拆出周期检测 → 新建 `periodicity_detector`;聚类/分布部分先留(后续按业务) |
