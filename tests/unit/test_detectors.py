@@ -51,3 +51,12 @@ def test_high_freq_detector_spike():
     mask, details = d.detect(data)
     assert details.get("is_high_freq") is True
     assert details.get("score", 0) > 0.3
+
+
+def test_periodicity_detector_periodic():
+    from shared.operators.specialized.periodicity_detector import PeriodicityDetector
+    d = PeriodicityDetector()
+    t = np.arange(40)
+    data = pd.Series(np.sin(t * 2 * np.pi / 8) + 7)
+    mask, details = d.detect(data)
+    assert details.get("is_periodic") is True
