@@ -42,3 +42,12 @@ def test_trend_detector_random_not_trend():
     data = pd.Series(np.random.RandomState(42).randn(20) + 7)
     mask, details = d.detect(data)
     assert details.get("is_trend") is False
+
+
+def test_high_freq_detector_spike():
+    from shared.operators.specialized.high_freq_detector import HighFreqDetector
+    d = HighFreqDetector()
+    data = pd.Series([7.0, 9.5, 7.0, 4.5, 7.0, 9.5, 7.0, 4.5] * 3)
+    mask, details = d.detect(data)
+    assert details.get("is_high_freq") is True
+    assert details.get("score", 0) > 0.3
