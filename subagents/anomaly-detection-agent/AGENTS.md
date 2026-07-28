@@ -8,14 +8,14 @@
 
 ## 执行纪律（防瞎逛）
 
-主智能体通过**共享入口 `subagent_entry.py`** 以 subprocess 调起你：你的 SOUL/AGENTS/MEMORY + SKILL.md 已被预加载进 prompt，任务以用户消息形式送达。你**唯一该做的**：
+主智能体通过**共享入口 `subagent_entry.py`** 以 subprocess 调起你：你的 SOUL/AGENTS/MEMORY 已加载，任务以用户消息形式送达。你用 hermes 原生 **`skill_view`** 读取自己的 `SKILL.md`。你**唯一该做的**：
 
 1. 照 SKILL.md 跑它指定的脚本（`run_anomaly_detection_simple.py`）。
 2. 确认产出了 `anomaly_result.json`。
 3. 停。
 
-- ❌ 不要 `skill_view` / `skills_list` / `memory` 探索
-- ❌ 不要翻 `scripts/` 里别的检测变体脚本
+- ✅ 用 `skill_view('anomaly-detection-core')` 读取技能说明，然后 `terminal` 跑脚本
+- ❌ 不要翻 `scripts/` 里别的检测变体脚本、不要 `memory` 探索
 - ❌ 不要解析 JSON、不要生成报告、**不要做违规判定 / 预警**
 - ✅ 迭代上限 4 轮，跑完即止
 
@@ -43,15 +43,17 @@ python "$HERMES_HOME/skills/anomaly-detection-core/scripts/run_anomaly_detection
 - ❌ **违规判定** → `rule-reasoning`（你只产出异常，不判定违规）
 - ❌ 预警 / 工单 → `disposition-execution`
 
-## 异常类型（5 类，对齐真实脚本）
+## 异常特征（5 类，数据层，依据资料）
 
-| 类型 | 标识 | 描述 | 检测方法 |
-|------|------|------|---------|
-| 边界异常 | `boundary` | 时序首尾的异常点 | 位置判定 |
-| 恒定值异常 | `constant` | 数值长时间不变 | 标准差检测 |
-| 突变异常 | `spike` | 突然升高 / 降低 | 局部变化率 |
-| 趋势异常 | `trend` | 持续上升 / 下降 | 线性拟合 |
-| 点异常 | `point` | 单点偏离正常范围 | 多算子投票 |
+| 特征 | 定义 | 算子 |
+|---|---|---|
+| 平稳异常 | 标准差/变异系数低于阈值 | constant_detector |
+| 突变异常 | 相邻点变化幅度超阈值 | change_point_detector |
+| 趋势异常 | 单向均匀升降,二阶导≈0 | trend_detector |
+| 周期异常 | FFT 检测显著周期性 | periodicity_detector |
+| 高频波动 | 分钟级突升突降/归零 | high_freq_detector |
+
+**不判违规模式**(插瓶/拟合/稀释/逃避是规则推理的活,你只输出异常特征 + 分数 + 可信度)。
 
 ## 算子调用规范（三库一体）
 
