@@ -153,7 +153,10 @@ def run_subagent() -> Dict[str, Any]:
         "1. 用 skills_list 查看你的可用技能，用 skill_view 读取相关技能的 SKILL.md\n"
         "2. 严格按 SKILL.md 的说明，用 terminal 运行其指定的脚本\n"
         "3. 脚本产出结果文件后即停止\n"
-        "注意：技能已限定为你的作用域(只含与你相关的)，直接选用即可，不要反复翻阅。"
+        "注意：技能已限定为你的作用域(只含与你相关的)，直接选用即可，不要反复翻阅。\n"
+        "⚠️ 评判成功的唯一标准：你用 terminal 运行了脚本并产出结果文件。"
+        "禁止只回复\"我已就绪\"/\"等待指令\"/\"我将执行\"之类的确认就结束——"
+        "那会被判为任务失败。读完 SKILL.md 后必须立刻调用 terminal 运行脚本。"
     )
 
     try:
@@ -174,12 +177,18 @@ def run_subagent() -> Dict[str, Any]:
 
         result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
         result = _read_script_result(session_dir, result_filename)
+
+        # 自愈：ctgu-vlm 偶尔读完 skill_view 后直接回"我已就绪"就结束（finish_reason=stop），
+        # 压根没调 terminal 跑脚本 → 没产出结果文件。检测到此情况时，复用同一会话追加一条
+        # 硬指令再跑一轮，逼 LLM 真正用 terminal 执行脚本。比让主智能体重试更省（不必重建
+        # agent、不必重新 skill_view；技能说明已在 history 里）。2026-07-28 trace 实证：
+        # 首轮只 skill_view 后"就绪"finish，主智能体简化重试才成功——把那次重试下沉到这里。
         if result is None:
-            # 脚本没产出自己的结果文件——通常是 LLM 子智能体没跑 canonical 脚本（防瞎逛）。
-            # 标记 failed 让失败可见，主智能体可据此重试或如实告知用户；不再用 LLM 文本
-            # 伪装成结构化结果，更不能抄别的步骤的结果。
+            # LLM 没产出结果文件（通常"读了 skill 没执行脚本"）。不自愈（自愈给命令是 hack：
+            # hermes 第二轮 run_conversation history=0 不继承，且时间窗不准）。直接 failed，
+            # 让主智能体决定重试或如实告知用户。
             final_text = response.get('final_response', '') if isinstance(response, dict) else str(response)
-            logger.warning(f"[WARN] 脚本未产出 {result_filename}（LLM 可能没跑脚本），标记 failed")
+            logger.warning(f"[WARN] 未产出 {result_filename}（LLM 可能读了 skill 没执行脚本），标记 failed")
             result = {"task_id": task_id, "status": "failed",
                       "error": f"subagent did not produce {result_filename}; "
                                f"LLM likely did not run its canonical script",
