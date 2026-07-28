@@ -25,3 +25,20 @@ def test_constant_detector_normal_data():
     data = pd.Series(np.random.RandomState(42).randn(20) + 7)
     mask, details = d.detect(data)
     assert details.get("is_constant") is False
+
+
+def test_trend_detector_uniform_rise():
+    from shared.operators.specialized.trend_detector import TrendDetector
+    d = TrendDetector()
+    data = pd.Series(np.linspace(7.0, 9.0, 20))
+    mask, details = d.detect(data)
+    assert details.get("is_trend") is True
+    assert details.get("score", 0) > 0.5
+
+
+def test_trend_detector_random_not_trend():
+    from shared.operators.specialized.trend_detector import TrendDetector
+    d = TrendDetector()
+    data = pd.Series(np.random.RandomState(42).randn(20) + 7)
+    mask, details = d.detect(data)
+    assert details.get("is_trend") is False
