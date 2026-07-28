@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class HighFreqDetector:
     """高频波动:相邻点差分大且频繁(突升突降),或出现异常归零。"""
 
-    def __init__(self, diff_threshold: float = 3.0, freq_ratio_threshold: float = 0.3,
+    def __init__(self, diff_threshold: float = 1.0, freq_ratio_threshold: float = 0.3,
                  min_length: int = 8):
         self.diff_threshold = diff_threshold
         self.freq_ratio_threshold = freq_ratio_threshold
