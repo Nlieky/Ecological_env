@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class TrendDetector:
     """趋势检测器:序列呈单向均匀升降(线性,二阶导接近 0)。"""
 
-    def __init__(self, min_slope_ratio: float = 0.5, min_length: int = 10):
+    def __init__(self, min_slope_ratio: float = 0.1, min_length: int = 10):
         self.min_slope_ratio = min_slope_ratio
         self.min_length = min_length
         self.name = "趋势检测器"
