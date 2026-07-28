@@ -73,32 +73,28 @@ class ConstantDetector:
         # 综合判断
         is_constant = is_constant_std or is_constant_cv or is_constant_unique
 
-        # 全局异常（整个序列都是恒定的）
         if is_constant:
             anomaly_mask = np.ones(len(data), dtype=bool)
-            violation_type = "插瓶干扰"
-            confidence = max(
+            score = max(
                 1.0 - data_std / self.std_threshold if self.std_threshold > 0 else 0,
-                1.0 - data_cv / self.cv_threshold if self.cv_threshold > 0 else 0,
-                1.0 - unique_ratio / self.unique_ratio_threshold if self.unique_ratio_threshold > 0 else 0
+                1.0 - data_cv / self.cv_threshold if self.cv_threshold > 0 and data_cv != float('inf') else 0,
+                1.0 - unique_ratio / self.unique_ratio_threshold if self.unique_ratio_threshold > 0 else 0,
             )
+            score = float(min(max(score, 0.0), 1.0))
         else:
             anomaly_mask = np.zeros(len(data), dtype=bool)
-            violation_type = None
-            confidence = 0.0
+            score = 0.0
 
         details = {
-            "violation_type": violation_type if is_constant else None,
-            "confidence": float(confidence),
+            "feature": "平稳",
+            "is_constant": bool(is_constant),
+            "score": score,
             "std": float(data_std),
             "cv": float(data_cv),
             "unique_count": int(unique_count),
             "unique_ratio": float(unique_ratio),
-            "is_constant_std": bool(is_constant_std),
-            "is_constant_cv": bool(is_constant_cv),
-            "is_constant_unique": bool(is_constant_unique)
         }
-
+        # 不输出 violation_type —— 违规模式判定是规则推理的活
         return anomaly_mask, details
 
     def __call__(self, data: pd.Series) -> Tuple[np.ndarray, Dict[str, Any]]:
