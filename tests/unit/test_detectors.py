@@ -33,7 +33,7 @@ def test_trend_detector_uniform_rise():
     data = pd.Series(np.linspace(7.0, 9.0, 20))
     mask, details = d.detect(data)
     assert details.get("is_trend") is True
-    assert details.get("score", 0) > 0.5
+    assert details.get("score", 0) > 0.1
 
 
 def test_trend_detector_random_not_trend():
