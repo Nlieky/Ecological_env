@@ -41,6 +41,10 @@ _FIELD_RENAME = {
 }
 _KEEP_FIELDS = ["pH", "COD", "TN", "AN", "TP", "flow", "discharge", "suspended_solids"]
 
+# 当前工艺的水力停留时间(小时)。标注进 metadata,供下游按需做进水出水时间对齐。
+# 数据感知本身不做对齐(零分析)。
+_HRT_HOURS = 2
+
 
 def _load_env() -> None:
     """轻量加载项目根 .env(不覆盖已有环境变量)。"""
@@ -99,6 +103,30 @@ def get_data_by_range(client, bucket, data_type, start_time, end_time):
     return _df_to_records(df.loc[mask])
 
 
+def _compute_missing_points(records, use_range, start, end, hours_back):
+    """计算缺失的时间点(期望每小时一条,实际记录里没有的)。
+
+    数据感知只标记缺失(客观事实),不补齐(缺失是异常信号,交下游)。
+    """
+    if not records:
+        return []
+    timestamps = [r.get("timestamp") for r in records if r.get("timestamp")]
+    if not timestamps:
+        return []
+    ts = pd.to_datetime(timestamps)
+    actual = set(ts)
+    if use_range and start and end:
+        start_dt = pd.to_datetime(start)
+        end_dt = pd.to_datetime(end)
+        expected = pd.date_range(start_dt, end_dt, freq="H")
+    else:
+        latest = ts.max()
+        expected = pd.date_range(latest - pd.Timedelta(hours=max(hours_back - 1, 0)),
+                                 latest, freq="H")
+    missing = [t for t in expected if t not in actual]
+    return [t.strftime("%Y-%m-%d %H:%M:%S") for t in missing]
+
+
 def main():
     _load_env()
     url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
@@ -143,6 +171,11 @@ def main():
             "metadata": {
                 "time_range": time_range_str,
                 "indicators": ["pH", "COD", "TN", "NH3-N", "TP", "SS", "flow_rate", "discharge_volume"],
+                "hrt_hours": _HRT_HOURS,
+                "missing_points": _compute_missing_points(
+                    influent_data or effluent_data or [],
+                    use_range, args.start if use_range else None,
+                    args.end if use_range else None, hours_back),
                 "data_source": "influxdb",
             },
         },
