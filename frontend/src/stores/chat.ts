@@ -45,12 +45,20 @@ export const useChatStore = defineStore('chat', () => {
       // 还原该会话的历史消息到聊天区(过滤 tool 中间步骤,只留 user/assistant 对话)
       messages.value = (r.data?.messages || [])
         .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({
-          id: nextId(),
-          role: m.role as 'user' | 'assistant',
-          content: m.content || '',
-          timestamp: m.timestamp || new Date().toISOString(),
-        }))
+        .map((m) => {
+          const msg: ChatMessage = {
+            id: nextId(),
+            role: m.role as 'user' | 'assistant',
+            content: m.content || '',
+            timestamp: m.timestamp || new Date().toISOString(),
+          }
+          const ti = m.tool_call_info as any
+          if (ti?.chartData) {
+            const cd = ti.chartData
+            msg.chartData = Array.isArray(cd) ? { charts: cd } : (cd.charts ? cd : { charts: [] })
+          }
+          return msg
+        })
     } catch { /* 拦截器已弹错 */ }
     finally { loading.value = false }
   }

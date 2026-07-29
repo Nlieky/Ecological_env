@@ -253,6 +253,7 @@ async def query_stream(request: QueryRequest):
         sub_starts = {}            # subagent -> 开始时间
         subagent_executions = []   # [{subagent_name, execution_time_ms, status, summary}]
         decision_order = []        # 按调用顺序去重的子智能体名
+        stream_chart_data = None  # 收集 chartData（落对话历史供历史会话恢复）
         buf = ""
         timeout = httpx.Timeout(AGENT_TIMEOUT, connect=10.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -299,6 +300,9 @@ async def query_stream(request: QueryRequest):
                                     "skill_calls": evt.get("skill_calls") or [],
                                     "evidence": evt.get("evidence") or {},
                                 })
+                                # 收集 chartData（异常检测优先带标注，否则数据感知）
+                                if evt.get("chartData"):
+                                    stream_chart_data = evt["chartData"]
                         elif etype == "done":
                             final_content = evt.get("content", "")
                             final_session_id = evt.get("session_id", session_id)
@@ -316,6 +320,7 @@ async def query_stream(request: QueryRequest):
                             "source": "agent_service_stream",
                             "forwarded": True,
                             "latency_ms": total_latency_ms,
+                            "chartData": stream_chart_data,
                         },
                     )
                 except Exception as persist_error:
