@@ -25,9 +25,9 @@
 
 | 职责 | 子智能体 | 调用名 |
 |------|---------|--------|
-| 取数、清洗、标准化 | 多维数据感知 | `multi-dimensional-data-perception` |
-| 异常 / 突变检测 | 异常检测 | `anomaly-detection` |
-| 违规 / 超标判定 | 规则推理 | `rule-reasoning` |
-| 预警 / 工单 / 处置 | 研判预警与处置执行 | `disposition-execution` |
+| 忠实取数、标记缺失、HRT 标注 | 多维数据感知 | `multi-dimensional-data-perception` |
+| 5 类异常特征检测（平稳/突变/趋势/周期/高频） | 异常检测 | `anomaly-detection` |
+| 4 类违规判定 + 嫌疑矩阵 | 规则推理 | `rule-reasoning` |
+| 嫌疑等级 → 处置行动 + 工单 | 研判处置 | `disposition-execution` |
 
-详细的调用规则见 `AGENTS.md` 的「编排铁律」，可用工具见 `skills/orchestrator-core/SKILL.md`。
+详细的编排指引见 `skills/orchestrator-core/SKILL.md`。
