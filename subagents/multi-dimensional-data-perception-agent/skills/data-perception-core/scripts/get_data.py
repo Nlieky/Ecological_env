@@ -197,6 +197,16 @@ def main():
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
+    # 报告可视化: 构造 chartData(无异常标注, 纯数据曲线)
+    try:
+        from shared.viz.build_chart import build_chart_data
+        result["result"]["chartData"] = build_chart_data(
+            {"influent": influent_data, "effluent": effluent_data})
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"build_chart 失败(忽略,不影响取数): {e}") if 'logger' in dir() else None
+
     print(f"\n=== 数据统计 ===")
     if influent_data:
         print(f"进水数据：{len(influent_data)} 条")

@@ -26,6 +26,12 @@ from shared.operators.specialized.trend_detector import TrendDetector
 from shared.operators.specialized.high_freq_detector import HighFreqDetector
 from shared.operators.specialized.periodicity_detector import PeriodicityDetector
 
+# IsolationForest 在 isolation_forest_anomaly() 和 detect_features_for_series() 两处使用
+try:
+    from sklearn.ensemble import IsolationForest
+except ImportError:
+    IsolationForest = None  # 运行时 fallback
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -489,6 +495,30 @@ def main():
 
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
+
+        # 报告可视化: 构造 chartData(带异常 markPoint)
+        try:
+            from shared.viz.build_chart import build_chart_data
+            records = {}
+            if data and isinstance(data, dict):
+                for side in ("influent", "effluent"):
+                    df = data.get(f"{side}_df")
+                    if df is not None and not df.empty:
+                        tc = data.get(f"time_col_{'in' if side == 'influent' else 'out'}", "监测时间")
+                        rows = []
+                        for _, row in df.iterrows():
+                            r = {"timestamp": str(row[tc]) if tc in df.columns else ""}
+                            for c in df.columns:
+                                if c != tc:
+                                    r[c] = round(float(row[c]), 2) if pd.notna(row[c]) else None
+                            rows.append(r)
+                        records[side] = rows
+            output["result"]["chartData"] = build_chart_data(
+                records, anomalies=detection_result.get("anomalies"))
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(output, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.warning(f"build_chart 失败(忽略): {e}")
 
         # 打印摘要信息
         print(f"=== 异常检测完成 ===")
