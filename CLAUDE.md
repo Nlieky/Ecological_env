@@ -194,7 +194,7 @@ curl http://localhost:8000/api/health
                                ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  ④ 任务编排层                                                    │
-│  workspace/skills/orchestrator-core/                            │
+│  skills/orchestrator-core/ (主智能体从这里 skill_view 读编排技能) │
 └──────────────────────────────┬──────────────────────────────────┘
                                ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -301,7 +301,7 @@ Natural language report + alerts
 
 ### 核心模块
 - `stream/dual_data_stream.py`: 双数据流发送器
-- `workspace/skills/orchestrator-core/scripts/`: 核心编排模块
+- `skills/orchestrator-core/scripts/`: 核心编排模块（tool_registration/call_subagent/subagent_entry 等）
 - `shared/configs/llm_client.py`: LLM 客户端
 - `shared/knowledge/`: 知识库
 - `shared/operators/`: 异常检测算子
@@ -350,8 +350,10 @@ The system detects 4 types of violations:
   - ② **定制层** `shared/framework/hermes_agent/`（下划线，7 个活文件）：薄壳 AIAgent(`run_agent.py`，forward `run_conversation` 到原生 loop) + `agent_init.py` + **`identity_loader.py`（唯一真定制：读全部身份文件，原生只读 SOUL.md）** + process_bootstrap.py/utils.py。早期 ~1 万行的死代码 fork（slim conversation_loop、下划线 system_prompt/prompt_builder/hermes_constants/runtime_cwd）已于 2026-07-23 删除。
   - ③ **overlays** `shared/framework/hermes-overlays/`（3 个，全功能必需）：`agent_init.py` + `run_agent.py`（身份定制，转发到下划线 agent_init）、`tools/orchestrator_tool.py`（编排桥）。orchestrator 工具运行时由 `tool_registration.py` 以 `override=True` 注册（correct schema + bridge），覆盖 vendored 自带的损坏版。
   - **身份加载（2026-07-23 修好，之前是坏的）**：原生 system_prompt 只读 SOUL.md；通过 `vendor_hermes.py` 的 PATCH 给原生 `agent/system_prompt.py` 接了 20 行——按 `_identity_path`(主智能体) / `HERMES_HOME`(子智能体) 加载目录里全部身份文件。主智能体读 7 个、子智能体读 3 个（SOUL/AGENTS/MEMORY）。
-  - **主智能体工具（维持 hermes 原生 29 个，不精简）**：hermes registry 的 `get_tool_definitions` 给主智能体 29 个工具(terminal/skills/browser/memory/clarify/todo/...+ 4 个编排)。`tool_registration.py` 曾尝试把 `agent.tools` 精简到 4 个，但 conversation_loop 实际从 registry 取(仍 29)。**2026-07-27 决定不精简**——原生工具大部分有用(memory/clarify/todo/file_ops 等)，砍了是负优化；模糊输入偶尔用 terminal 探查(如"Hi"查健康端点)可接受，不影响监测问答。
-  - **LLM 驱动子智能体（2026-07-27 改用 hermes 原生 skill_view）**：`workspace/skills/orchestrator-core/scripts/subagent_entry.py`（**共享入口**，靠 `HERMES_HOME` 定位子智能体、读其身份+技能）起 AIAgent 会话，LLM 用 hermes 原生 **skill_view 读自己的 SKILL.md**(`HERMES_HOME` 作用域)选+调对应 canonical 脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition）。**防瞎逛：靠 HERMES_HOME 作用域**(skill_view 只翻该子智能体 skill,边界清晰)+ `enabled_toolsets=["skills","terminal"]` + `max_iterations=6`。2026-07-27 验证 4/4 子智能体无一瞎逛(2-3 次工具调用)——当年预加载妥协的根因是没设作用域,不是模型。结果经 `sessions/` 共享目录链式传递。
+  - **主智能体工具（6 个：4 编排 + skill_view/skills_list）**：`tool_registration.py` 把 hermes 原生 29 个工具精简为 **6 个**——保留 4 个编排工具(call_subagent/list_subagents/create_session/read_result)**+ skill_view/skills_list**，移除 terminal/browser/memory 等真·分心工具。conversation_loop 用的是 `agent.tools`（**非** registry——2026-07-29 实测确认，纠正了之前"仍 29 个"的错误记录）。**关键**：必须保留 skill_view——主智能体靠它 `skill_view('orchestrator-core')` 读编排技能（AGENTS.md 要求）；自 `e263fb6` 起曾把 skill_view 一起砍掉，导致**编排技能从没生效过**（LLM 裸猜、时对时错），2026-07-29 修复。
+  - **编排技能位置（2026-07-29 迁移）**：`orchestrator-core` 在 `skills/orchestrator-core/`（**不是** workspace/skills/）。主智能体 HERMES_HOME=项目根，技能从 `HERMES_HOME/skills/`=项目根/skills/ 加载；旧位置 `workspace/skills/` 不在加载路径里，是 e263fb6 前的历史遗留。scripts 用标记法 `_project_root()`（向上找含 `shared/`+`workspace/` 的目录）定位项目根，位置无关。
+  - **会话内数据续传（2026-07-29）**：`start_agent._fresh_session_dir(session_id)` 同一会话多轮追问时把上一轮的 `*_result.json` 拷进新 session 目录，让"那有没有异常"这类追问链式消费上轮数据（像正常多轮对话有上下文）；不同会话不拷（隔离）。
+  - **LLM 驱动子智能体（2026-07-27 改用 hermes 原生 skill_view）**：`skills/orchestrator-core/scripts/subagent_entry.py`（**共享入口**，靠 `HERMES_HOME` 定位子智能体、读其身份+技能）起 AIAgent 会话，LLM 用 hermes 原生 **skill_view 读自己的 SKILL.md**(`HERMES_HOME` 作用域)选+调对应 canonical 脚本（get_data / run_anomaly_detection_simple / run_rule_reasoning / run_disposition）。**防瞎逛：靠 HERMES_HOME 作用域**(skill_view 只翻该子智能体 skill,边界清晰)+ `enabled_toolsets=["skills","terminal"]` + `max_iterations=6`。2026-07-27 验证 4/4 子智能体无一瞎逛(2-3 次工具调用)——当年预加载妥协的根因是没设作用域,不是模型。结果经 `sessions/` 共享目录链式传递。
   - **超时层级**（从外到内，外层压内层）：
     - `AGENT_TIMEOUT=300s`：backend → agent 服务 HTTP 请求超时（`settings.AGENT_TIMEOUT`）
     - `HERMES_TOTAL_TIMEOUT=300s`：agent 服务内主智能体 `run_conversation` 总超时（`start_agent.py` 设）
