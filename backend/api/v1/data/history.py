@@ -17,7 +17,7 @@ async def query_history_data(
     indicators: Optional[str] = Query(None, description="指标列表（逗号分隔）"),
     aggregation: str = Query(default="raw", description="聚合方式（raw, hourly, daily）"),
     page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=50, ge=1, le=100, description="每页数量")
+    page_size: int = Query(default=50, ge=1, le=500, description="每页数量")
 ):
     """查询历史监测数据
 

@@ -157,8 +157,10 @@ def _compact_result_for_master(result):
     infl = r.get("influent")
     effl = r.get("effluent")
     if isinstance(infl, list) and infl:
-        compact["influent_count"] = len(infl)
-        compact["effluent_count"] = len(effl) if isinstance(effl, list) else 0
+        n_in = len(infl)
+        n_out = len(effl) if isinstance(effl, list) else 0
+        compact["influent_count"] = n_in
+        compact["effluent_count"] = n_out
         compact["chart_generated"] = "曲线已由数据感知自动生成（chartData），前端会自动渲染，你不需要自己画"
         stats = {}
         for ind in ("pH", "COD", "TN", "NH3-N", "TP", "SS"):
@@ -178,6 +180,16 @@ def _compact_result_for_master(result):
         md = r.get("metadata", {})
         if isinstance(md, dict) and md.get("time_range"):
             compact["time_range"] = md["time_range"]
+        # ★ 把"数据+曲线已就绪"塞进 summary 头条——LLM 最先读 summary 字段。
+        #   之前只把"曲线已生成"放在独立的 chart_generated 字段里，主智能体没读它，
+        #   仍为"画曲线"重复调用①。现在让 summary 本身明确告知曲线已随数据返回，杜绝重调。
+        ind_list = ", ".join(stats.keys()) if stats else "各指标"
+        compact["summary"] = (
+            f"✅ 数据+曲线已就绪：进出水各 {n_in}/{n_out} 条"
+            f"（{ind_list} 的 min/max/mean 见 data_stats）；"
+            f"时序曲线 chartData 已生成，前端自动渲染。"
+            f"用户要的'曲线/图'已包含——不要为画曲线再调本子智能体。"
+        )
 
     # 异常检测：异常数
     anoms = r.get("anomalies")
