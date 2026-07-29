@@ -371,7 +371,8 @@ def main():
                 anomalies,
                 correlation_results,
                 trend_results,
-                data=effluent_df
+                data=effluent_df,
+                hrt_hours=data_result.get("result", {}).get("metadata", {}).get("hrt_hours", 2) if data_result else 2
             )
 
             # 5.3 专家经验推理
@@ -386,28 +387,24 @@ def main():
             # 6. 生成综合结论
             logger.info("[STEP 5/5] 生成综合结论")
 
-            # 确定违规类型
-            violation_types = []
-            for pattern in reasoning_result.get("matched_patterns", []):
-                pattern_key = pattern.get("pattern_key", "")
-                if pattern_key:
-                    violation_types.append(pattern_key)
+            # 确定违规类型(从工艺校验的 matched_patterns 取)
+            violation_types = [p.get("pattern", "") for p in process_validation.get("matched_patterns", []) if p.get("pattern")]
 
-            # 嫌疑等级映射
-            suspicion_level = reasoning_result.get("suspicion_level", "low")
-            suspicion_mapping = {
-                "low": "低",
-                "medium": "中",
-                "high": "高",
-                "critical": "严重"
-            }
+            # 嫌疑等级矩阵(资料定义): 合规性 × 工艺违背
+            regulation_violation = len(regulation_matches.get("violations", [])) > 0
+            process_violation = process_validation.get("violations_count", 0) > 0
+            if regulation_violation and process_violation:
+                suspicion_level = "high"
+            elif not regulation_violation and process_violation:
+                suspicion_level = "medium"
+            elif regulation_violation and not process_violation:
+                suspicion_level = "low"
+            else:
+                suspicion_level = "none"
+            suspicion_mapping = {"low": "低", "medium": "中", "high": "高", "none": "无"}
 
             # 生成违规判定结论
-            has_violation = (
-                suspicion_level in ["high", "critical"] or
-                process_validation.get("violations_count", 0) > 0 or
-                len(regulation_matches.get("violations", [])) > 0
-            )
+            has_violation = suspicion_level in ("high", "medium", "low")
 
             output = {
                 "task_id": task_id,
@@ -432,6 +429,9 @@ def main():
                     "regulation_matches": regulation_matches,
                     "process_validation": process_validation,
                     "expert_reasoning": reasoning_result,
+
+                    # 缺数据标记(初版)
+                    "missing_data": ["工况数据(人工拟合降级)", "停产申报数据(恶意逃避 TODO)"],
 
                     # 结论
                     "conclusion": generate_conclusion(
