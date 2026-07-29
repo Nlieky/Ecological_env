@@ -99,6 +99,10 @@ def get_data_by_range(client, bucket, data_type, start_time, end_time):
         return []
     start_dt = pd.to_datetime(start_time)
     end_dt = pd.to_datetime(end_time)
+    # --end 只给日期（如 "2026-07-15"）时 pd.to_datetime 解析为 00:00:00，会漏掉当天
+    # 01:00~23:00 的数据。检测到 end 是午夜（00:00:00）就补到 23:59:59，覆盖整天。
+    if end_dt == end_dt.normalize():
+        end_dt = end_dt + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
     mask = (df.index >= start_dt) & (df.index <= end_dt)
     return _df_to_records(df.loc[mask])
 
