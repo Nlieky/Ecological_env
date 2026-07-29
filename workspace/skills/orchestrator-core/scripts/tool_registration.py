@@ -135,9 +135,10 @@ def _compact_result_for_master(result):
     """精简子智能体结果——给主智能体编排决策够用的摘要，不返回原始数据。
 
     铁律：LLM（主智能体）绝不读原始数据。数据是算子之间通过 SESSION_DIR 文件传递的。
-    但 LLM 需要足够的信息确信"做完了"——否则它会调 read_result 去读完整文件（更糟）。
-    所以返回 status + 一句话摘要 + 关键数字（异常数/嫌疑等级/违规类型）。
-    不返回原始进出水数据/完整异常列表/完整违规详情/chartData。
+    但 LLM 需要足够的信息回答用户——否则它会调 read_result 去读完整文件（更糟）。
+    所以返回 status + 摘要 + 关键数字。
+    对数据感知结果，额外计算各指标的统计值（min/max/mean，Python 算不是 LLM 编），
+    让主智能体能回答"pH是多少"这类数据查询。
     """
     if not isinstance(result, dict):
         return {"status": "failed", "summary": str(result)[:200]}
@@ -152,16 +153,45 @@ def _compact_result_for_master(result):
         "summary": summary,
     }
 
-    # 加关键数字（让 LLM 确信"做完了"，不会去 read_result 查）
+    # 数据感知：计算各指标统计值（Python 算，不是 LLM 编），让主智能体能回答数据查询
+    infl = r.get("influent")
+    effl = r.get("effluent")
+    if isinstance(infl, list) and infl:
+        compact["influent_count"] = len(infl)
+        compact["effluent_count"] = len(effl) if isinstance(effl, list) else 0
+        stats = {}
+        for ind in ("pH", "COD", "TN", "NH3-N", "TP", "SS"):
+            infl_vals = [x.get(ind) for x in infl if x.get(ind) is not None]
+            effl_vals = [x.get(ind) for x in (effl or []) if x.get(ind) is not None]
+            if infl_vals or effl_vals:
+                s = {}
+                if infl_vals:
+                    s["influent"] = {"min": round(min(infl_vals), 2), "max": round(max(infl_vals), 2),
+                                     "mean": round(sum(infl_vals) / len(infl_vals), 2)}
+                if effl_vals:
+                    s["effluent"] = {"min": round(min(effl_vals), 2), "max": round(max(effl_vals), 2),
+                                     "mean": round(sum(effl_vals) / len(effl_vals), 2)}
+                stats[ind] = s
+        if stats:
+            compact["data_stats"] = stats
+        md = r.get("metadata", {})
+        if isinstance(md, dict) and md.get("time_range"):
+            compact["time_range"] = md["time_range"]
+
+    # 异常检测：异常数
     anoms = r.get("anomalies")
     if isinstance(anoms, list):
         compact["anomaly_count"] = len(anoms)
+
+    # 规则推理：嫌疑等级 + 违规类型
     if "suspicion_level" in r:
         compact["suspicion_level"] = r["suspicion_level"]
     if "violation_types" in r:
         vt = r["violation_types"]
         if isinstance(vt, list) and vt:
             compact["violation_types"] = vt
+
+    # 处置执行：处置行动
     if "action" in r:
         compact["action"] = r["action"]
 
