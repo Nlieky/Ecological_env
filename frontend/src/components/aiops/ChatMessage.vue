@@ -7,6 +7,10 @@
       <MarkdownRenderer v-if="!msg.streaming && msg.content" :content="msg.content" />
       <div v-else-if="msg.content" class="stream-text">{{ msg.content }}<span class="cur">▋</span></div>
       <div v-else-if="msg.streaming" class="stream-text muted">主智能体思考中…</div>
+      <!-- 数据曲线(chartData) -->
+      <div v-if="charts.length" class="charts">
+        <div v-for="(c, i) in charts" :key="i" :ref="el => setChartRef(el, i)" class="chart-item"></div>
+      </div>
       <div v-if="msg.trace" class="cards">
         <DecisionFlow :trace="msg.trace" />
         <SubAgentChips :trace="msg.trace" />
@@ -17,12 +21,26 @@
 </template>
 
 <script setup lang="ts">
+import { computed, nextTick, watch } from 'vue'
+import echarts from '@/lib/echarts'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
 import DecisionFlow from './DecisionFlow.vue'
 import SubAgentChips from './SubAgentChips.vue'
 import EvidenceChain from './EvidenceChain.vue'
 import type { ChatMessage } from '@/stores/chat'
-defineProps<{ msg: ChatMessage }>()
+const props = defineProps<{ msg: ChatMessage }>()
+
+// chartData 渲染
+const charts = computed(() => props.msg?.chartData?.charts || [])
+const chartRefs: HTMLElement[] = []
+const setChartRef = (el: any, i: number) => { if (el) chartRefs[i] = el }
+watch(charts, async () => {
+  await nextTick()
+  charts.value.forEach((c, i) => {
+    const el = chartRefs[i]
+    if (el && c.option) echarts.init(el).setOption(c.option)
+  })
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -37,4 +55,6 @@ defineProps<{ msg: ChatMessage }>()
 .stream-text.muted { color: var(--text-muted) }
 .cur { animation: blink 1s step-start infinite; color: var(--primary); margin-left: 1px }
 @keyframes blink { 50% { opacity: 0 } }
+.charts { margin-top: 12px; display: flex; flex-direction: column; gap: 10px }
+.chart-item { width: 100%; height: 280px; border: 1px solid var(--brd); border-radius: 10px; overflow: hidden }
 </style>
