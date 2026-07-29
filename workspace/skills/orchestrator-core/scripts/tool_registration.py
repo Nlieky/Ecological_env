@@ -46,8 +46,12 @@ except ImportError:
 _current_progress_queue = None
 
 
-def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=None):
-    """向当前请求的队列 push 进度事件（非流式时队列为 None，no-op）。"""
+def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=None, evidence=None, chartData=None):
+    """向当前请求的队列 push 进度事件（非流式时队列为 None，no-op）。
+
+    evidence: 结构化证据（异常前几条/违规判定/预警级别），供审计证据链展示；
+    chartData: 报告可视化数据（ECharts option 列表），供前端渲染曲线。
+    """
     if _current_progress_queue is None:
         return
     evt = {"type": "progress", "subagent": subagent, "stage": stage}
@@ -55,6 +59,10 @@ def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=N
         evt["summary"] = summary
     if skill_calls:
         evt["skill_calls"] = skill_calls
+    if evidence:
+        evt["evidence"] = evidence
+    if chartData:
+        evt["chartData"] = chartData
     try:
         _current_progress_queue.put(evt)
     except Exception:
@@ -77,6 +85,50 @@ def _summarize_result(result) -> str:
     except Exception:
         pass
     return ""
+
+
+def _extract_evidence(result) -> dict:
+    """从子智能体结果提取【结构化证据】（供审计证据链展示，非主智能体）。
+
+    与 _summarize_result（一句话摘要）不同，这里返回结构化 dict：
+      异常检测 → {kind:anomaly, count, top:[{metric,time,type,value,score}...]}
+      规则推理 → {kind:rule, has_violation, suspicion, types}
+      处置执行 → {kind:disposition, level, disposition}
+      数据感知 → {kind:data, rows_in, rows_out}
+    """
+    try:
+        r = result.get("result") if isinstance(result, dict) else None
+        if not isinstance(r, dict):
+            return {}
+        ev = {}
+        anoms = r.get("anomalies")
+        if isinstance(anoms, list):
+            ev["kind"] = "anomaly"
+            ev["count"] = len(anoms)
+            ev["top"] = [{
+                "metric": a.get("indicator") or a.get("metric"),
+                "time": (a.get("timestamp") or "")[:16],
+                "type": a.get("type"),
+                "value": a.get("value"),
+                "score": round(a.get("score"), 2) if isinstance(a.get("score"), (int, float)) else a.get("score"),
+            } for a in anoms[:5]]
+        elif "has_violation" in r:
+            ev["kind"] = "rule"
+            ev["has_violation"] = r.get("has_violation")
+            ev["suspicion"] = r.get("suspicion_level")
+            ev["types"] = r.get("violation_types") or r.get("patterns") or []
+        elif isinstance(r.get("alert"), dict):
+            ev["kind"] = "disposition"
+            al = r["alert"]
+            ev["level"] = al.get("level_cn") or al.get("level")
+            ev["disposition"] = al.get("disposition") or al.get("suggestion") or al.get("action")
+        elif isinstance(r.get("influent_count"), int) or isinstance(r.get("effluent_count"), int) or isinstance(r.get("effluent"), list):
+            ev["kind"] = "data"
+            ev["rows_in"] = r.get("influent_count", len(r.get("influent") or []))
+            ev["rows_out"] = r.get("effluent_count", len(r.get("effluent") or []))
+        return ev
+    except Exception:
+        return {}
 
 
 def _compact_result_for_master(result):
@@ -226,7 +278,9 @@ def _call_subagent_handler(*args, **kwargs) -> str:
         _emit_progress(subagent_name, 'start')
         result = call_subagent(**params)
         _sc = result.get("skill_calls") if isinstance(result, dict) else None
-        _emit_progress(subagent_name, 'done', _summarize_result(result), skill_calls=_sc)
+        _ev = _extract_evidence(result)
+        _cd = result.get("result", {}).get("chartData") if isinstance(result, dict) else None
+        _emit_progress(subagent_name, 'done', _summarize_result(result), skill_calls=_sc, evidence=_ev, chartData=_cd)
         # 给主智能体回传精简版：去掉大数据数组（进/出水原始行），只留摘要+关键字段。
         # 完整结果已在 session 文件，下游子智能体从文件读；主智能体不该背原始数据
         # （一周 53K 会撑爆上下文/迭代预算）。需要细节时用 read_result 取。

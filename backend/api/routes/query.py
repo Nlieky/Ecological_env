@@ -58,6 +58,7 @@ def execute_query(request: QueryRequest):
 
     # 生成或使用提供的 session_id
     session_id = request.session_id or generate_session_id()
+    turn_id = generate_session_id()  # 本轮查询唯一ID，贯穿 decision+execution，审计按轮归属
 
     try:
         logger.info(f"收到查询: {request.query[:50]}...")
@@ -124,7 +125,8 @@ def execute_query(request: QueryRequest):
                 decision_path=decision_path,
                 subagents_called=decision_path,
                 reasoning_summary=f"查询完成，返回 {len(content)} 字符，调用 {len(subagent_calls)} 个子智能体",
-                total_latency_ms=total_latency_ms
+                total_latency_ms=total_latency_ms,
+                turn_id=turn_id
             )
             # 记录每个子智能体执行明细（与流式 query_stream 一致，审计页可见）
             for sc in subagent_calls:
@@ -133,9 +135,10 @@ def execute_query(request: QueryRequest):
                         session_id=final_session_id,
                         subagent_name=sc.get("subagent_name", ""),
                         input_params={},
-                        output_result={"summary": sc.get("summary", ""), "skill_calls": sc.get("skill_calls", [])},
+                        output_result={"summary": sc.get("summary", ""), "skill_calls": sc.get("skill_calls", []), "evidence": sc.get("evidence", {})},
                         execution_time_ms=sc.get("execution_time_ms") or 0.0,
                         status=sc.get("status", "success"),
+                        turn_id=turn_id,
                     )
                 except Exception as se:
                     logger.warning(f"Failed to log subagent execution: {se}")
@@ -161,12 +164,28 @@ def execute_query(request: QueryRequest):
 
         logger.info(f"查询完成: session={final_session_id}, 耗时={time.time() - start_time:.2f}s")
 
+        # 收集 chartData(异常检测优先带标注,否则数据感知)
+        chart_data = None
+        for sc in subagent_calls:
+            if sc.get("subagent_name") == "anomaly-detection":
+                chart_data = sc.get("chartData")
+                break
+        if chart_data is None:
+            for sc in subagent_calls:
+                if sc.get("subagent_name") == "multi-dimensional-data-perception":
+                    chart_data = sc.get("chartData")
+                    break
+
+        # 包装成 {charts: [...]} 格式(build_chart_data 返回 list)
+        if chart_data and isinstance(chart_data, list):
+            chart_data = {"charts": chart_data}
+
         # 返回标准格式的响应
         return QueryResponse(
             content=content,
             session_id=final_session_id,
             timestamp=agent_data.get("timestamp", ""),
-            chartData=None,
+            chartData=chart_data,
             decision_path=[],
             sub_agent_calls=[],
             data_sources=[],
@@ -225,6 +244,7 @@ async def query_stream(request: QueryRequest):
     """
     session_id = request.session_id or generate_session_id()
     start_time = time.time()
+    turn_id = generate_session_id()  # 本轮查询唯一ID，贯穿 decision+execution
 
     async def proxy():
         final_content = ""
@@ -277,6 +297,7 @@ async def query_stream(request: QueryRequest):
                                     "status": "success",
                                     "summary": evt.get("summary", ""),
                                     "skill_calls": evt.get("skill_calls") or [],
+                                    "evidence": evt.get("evidence") or {},
                                 })
                         elif etype == "done":
                             final_content = evt.get("content", "")
@@ -303,7 +324,19 @@ async def query_stream(request: QueryRequest):
             try:
                 # decision_order 靠 progress start 事件;若流式透传丢 start 导致空,
                 # 从 subagent_executions(done 事件,更可靠)反推调用顺序
-                _final_decision = decision_order or [ex.get("subagent_name", "") for ex in subagent_executions if ex.get("subagent_name")]
+                # decision_order 靠 progress start 事件（已按子智能体名去重）；若流式透传丢
+                # start 导致为空，从 done 事件（subagent_executions）反推并去重保序——避免
+                # 同一查询内某子智能体重试 done 两次时把同名列两次写进决策路径。
+                if decision_order:
+                    _final_decision = decision_order
+                else:
+                    _seen = set()
+                    _final_decision = []
+                    for ex in subagent_executions:
+                        n = ex.get("subagent_name", "")
+                        if n and n not in _seen:
+                            _seen.add(n)
+                            _final_decision.append(n)
                 log_master_decision(
                     session_id=final_session_id,
                     user_query=request.query,
@@ -312,6 +345,7 @@ async def query_stream(request: QueryRequest):
                     subagents_called=_final_decision,
                     reasoning_summary=f"流式查询完成，调用 {len(_final_decision)} 个子智能体",
                     total_latency_ms=total_latency_ms,
+                    turn_id=turn_id,
                 )
             except Exception as e:
                 logger.warning(f"Failed to log master decision (stream): {e}")
@@ -321,9 +355,10 @@ async def query_stream(request: QueryRequest):
                         session_id=final_session_id,
                         subagent_name=ex["subagent_name"],
                         input_params={},
-                        output_result={"summary": ex.get("summary", ""), "skill_calls": ex.get("skill_calls", [])},
+                        output_result={"summary": ex.get("summary", ""), "skill_calls": ex.get("skill_calls", []), "evidence": ex.get("evidence", {})},
                         execution_time_ms=ex.get("execution_time_ms") or 0.0,
                         status=ex.get("status", "success"),
+                        turn_id=turn_id,
                     )
                 except Exception as e:
                     logger.warning(f"Failed to log subagent execution: {e}")
