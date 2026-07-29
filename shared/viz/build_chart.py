@@ -81,18 +81,26 @@ def build_chart_data(records: dict, indicators: Optional[List[str]] = None,
             else:
                 s["yAxisIndex"] = 1   # 浓度用右轴
 
-            # 异常 markPoint：anomaly.indicator 可能是英文(pH)/短中文(氨氮)/全中文(化学需氧量浓度...)
-            if anomalies:
-                ind_names = {ind, _to_cn(ind), _INDICATOR_CN_FULL.get(ind, ind)}
-                pts = [{"name": (a.get("features") or ["异常"])[0],
-                        "xAxis": _xlab(a.get("timestamp", "")),
-                        "yAxis": _num(a.get("value"))}   # 直接用异常自带的值，比按时间戳查可靠
-                       for a in anomalies
-                       if a.get("indicator") in ind_names and a.get("data_type") == side_key]
-                if pts:
-                    s["markPoint"] = {"data": pts, "symbolSize": 45}
-
             series.append(s)
+
+        # 异常标注：竖直 markLine（比 markPoint 稳——不受双轴 yAxis 归属、边缘裁切影响）。
+        # 在该图(进/出水)的每个异常时刻画一条红色虚线，顶部标异常特征。只标本图所画指标的异常。
+        if anomalies and series:
+            allowed = {(i, _to_cn(i), _INDICATOR_CN_FULL.get(i, i)) for i in indicators}
+            allowed = set().union(*allowed)
+            side_anoms = [a for a in anomalies
+                          if a.get("data_type") == side_key and a.get("indicator") in allowed]
+            if side_anoms:
+                ml_data = [{"xAxis": _xlab(a.get("timestamp", "")),
+                            "label": {"show": True, "position": "insideEndTop",
+                                      "formatter": (a.get("features") or ["异常"])[0]}}
+                           for a in side_anoms]
+                series[0]["markLine"] = {
+                    "symbol": "none",
+                    "lineStyle": {"type": "dashed", "color": "#ef4444", "width": 2},
+                    "label": {"color": "#ef4444", "fontSize": 10},
+                    "data": ml_data,
+                }
 
         option = {
             "title": {"text": title, "left": "center", "textStyle": {"fontSize": 14, "fontWeight": "bold"}},
@@ -136,16 +144,5 @@ def _xlab(ts) -> str:
     return str(ts).replace("T", " ")[5:16]
 
 
-def _val_at(records, side, ind, ts):
-    for r in records.get(side, []):
-        if r.get("timestamp") == ts:
-            return r.get(ind, r.get(_to_en(ind)))
-    return None
-
-
 def _to_cn(ind):
     return {"NH3-N": "氨氮", "TP": "总磷", "SS": "悬浮物"}.get(ind, ind)
-
-
-def _to_en(ind_cn):
-    return {"氨氮": "NH3-N", "总磷": "TP", "悬浮物": "SS"}.get(ind_cn, ind_cn)

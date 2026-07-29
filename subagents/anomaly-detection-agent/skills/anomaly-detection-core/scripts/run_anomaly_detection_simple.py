@@ -517,8 +517,17 @@ def main():
                                     r[en_key] = round(float(row[c]), 2) if pd.notna(row[c]) else None
                             rows.append(r)
                         records[side] = rows
+            # 读数据感知记录的用户指定指标(若有)，让异常图画同样的指标(用户问pH和COD就只画这俩)
+            chart_inds = None
+            _dr_path = Path(os.environ.get("SESSION_DIR", "")) / "data_result.json"
+            if _dr_path.exists():
+                try:
+                    chart_inds = (json.load(open(_dr_path, encoding="utf-8"))
+                                  .get("result", {}).get("metadata", {}).get("chart_indicators"))
+                except Exception:
+                    chart_inds = None
             output["result"]["chartData"] = build_chart_data(
-                records, anomalies=detection_result.get("anomalies"))
+                records, indicators=chart_inds, anomalies=detection_result.get("anomalies"))
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(output, f, ensure_ascii=False, indent=2)
         except Exception as e:

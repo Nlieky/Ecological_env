@@ -149,6 +149,10 @@ def main():
     parser.add_argument("--chart-indicators", type=str, default="", help="只画指定指标的曲线(逗号分隔,如 pH,COD)")
     args = parser.parse_args()
 
+    # 用户指定的曲线指标(None=画全部水质指标)。提前解析，metadata 和 chartData 都要用。
+    chart_inds = ([x.strip() for x in args.chart_indicators.split(",") if x.strip()]
+                  if args.chart_indicators else None)
+
     task_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     hours_back = args.hours or (args.days * 24 if args.days else 24)
     use_range = bool(args.start and args.end)
@@ -176,6 +180,9 @@ def main():
             "metadata": {
                 "time_range": time_range_str,
                 "indicators": ["pH", "COD", "TN", "NH3-N", "TP", "SS", "flow_rate", "discharge_volume"],
+                # 用户 --chart-indicators 指定的指标(None=没指定，画全部水质指标)。
+                # 异常检测子智能体读它，让异常图画同样的指标(用户问"pH和COD"就只画pH/COD)。
+                "chart_indicators": chart_inds,
                 "hrt_hours": _HRT_HOURS,
                 "missing_points": _compute_missing_points(
                     influent_data or effluent_data or [],
@@ -205,9 +212,6 @@ def main():
     # 报告可视化: 构造 chartData(无异常标注, 纯数据曲线)
     try:
         from shared.viz.build_chart import build_chart_data
-        chart_inds = None
-        if args.chart_indicators:
-            chart_inds = [x.strip() for x in args.chart_indicators.split(",") if x.strip()]
         result["result"]["chartData"] = build_chart_data(
             {"influent": influent_data, "effluent": effluent_data}, indicators=chart_inds)
         with open(output_file, "w", encoding="utf-8") as f:
