@@ -191,98 +191,55 @@ def main():
         logger.info("[STEP 2/5] 提取数据上下文")
         data_context = extract_data_context(anomaly_result, violation_result)
 
-        # 4. 初始化模块
-        logger.info("[STEP 3/5] 初始化模块")
+        # 4. 直接读规则推理的嫌疑等级（废弃融合共识 + 旧预警分级）
+        logger.info("[STEP 3/5] 读取嫌疑等级 + 处置行动")
 
-        consensus_engine = ConsensusEngine()
-        alert_classifier = AlertClassifier(consensus_engine)
+        suspicion_level = "none"
+        violation_types = []
+        evidence_points = []
+        violation_confidence = 0.0
+        if violation_result and "result" in violation_result:
+            res = violation_result["result"]
+            suspicion_level = res.get("suspicion_level", "none")
+            violation_types = res.get("violation_types") or res.get("violation_type_names") or []
+            evidence_points = res.get("evidence_points", [])
+            violation_confidence = res.get("confidence", 0.0)
+
+        # 嫌疑等级 → 处置行动映射
+        ACTION_MAP = {
+            "high": ("立即调查取证", True),
+            "medium": ("现场核查", True),
+            "low": ("持续监控", True),
+            "none": ("无违规", False),
+        }
+        action, need_work_order = ACTION_MAP.get(suspicion_level, ("持续监控", True))
+
+        # 5. 工单 + 报告
+        logger.info("[STEP 5/5] 工单与报告生成")
         work_order_generator = WorkOrderGenerator()
         report_generator = ReportGenerator()
 
-        # 5. 执行融合共识
-        logger.info("[STEP 4/5] 执行融合共识")
-
-        # 提取置信度
-        anomaly_confidence = 0.0
-        violation_confidence = 0.0
-
-        if anomaly_result and "result" in anomaly_result:
-            # 从异常结果中提取最大置信度
-            anomalies = anomaly_result["result"].get("anomalies", [])
-            if anomalies:
-                anomaly_confidence = max([a.get("score", 0.0) for a in anomalies]) / 3.0  # 归一化
-
-        if violation_result and "result" in violation_result:
-            violation_confidence = violation_result["result"].get("confidence", 0.0)
-
-        # 执行融合
-        fusion_result = consensus_engine.fuse_results(
-            {"confidence": anomaly_confidence},
-            {"confidence": violation_confidence}
-        )
-
-        # 6. 预警分级
-        logger.info("[STEP 5/5] 预警分级和工单生成")
-
-        # 提取违规类型
-        violation_type = "未知"
-        if violation_result and "result" in violation_result:
-            violation_types = violation_result["result"].get("violation_type_names", [])
-            if violation_types:
-                violation_type = violation_types[0]
-
-        # 预警分类
-        alert_info = alert_classifier.classify_alert(
-            anomaly_result or {},
-            violation_result or {}
-        )
-
-        # 生成工单
         work_order = work_order_generator.generate_work_order(
-            alert_info,
-            data_context
-        )
+            {"suspicion_level": suspicion_level, "violation_types": violation_types,
+             "action": action}, data_context
+        ) if need_work_order else None
+        alert_report = report_generator.generate_alert_report(work_order, data_context) if need_work_order else None
 
-        # 生成预警报告
-        alert_report = report_generator.generate_alert_report(work_order, data_context)
-
-        # 7. 生成输出
-        # 预警级别中文映射
-        alert_level_cn = map_alert_level_to_chinese(alert_info["level"])
-        action_cn = map_action_to_chinese(alert_info["action"])
+        # 6. 生成输出
+        suspicion_cn = {"high": "高风险", "medium": "中风险", "low": "低风险", "none": "无违规"}.get(suspicion_level, "未知")
 
         output = {
             "task_id": task_id,
             "status": "completed",
             "result": {
-                # 预警信息
-                "alert": {
-                    "level": alert_info["level"],
-                    "level_cn": alert_level_cn,
-                    "confidence": alert_info["fused_confidence"],
-                    "action": alert_info["action"],
-                    "action_cn": action_cn,
-                    "reasoning": alert_info.get("reasoning", "")
-                },
-
-                # 违规信息
-                "violation_type": violation_type,
-                "violation_types": data_context.get("violation_type", ["未知"]),
-                "suspicion_level": data_context.get("suspicion_level", "unknown"),
-
-                # 工单信息
+                "suspicion_level": suspicion_level,
+                "suspicion_level_cn": suspicion_cn,
+                "violation_types": violation_types,
+                "action": action,
+                "confidence": violation_confidence,
                 "work_order": work_order,
-
-                # 报告信息
-                "report": alert_report.to_dict(),
-
-                # 融合信息
-                "fusion": {
-                    "anomaly_confidence": round(fusion_result.anomaly_confidence, 3),
-                    "violation_confidence": round(fusion_result.violation_confidence, 3),
-                    "fused_confidence": round(fusion_result.fused_confidence, 3),
-                    "adaptive_weights": fusion_result.adaptive_weights
-                }
+                "report": alert_report.to_dict() if alert_report else None,
+                "evidence_points": evidence_points,
             },
             "metadata": {
                 "subagent": "disposition-execution-agent",
