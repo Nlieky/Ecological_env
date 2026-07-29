@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # AgentService 封装了对 Hermes 智能体的调用，通过 HTTP 与 Hermes API 通信
     # 注意：Hermes API 仍运行在 localhost:8642（由 Hermes Agent 框架提供）
     AGENT_SERVICE_URL: str = "http://localhost:8642"
-    AGENT_TIMEOUT: int = 300  # AgentService 请求超时时间（秒）
+    AGENT_TIMEOUT: int = 600  # AgentService 请求超时时间（秒）— 完整pipeline 4子智能体~280-310s，留余量
 
     # LLM 配置（用于展示）
     LLM_MODEL: str = "ctgu-vlm"
