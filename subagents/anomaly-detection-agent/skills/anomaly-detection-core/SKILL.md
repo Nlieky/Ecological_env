@@ -16,28 +16,26 @@ description: 异常检测——调算子库检测 5 类异常特征（平稳/突
 
 **你的工作就是：调脚本 → 确认完成。**
 
-## 怎么调
-
-```bash
-python "$HERMES_HOME/skills/anomaly-detection-core/scripts/run_anomaly_detection_simple.py"
-```
-
-不需要传参数。脚本自动从 SESSION_DIR 读 `data_result.json`（数据感知写的），按上游的时间范围检测。
-
-### 好 vs 差
-
-```
-✅ 好：python "...run_anomaly_detection_simple.py"
-   → 脚本自动读 data_result，按上游时间范围检测
-
-❌ 差：python "...run_anomaly_detection_simple.py" --hours 24
-   → 主智能体说"7月14日"，数据感知取了14日，你却自己加 --hours 24 覆盖了时间范围
-```
-
 ## 执行流程
 
-1. 调脚本（无参数）
-2. 响应："✅ 脚本执行完成"
+**两步完成，不多做：**
+
+1. 用 `skill_view` 读本技能（你现在在读）
+2. 用 `terminal` 运行脚本
+3. 回复："✅ 脚本执行完成"
+
+**就这三步。不需要其他任何操作。**
+
+### 不要做的事（每多做一步浪费 ~6s）
+
+- ❌ 不要先 `echo $HERMES_HOME` / `ls` / `pwd` 检查环境——系统已设置好
+- ❌ 不要先检查 `data_result.json` 是否存在——脚本内部自动检查
+- ❌ 不要跑完脚本后再 `ls` / `cat` / `python -c` 验证结果——结果文件由下游自动读
+- ❌ 不要解析 JSON 或总结结果——主智能体会整合
+
+### 为什么
+
+每多一步 terminal 探索 = 1 次 LLM 调用（~6s）。4 个子智能体 × 多 2-3 步 = 浪费 50-70s。直接 skill_view → 跑脚本 → 确认完成，3 步搞定。
 
 ## 5 类异常特征
 

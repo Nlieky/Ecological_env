@@ -215,4 +215,9 @@ def run_subagent() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     _r = run_subagent()
-    sys.exit(0 if (isinstance(_r, dict) and _r.get("status") != "failed") else 1)
+    # 结果已写入文件后，立即强制退出——跳过 Hermes bg-review 后台线程（子智能体不需要
+    # 技能审查，那是为持久化 agent 设计的）。bg-review 每次浪费 ~20-30s LLM 调用 +
+    # 等待线程退出。os._exit 不等后台线程，直接终止进程。
+    _exit_code = 0 if (isinstance(_r, dict) and _r.get("status") != "failed") else 1
+    import os as _os
+    _os._exit(_exit_code)
