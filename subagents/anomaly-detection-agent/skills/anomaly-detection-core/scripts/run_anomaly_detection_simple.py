@@ -499,6 +499,9 @@ def main():
         # 报告可视化: 构造 chartData(带异常 markPoint)
         try:
             from shared.viz.build_chart import build_chart_data
+            # df 用的是中文列名(_RESULT_FIELD_CN)，build_chart_data 期望英文键(pH/COD)，
+            # 这里反向映射回英文，否则 build_chart_data 找不到指标 → 0 series → 图表空白
+            _cn_to_en = {v: k for k, v in _RESULT_FIELD_CN.items()}
             records = {}
             if data and isinstance(data, dict):
                 for side in ("influent", "effluent"):
@@ -510,7 +513,8 @@ def main():
                             r = {"timestamp": str(row[tc]) if tc in df.columns else ""}
                             for c in df.columns:
                                 if c != tc:
-                                    r[c] = round(float(row[c]), 2) if pd.notna(row[c]) else None
+                                    en_key = _cn_to_en.get(c, c)  # 中文列名→英文键
+                                    r[en_key] = round(float(row[c]), 2) if pd.notna(row[c]) else None
                             rows.append(r)
                         records[side] = rows
             output["result"]["chartData"] = build_chart_data(

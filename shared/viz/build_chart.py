@@ -25,6 +25,14 @@ _INDICATOR_COLORS = {
 }
 _DEFAULT_COLOR = "#6b7280"
 
+# 英文指标 → 全中文（异常检测算子用的中文列名，见 run_anomaly_detection_simple._RESULT_FIELD_CN）。
+# 异常对象的 indicator 字段可能是英文/短中文/全中文任一种，markPoint 匹配时要都覆盖。
+_INDICATOR_CN_FULL = {
+    "pH": "pH值", "COD": "化学需氧量浓度（毫克/升）", "TN": "总氮浓度（毫克/升）",
+    "NH3-N": "氨氮浓度（毫克/升）", "TP": "总磷浓度（毫克/升）", "SS": "悬浮物浓度（毫克/升）",
+    "flow_rate": "流量（升/秒）", "discharge_volume": "排放量（吨）",
+}
+
 
 def build_chart_data(records: dict, indicators: Optional[List[str]] = None,
                      anomalies: Optional[List[dict]] = None) -> List[Dict[str, Any]]:
@@ -44,7 +52,7 @@ def build_chart_data(records: dict, indicators: Optional[List[str]] = None,
         sample = (infl or effl or [{}])[0]
         indicators = [k for k in indicators if k in sample]
 
-    xs = [r.get("timestamp", "")[5:16] for r in infl] or [r.get("timestamp", "")[5:16] for r in effl]
+    xs = [_xlab(r.get("timestamp", "")) for r in infl] or [_xlab(r.get("timestamp", "")) for r in effl]
 
     # 按进出水分图，每张图含多个指标
     charts = []
@@ -73,13 +81,14 @@ def build_chart_data(records: dict, indicators: Optional[List[str]] = None,
             else:
                 s["yAxisIndex"] = 1   # 浓度用右轴
 
-            # 异常 markPoint
+            # 异常 markPoint：anomaly.indicator 可能是英文(pH)/短中文(氨氮)/全中文(化学需氧量浓度...)
             if anomalies:
+                ind_names = {ind, _to_cn(ind), _INDICATOR_CN_FULL.get(ind, ind)}
                 pts = [{"name": (a.get("features") or ["异常"])[0],
-                        "xAxis": (a.get("timestamp", "")[5:16]),
-                        "yAxis": _num(_val_at(records, side_key, ind, a.get("timestamp")))}
+                        "xAxis": _xlab(a.get("timestamp", "")),
+                        "yAxis": _num(a.get("value"))}   # 直接用异常自带的值，比按时间戳查可靠
                        for a in anomalies
-                       if a.get("indicator") in (ind, _to_cn(ind)) and a.get("data_type") == side_key]
+                       if a.get("indicator") in ind_names and a.get("data_type") == side_key]
                 if pts:
                     s["markPoint"] = {"data": pts, "symbolSize": 45}
 
@@ -117,6 +126,14 @@ def _num(v):
         return None if v is None else round(float(v), 2)
     except (TypeError, ValueError):
         return None
+
+
+def _xlab(ts) -> str:
+    """时间戳 → x 轴标签 'MM-DD HH:MM'。
+    归一化 ISO 的 'T' 分隔（异常时间戳常是 2026-07-25T12:00:00，records 是空格分隔），
+    否则 markPoint 的 xAxis 类别对不上曲线 category，标注点定位失败不显示。
+    """
+    return str(ts).replace("T", " ")[5:16]
 
 
 def _val_at(records, side, ind, ts):
