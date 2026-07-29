@@ -159,6 +159,7 @@ def _compact_result_for_master(result):
     if isinstance(infl, list) and infl:
         compact["influent_count"] = len(infl)
         compact["effluent_count"] = len(effl) if isinstance(effl, list) else 0
+        compact["chart_generated"] = "曲线已由数据感知自动生成（chartData），前端会自动渲染，你不需要自己画"
         stats = {}
         for ind in ("pH", "COD", "TN", "NH3-N", "TP", "SS"):
             infl_vals = [x.get(ind) for x in infl if x.get(ind) is not None]

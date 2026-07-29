@@ -146,6 +146,7 @@ def main():
     parser.add_argument("--days", type=int, help="最近N天")
     parser.add_argument("--start", type=str, help="开始时间 (YYYY-MM-DD)")
     parser.add_argument("--end", type=str, help="结束时间 (YYYY-MM-DD)")
+    parser.add_argument("--chart-indicators", type=str, default="", help="只画指定指标的曲线(逗号分隔,如 pH,COD)")
     args = parser.parse_args()
 
     task_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -204,8 +205,11 @@ def main():
     # 报告可视化: 构造 chartData(无异常标注, 纯数据曲线)
     try:
         from shared.viz.build_chart import build_chart_data
+        chart_inds = None
+        if args.chart_indicators:
+            chart_inds = [x.strip() for x in args.chart_indicators.split(",") if x.strip()]
         result["result"]["chartData"] = build_chart_data(
-            {"influent": influent_data, "effluent": effluent_data})
+            {"influent": influent_data, "effluent": effluent_data}, indicators=chart_inds)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
     except Exception as e:

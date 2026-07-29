@@ -42,6 +42,14 @@ python "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --hours 16
 | "本月" / "一个月" | `--hours 720` |
 | 没提时间 | `--hours 24`（唯一允许默认的情况） |
 
+### 指定指标（用户只问了某些指标时加这个参数）
+
+如果用户只问特定指标（如"pH和COD"），加 `--chart-indicators` 只画这些指标的曲线：
+```bash
+python "...get_data.py" --start "2026-07-14" --end "2026-07-15" --chart-indicators "pH,COD"
+```
+不加这个参数时默认画所有水质指标（pH/COD/TN/氨氮/TP/SS）。
+
 **关键**：从任务描述里识别时间，选对参数，把数值/日期写进命令。任务说"一周"就写 `--hours 168`，不能写成 24。
 
 ### 好的调用 vs 差的调用
