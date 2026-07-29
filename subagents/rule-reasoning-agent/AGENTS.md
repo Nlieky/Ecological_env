@@ -8,14 +8,14 @@
 
 ## 执行纪律（防瞎逛）
 
-主智能体通过**共享入口 `subagent_entry.py`** 以 subprocess 调起你：你的 SOUL/AGENTS/MEMORY + SKILL.md 已被预加载进 prompt，任务以用户消息形式送达。你**唯一该做的**：
+主智能体通过**共享入口 `subagent_entry.py`** 以 subprocess 调起你：你的 SOUL/AGENTS/MEMORY 已加载，任务以用户消息形式送达。你用 hermes 原生 **`skill_view`** 读取自己的 `SKILL.md`。你**唯一该做的**：
 
 1. 照 SKILL.md 跑它指定的脚本（`run_rule_reasoning.py`）。
 2. 确认产出了 `rule_reasoning_result.json`。
 3. 停。
 
-- ❌ 不要 `skill_view` / `skills_list` / `memory` 探索
-- ❌ 不要翻 `scripts/` 里别的模块（regulation_matcher / process_validator 等是内部实现，不是入口）
+- ✅ 用 `skill_view('rule-reasoning-core')` 读取技能说明，然后 `terminal` 跑脚本
+- ❌ 不要翻 `scripts/` 里别的模块、不要 `memory` 探索
 - ❌ 不要解析 JSON、不要生成报告、不要做异常检测 / 预警
 - ✅ 迭代上限 4 轮，跑完即止
 
@@ -47,29 +47,32 @@ python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py"
 - ❌ 预警 / 工单 → `disposition-execution`
 - ⚠️ 你接收数据层异常，加上语义层判定
 
-## 违规类型（对齐真实脚本 5 类）
+## 违规模式（4 类，对标资料）
 
-| 标识 | 中文 |
-|------|------|
-| `bottle_interference` | 插瓶干扰 |
-| `data_dilution` | 稀释排放 |
-| `secret_pipe` | 暗管偷排 |
-| `false_shutdown` | 虚假停产 |
-| `formula_tampering` | 公式篡改（人工拟合） |
+| 模式 | 初版状态 | 主要判据 |
+|---|---|---|
+| 插瓶干扰 | ✅ 完整 | pH-COD 协同 + 氨氮-总氮转化 |
+| 稀释排放 | ✅ 完整 | 质量平衡 + 多指标同步突降 |
+| 人工拟合 | ⚠ 简化(缺工况) | 趋势异常(无工况校验) |
+| 恶意逃避 | ❌ TODO | 需停产申报数据 |
 
-## 嫌疑等级
+## 嫌疑等级矩阵（资料定义）
 
-`low`(低) / `medium`(中) / `high`(高) / `critical`(严重)
+| | 工艺违背 | 工艺无违背 |
+|---|---|---|
+| **法规违规**(超阈值) | high | low |
+| **法规未违规** | medium | none |
 
-## 工艺机理规则
+## 工艺规则（4 条，资料精确判据）
 
-| 规则 | 判定条件 | 异常标准 |
-|------|---------|---------|
-| pH-COD 协同 | 相关性检查 | 相关性 < 0.3 异常 |
-| 氨氮-总氮转化 | 相关性 / 比值 | 相关性 < 0.3 或比值 ∉ [20%, 60%] |
-| 质量平衡 | C_in×(1−η) ≈ C_out | 误差 > ±20% 异常 |
+| 规则 | 判据 | 异常特征 | 判向 |
+|---|---|---|---|
+| pH-COD 协同 | pH std≤0.1 且 COD std≤5.0 mg/L | + 平稳 | 插瓶 |
+| 氨氮-总氮转化 | 氨氮突降而总氮基本不变 | + 突变 | 插瓶 |
+| 质量平衡 | 去除率偏差 > 0.2 | + 趋势/突变 | 稀释 |
+| 多指标同步突降 | 2+ 污染物同步下降 >50% | + 突变 | 稀释 |
 
-> 进水→出水按 **2 小时** HRT 滞后做时间对齐后再做机理校验。
+质量平衡按 `data_result.metadata.hrt_hours` 做进水出水时间对齐。
 
 ## Red Lines
 
