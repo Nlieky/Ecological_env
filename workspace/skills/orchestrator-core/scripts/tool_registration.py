@@ -132,31 +132,39 @@ def _extract_evidence(result) -> dict:
 
 
 def _compact_result_for_master(result):
-    """极致精简子智能体结果——只给主智能体一句话摘要，不返回任何原始数据/中间结构。
+    """精简子智能体结果——给主智能体编排决策够用的摘要，不返回原始数据。
 
-    铁律：LLM（主智能体）绝不读原始数据、不处理数据。数据是算子之间通过 SESSION_DIR
-    文件传递的。主智能体只需要知道"这步做完了、做得怎么样"来做编排决策（调下一个子智能体
-    还是生成报告）。返回完整 JSON 会撑爆上下文 token + LLM 会浪费 turn 去"分析"数据。
-
-    所以：只返回 {"status": "completed/failed", "summary": "一句话摘要"}。
-    原始数据/异常列表/违规详情/chartData 全部不进主智能体上下文。
+    铁律：LLM（主智能体）绝不读原始数据。数据是算子之间通过 SESSION_DIR 文件传递的。
+    但 LLM 需要足够的信息确信"做完了"——否则它会调 read_result 去读完整文件（更糟）。
+    所以返回 status + 一句话摘要 + 关键数字（异常数/嫌疑等级/违规类型）。
+    不返回原始进出水数据/完整异常列表/完整违规详情/chartData。
     """
     if not isinstance(result, dict):
         return {"status": "failed", "summary": str(result)[:200]}
 
     status = result.get("status", "unknown")
     r = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
-    sub = result.get("skill_calls", [])
-
-    # 按子智能体类型生成一句话摘要
     summary = _summarize_result(result) or "完成"
 
-    # 极致精简：只留 status + summary，不返回任何 result 内部数据
     compact = {
         "task_id": result.get("task_id", ""),
         "status": status,
         "summary": summary,
     }
+
+    # 加关键数字（让 LLM 确信"做完了"，不会去 read_result 查）
+    anoms = r.get("anomalies")
+    if isinstance(anoms, list):
+        compact["anomaly_count"] = len(anoms)
+    if "suspicion_level" in r:
+        compact["suspicion_level"] = r["suspicion_level"]
+    if "violation_types" in r:
+        vt = r["violation_types"]
+        if isinstance(vt, list) and vt:
+            compact["violation_types"] = vt
+    if "action" in r:
+        compact["action"] = r["action"]
+
     return compact
 
 
@@ -327,29 +335,17 @@ def _create_session_handler(*args, **kwargs) -> str:
 
 
 def _read_result_handler(*args, **kwargs) -> str:
-    """read_result工具的hermes-agent兼容处理器
+    """read_result 已废弃——主智能体不应读结果文件。
 
-    支持多种调用方式，参见 _call_subagent_handler
-
-    Returns:
-        str: JSON格式的结果字符串
+    编排铁律：call_subagent 返回的摘要已足够编排决策。读完整结果文件会把原始数据
+    灌进 LLM 上下文（撑爆 token + 浪费 turn）。如果需要细节，调对应子智能体。
     """
-    try:
-        # 从参数获取result_file
-        if args and isinstance(args[0], dict):
-            result_file = args[0].get("result_file")
-        elif 'function_args' in kwargs:
-            result_file = kwargs['function_args'].get("result_file") if isinstance(kwargs['function_args'], dict) else None
-        else:
-            result_file = kwargs.get("result_file")
-
-        result = read_result(result_file)
-        if isinstance(result, dict):
-            return json.dumps(result, ensure_ascii=False)
-        return str(result)
-    except Exception as e:
-        error_msg = f"读取结果失败: {str(e)}"
-        return json.dumps({"success": False, "error": error_msg}, ensure_ascii=False)
+    return json.dumps({
+        "success": False,
+        "error": "read_result 已废弃。call_subagent 返回的摘要已足够编排决策。"
+                 "原始数据由子智能体之间通过文件传递，主智能体不需要读。"
+                 "编排铁律：数据感知→异常检测→规则推理→处置执行，4步完成，不读结果文件。"
+    }, ensure_ascii=False)
 
 
 # 导出函数
