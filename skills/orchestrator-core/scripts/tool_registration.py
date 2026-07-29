@@ -11,31 +11,31 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 
-# 添加项目路径
-project_root = Path(__file__).parents[4]
+# 添加项目路径——标记法找项目根(含 shared/ + workspace/)，位置无关，迁移后不会因目录深度算错
+def _project_root() -> Path:
+    p = Path(__file__).resolve()
+    for parent in p.parents:
+        if (parent / "shared").is_dir() and (parent / "workspace").is_dir():
+            return parent
+    return p.parents[3]  # 兜底：标准深度
+
+
+project_root = _project_root()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# 导入工具桥接
-try:
-    from workspace.skills.orchestrator_core_bridge import (
-        call_subagent,
-        list_subagents,
-        create_session,
-        read_result
-    )
-except ImportError:
-    # 如果直接导入失败，通过脚本导入
-    import importlib.util
-    bridge_path = project_root / "workspace" / "skills" / "orchestrator_core_bridge.py"
-    spec = importlib.util.spec_from_file_location("orchestrator_core_bridge", bridge_path)
-    bridge_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(bridge_module)
+# 导入工具桥接——bridge 现与本文件同目录(scripts/)，按文件路径加载最稳
+import importlib.util
 
-    call_subagent = bridge_module.call_subagent
-    list_subagents = bridge_module.list_subagents
-    create_session = bridge_module.create_session
-    read_result = bridge_module.read_result
+_bridge_path = Path(__file__).resolve().parent / "orchestrator_core_bridge.py"
+_spec = importlib.util.spec_from_file_location("orchestrator_core_bridge", _bridge_path)
+bridge_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(bridge_module)
+
+call_subagent = bridge_module.call_subagent
+list_subagents = bridge_module.list_subagents
+create_session = bridge_module.create_session
+read_result = bridge_module.read_result
 
 
 # ── 流式进度通道 ──────────────────────────────────────────────
@@ -264,15 +264,16 @@ def register_orchestrator_tools(agent):
         if s['function']['name'] not in existing:
             agent.tools.append(s)
 
-    # 砍掉所有非编排工具：主智能体只保留这 4 个编排工具（call_subagent/list_subagents/
-    # create_session/read_result），移除 skill_view/skill_manage/skills_list/memory/
-    # browser_*/terminal/execute_code 等会让它跑偏去翻技能/记忆/跑终端的分心工具。
-    # 主智能体职责是编排+综合，子智能体结果经 call_subagent 回传，不需要其它工具。
-    _ORCH_NAMES = {s['function']['name'] for s in _ORCH_SCHEMAS}
+    # 砍掉真·分心工具（terminal/browser/memory/execute_code/skill_manage 等），但
+    # 【保留 skill_view + skills_list】——主智能体必须能用 skill_view 读自己的编排技能
+    # orchestrator-core/SKILL.md（AGENTS.md 要求"先 skill_view('orchestrator-core')
+    # 再 call_subagent"）。之前把 skill_view 一起砍了，导致主智能体根本读不到编排规则，
+    # 只能瞎猜、时对时错（有时只调①、有时跑全链①②③④）。
+    _KEEP_NAMES = {s['function']['name'] for s in _ORCH_SCHEMAS} | {"skill_view", "skills_list"}
     before_n = len(agent.tools)
     agent.tools = [t for t in agent.tools if isinstance(t, dict)
-                   and t.get('function', {}).get('name') in _ORCH_NAMES]
-    print(f"主智能体工具精简：{before_n} → {len(agent.tools)}（仅保留编排工具，移除分心工具）")
+                   and t.get('function', {}).get('name') in _KEEP_NAMES]
+    print(f"主智能体工具精简：{before_n} → {len(agent.tools)}（保留编排工具 + skill_view/skills_list，移除 terminal/browser 等分心工具）")
 
     # 第 2 层：覆盖注册到 hermes 全局 registry。vendored hermes 自带的
     # tools/orchestrator_tool.py 是多处损坏的桥接（handler 签名错、schema 双层包裹

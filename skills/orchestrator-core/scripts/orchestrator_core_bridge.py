@@ -7,8 +7,8 @@
 import sys
 from pathlib import Path
 
-# 添加 scripts 目录到 Python 路径
-scripts_dir = Path(__file__).parent / "orchestrator-core" / "scripts"
+# 本文件就在 scripts/ 目录内(随 orchestrator-core 迁到 skills/ 后)，scripts_dir 即本目录
+scripts_dir = Path(__file__).resolve().parent
 if str(scripts_dir) not in sys.path:
     sys.path.insert(0, str(scripts_dir))
 

@@ -70,6 +70,10 @@ class AgentService:
         self.project_root = Path(__file__).parents[1]
         # 会话历史存储：session_id -> messages列表
         self.session_histories: Dict[str, list] = {}
+        # 会话→上一轮 session 目录的映射：同一对话多轮追问时，把上一轮的子智能体结果
+        # 文件(data_result/anomaly_result/...)续传进本轮新目录，让"那有没有异常"这类
+        # 追问能直接链式消费上一轮取的数据（像正常多轮对话有上下文）。不同会话不续传。
+        self._session_dirs: Dict[str, str] = {}
         # 查询缓存：提升性能
         self.query_cache: Dict[str, Dict] = {}
         self.cache_duration = 300  # 5分钟缓存
@@ -107,7 +111,7 @@ class AgentService:
             try:
                 # 修复导入路径：使用orchestrator-core而非orchestrator_core
                 import importlib.util
-                tool_reg_path = self.project_root / "workspace" / "skills" / "orchestrator-core" / "scripts" / "tool_registration.py"
+                tool_reg_path = self.project_root / "skills" / "orchestrator-core" / "scripts" / "tool_registration.py"
                 spec = importlib.util.spec_from_file_location("tool_registration", tool_reg_path)
                 tool_reg_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(tool_reg_module)
@@ -180,7 +184,7 @@ class AgentService:
 
         return None
 
-    def _fresh_session_dir(self) -> str:
+    def _fresh_session_dir(self, session_id: str = None) -> str:
         """为本次查询分配一个独立的 session 目录。
 
         一次查询内的 4 个子智能体(data→anomaly→rule→disposition)共享这一个目录做
@@ -189,11 +193,31 @@ class AgentService:
         却读到上次"24小时"的结果）。这里在每次查询开头强制换新目录。
         这是 scratch 中转通道的隔离，不影响 ①对话历史/④Hermes session DB/⑤MEMORY.md
         这些正当记忆（它们仍按 session_id / 框架机制各自保留）。
+
+        【续传(2026-07-29)】同一会话(conversation, 同一 session_id)的多轮追问，把
+        上一轮的子智能体结果文件拷进本轮新目录——让"那这些有没有异常"这类追问能直接
+        链式消费上一轮取的数据，像正常多轮对话一样有数据上下文，不必重新取数。
+        不同会话(session_id 不同)不拷→天然隔离；换时间段的追问由主智能体重新调①覆盖。
         """
+        import shutil
         sessions_root = project_root / "sessions"
         sessions_root.mkdir(parents=True, exist_ok=True)
         sd = sessions_root / f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
         sd.mkdir(parents=True, exist_ok=True)
+        # 续传：同一会话才把上一轮结果文件拷过来（不同会话天然隔离）
+        if session_id and session_id in self._session_dirs:
+            prev = Path(self._session_dirs[session_id])
+            if prev.exists() and prev.resolve() != sd.resolve():
+                carried = []
+                for fname in ("data_result.json", "anomaly_result.json",
+                              "rule_reasoning_result.json", "disposition_result.json"):
+                    src = prev / fname
+                    if src.exists():
+                        shutil.copy2(src, sd / fname)
+                        carried.append(fname)
+                if carried:
+                    logger.info(f"[session] 续传会话 {session_id} 上一轮结果 {carried} → {sd.name}")
+        self._session_dirs[session_id] = str(sd)
         os.environ['SESSION_DIR'] = str(sd)
         logger.info(f"[session] 新查询 session 目录: {sd}")
         return str(sd)
@@ -247,7 +271,7 @@ class AgentService:
             if _tool_reg is not None:
                 _tool_reg._current_progress_queue = _trace_q
             try:
-                self._fresh_session_dir()  # 本次查询用独立 session 目录，杜绝跨查询结果复用
+                self._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
                 result = self.master_agent.run_conversation(
                     user_message=query,
                     conversation_history=conversation_history,
@@ -442,7 +466,7 @@ def query_stream(request: QueryRequest):
             q.put({"type": "error", "message": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"})
             return
         try:
-            agent_service._fresh_session_dir()  # 本次查询用独立 session 目录，杜绝跨查询结果复用
+            agent_service._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
             history = agent_service.session_histories.get(session_id)
             result = agent_service.master_agent.run_conversation(
                 user_message=request.query,

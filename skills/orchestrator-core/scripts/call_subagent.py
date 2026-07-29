@@ -13,6 +13,15 @@ from typing import Optional, Dict, Any
 import time
 
 
+def _project_root() -> Path:
+    """标记法找项目根(含 shared/ + workspace/)，位置无关——迁移后不会因目录深度算错。"""
+    p = Path(__file__).resolve()
+    for parent in p.parents:
+        if (parent / "shared").is_dir() and (parent / "workspace").is_dir():
+            return parent
+    return p.parents[3]  # 兜底
+
+
 # 子智能体路径映射（完整名称和简化名称）
 SUBAGENT_PATHS = {
     # 完整名称
@@ -72,7 +81,7 @@ def get_session_dir() -> Optional[str]:
     from datetime import datetime
 
     # 获取项目根目录
-    current_dir = PathClass(__file__).parent.parent.parent.parent.parent
+    current_dir = _project_root()
     sessions_dir = current_dir / "sessions"
     sessions_dir.mkdir(parents=True, exist_ok=True)
 
@@ -211,10 +220,10 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
             "metadata": {"timestamp": datetime.now().isoformat()}
         }
 
-    # 获取子智能体路径
+    # 获取子智能体路径——SUBAGENT_PATHS 形如 "../subagents/X"(旧 workspace 相对约定)，
+    # 去掉前导 ../ 后从项目根解析，与脚本自身位置无关
     subagent_rel_path = SUBAGENT_PATHS[subagent_name]
-    current_dir = Path(__file__).parent.parent.parent.parent
-    subagent_path = (current_dir / subagent_rel_path).resolve()
+    subagent_path = (_project_root() / subagent_rel_path.replace("../", "", 1)).resolve()
 
     if not subagent_path.exists():
         return {
@@ -260,7 +269,7 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
     env['OPENAI_BASE_URL'] = llm_base_url
 
     # 添加 PYTHONPATH 以确保子进程能找到项目模块
-    project_root = Path(__file__).parent.parent.parent.parent.parent
+    project_root = _project_root()
     if 'PYTHONPATH' in env:
         env['PYTHONPATH'] = f"{project_root}{os.pathsep}{env['PYTHONPATH']}"
     else:

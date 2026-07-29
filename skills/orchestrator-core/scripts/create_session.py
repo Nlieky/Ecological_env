@@ -9,6 +9,15 @@ from datetime import datetime
 from pathlib import Path
 
 
+def _project_root() -> Path:
+    """标记法找项目根(含 shared/ + workspace/)，位置无关。"""
+    p = Path(__file__).resolve()
+    for parent in p.parents:
+        if (parent / "shared").is_dir() and (parent / "workspace").is_dir():
+            return parent
+    return p.parents[3]
+
+
 def create_session(**kwargs) -> str:
     """
     创建新的会话目录
@@ -18,7 +27,7 @@ def create_session(**kwargs) -> str:
         格式: sessions/session_YYYYMMDD_HHMMSS/
     """
     # 获取项目根目录
-    current_dir = Path(__file__).parent.parent.parent.parent.parent
+    current_dir = _project_root()
     sessions_dir = current_dir / "sessions"
 
     # 确保会话目录存在

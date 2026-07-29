@@ -12,6 +12,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
+def _project_root() -> Path:
+    """标记法找项目根(含 shared/ + workspace/)，位置无关。"""
+    p = Path(__file__).resolve()
+    for parent in p.parents:
+        if (parent / "shared").is_dir() and (parent / "workspace").is_dir():
+            return parent
+    return p.parents[3]
+
 # Import SubagentManager at module level for access to SUBAGENT_CONFIGS
 try:
     from .subagent_manager import SubagentManager
@@ -36,7 +45,7 @@ def get_subagent_manager():
     global _subagent_manager
     if _subagent_manager is None:
         # 使用项目根目录初始化
-        project_root = Path(__file__).parents[4]  # 回到项目根目录
+        project_root = _project_root()  # 回到项目根目录
         _subagent_manager = SubagentManager(project_root=project_root)
     return _subagent_manager
 
