@@ -265,31 +265,46 @@ def detect_features_for_series(values: np.ndarray, series_name: str) -> list:
     if not matched_features:
         return []
 
-    # 孤立森林评分
-    anomaly_score = 0.0
+    # 孤立森林逐点评分 → 找出真正偏离的点位(如 COD 12:00 尖峰),而非无脑锚定末点
+    point_idxs = []  # [(原始index, score), ...]
     try:
         vals = series.dropna().values.reshape(-1, 1)
+        valid_idx = np.where(~series.isna())[0]
         if len(vals) >= 10:
             iso = IsolationForest(contamination=0.1, random_state=42)
             iso.fit(vals)
-            raw = -iso.score_samples(vals)
-            mx, mn, sd = raw.max(), raw.min(), raw.std()
-            anomaly_score = float((mx - mn) / (sd + 1e-9))
-            anomaly_score = float(min(max(anomaly_score / 3.0, 0.0), 1.0))
+            raw = -iso.score_samples(vals)  # 越大越异常
+            outlier = iso.predict(vals) == -1  # IF 内置异常标签(约 top 10%)
+            for j, sc in enumerate(raw):
+                if outlier[j]:
+                    point_idxs.append((int(valid_idx[j]), float(sc)))
     except Exception as e:
         logger.warning(f"孤立森林评分失败({series_name}): {e}")
 
+    # 序列级异常分数(供置信度计算)
+    max_pt = max((s for _, s in point_idxs), default=0.0)
+    anomaly_score = float(min(max(max_pt / 3.0, 0.0), 1.0))
     pattern_similarity = len(matched_features) / 5.0
     confidence = 0.6 * anomaly_score + 0.4 * pattern_similarity
 
-    return [{
-        "index": len(series) - 1,  # 整序列级特征, 用末点做锚
-        "features": matched_features,
-        "score": anomaly_score,
-        "confidence": float(confidence),
-        "pattern_similarity": float(pattern_similarity),
-        "value": float(series.iloc[-1]),
-    }]
+    def _entry(idx, sc):
+        return {
+            "index": idx,
+            "features": matched_features,
+            "score": float(sc),
+            "confidence": float(confidence),
+            "pattern_similarity": float(pattern_similarity),
+            "value": float(series.iloc[idx]),
+        }
+
+    # 有点位异常 → 返回这些真实位置(按分数取前 6,避免太多); 否则(如"平稳"恒定值无离群点)
+    # 用局部偏离最大的点代表——总比无脑锚末点(23:00)有意义
+    if point_idxs:
+        point_idxs = sorted(point_idxs, key=lambda x: x[1], reverse=True)[:6]
+        return [_entry(idx, sc) for idx, sc in point_idxs]
+    dev = (series - series.mean()).abs()
+    rep = int(dev.idxmax()) if len(dev) else len(series) - 1
+    return [_entry(rep, anomaly_score)]
 
 
 def detect_anomalies_in_series(values: np.ndarray, series_name: str) -> list:
