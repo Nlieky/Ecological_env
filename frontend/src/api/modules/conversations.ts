@@ -8,4 +8,8 @@ export const conversationsService = {
     }),
   detail: (id: string) =>
     api.get<unknown, { success: boolean; data: ConversationDetail }>(`/v1/conversations/${id}`),
+  delete: (id: string) =>
+    api.delete<unknown, { success: boolean }>(`/v1/conversations/${id}`),
+  clearAll: () =>
+    api.delete<unknown, { success: boolean }>('/v1/conversations'),
 }

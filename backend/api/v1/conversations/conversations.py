@@ -2,8 +2,10 @@
 
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
+from sqlalchemy import text
 
 from backend.services.conversation_service import ConversationService
+from backend.database.session import SessionLocal
 from backend.models.api import (
     StandardResponse,
     ConversationListResponse,
@@ -103,3 +105,37 @@ async def get_conversation(conversation_id: str):
                 "message": str(e)
             }
         )
+
+
+@router.delete("/conversations/{conversation_id}", response_model=StandardResponse)
+async def delete_conversation(conversation_id: str):
+    """删除指定对话（含其所有消息）"""
+    try:
+        db = SessionLocal()
+        deleted_msgs = db.execute(
+            text("DELETE FROM conversation_messages WHERE conversation_id = :id"),
+            {"id": conversation_id}
+        )
+        deleted_conv = db.execute(
+            text("DELETE FROM conversations WHERE id = :id"),
+            {"id": conversation_id}
+        )
+        db.commit()
+        db.close()
+        return StandardResponse(success=True, data={"deleted": True, "conversation_id": conversation_id})
+    except Exception as e:
+        return StandardResponse(success=False, error={"code": "CONVERSATION_DELETE_ERROR", "message": str(e)})
+
+
+@router.delete("/conversations", response_model=StandardResponse)
+async def clear_all_conversations():
+    """清除所有对话历史"""
+    try:
+        db = SessionLocal()
+        db.execute(text("DELETE FROM conversation_messages"))
+        db.execute(text("DELETE FROM conversations"))
+        db.commit()
+        db.close()
+        return StandardResponse(success=True, data={"cleared": True})
+    except Exception as e:
+        return StandardResponse(success=False, error={"code": "CONVERSATION_CLEAR_ERROR", "message": str(e)})
