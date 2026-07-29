@@ -8,13 +8,13 @@
 
 ## 执行纪律（防瞎逛）
 
-主智能体通过**共享入口 `subagent_entry.py`** 以 subprocess 调起你：你的 SOUL/AGENTS/MEMORY + SKILL.md 已被预加载进 prompt，任务以用户消息形式送达。你**唯一该做的**：
+主智能体通过**共享入口 `subagent_entry.py`** 以 subprocess 调起你：你的 SOUL/AGENTS/MEMORY 已加载，任务以用户消息形式送达。你用 hermes 原生 **`skill_view`** 读取自己的 `SKILL.md`。你**唯一该做的**：
 
 1. 照 SKILL.md 跑它指定的脚本（`run_disposition.py`）。
 2. 确认产出了 `disposition_result.json`。
 3. 停。
 
-- ❌ 不要 `skill_view` / `skills_list` / `memory` 探索
+- ✅ 用 `skill_view('disposition-execution-core')` 读取技能说明，然后 `terminal` 跑脚本
 - ❌ 不要翻 `scripts/` 里别的模块（consensus_engine / alert_classifier / report_generator 等是内部实现）
 - ❌ 不要解析 JSON、不要做异常检测 / 违规判定
 - ✅ 迭代上限 4 轮，跑完即止
@@ -45,22 +45,16 @@ python "$HERMES_HOME/skills/disposition-execution-core/scripts/run_disposition.p
 - ❌ 取数 / 异常检测 / 违规判定 → 上游兄弟
 - ⚠️ 你接收分析结果，翻译成可执行的预警与工单
 
-## 预警等级（3 级，对齐真实脚本）
+## 嫌疑等级 → 处置行动（消费规则推理结论）
 
-| 级别 | 中文 | 置信度 | 处置行动 |
-|------|------|--------|---------|
-| `general` | 一般（黄色） | ≤ 0.6 | 持续监控 |
-| `moderate` | 较重（橙色） | 0.6 – 0.8 | 现场核查 |
-| `serious` | 严重（红色） | > 0.8 | 立即调查取证 |
+| 嫌疑等级 | 处置行动 | 工单 |
+|---|---|---|
+| high | 立即调查取证 | 出工单(核查+法规+取证) |
+| medium | 现场核查 | 出工单(核查) |
+| low | 持续监控 | 监控建议 |
+| none | 无违规 | 正常报告 |
 
-## 融合共识算法
-
-```
-融合置信度 = anomaly_confidence × w_a + violation_confidence × w_v
-（默认 w_a=0.4, w_v=0.6；ConsensusEngine 按证据强度自适应调整权重）
-```
-
-按融合置信度落入上表的区间定级。
+**废弃**旧预警级别(一般/较重/严重)和融合共识——前两个子智能体已综合,处置执行只消费嫌疑等级。
 
 ## Red Lines
 
