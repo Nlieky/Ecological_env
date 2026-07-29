@@ -132,32 +132,31 @@ def _extract_evidence(result) -> dict:
 
 
 def _compact_result_for_master(result):
-    """精简子智能体结果，回传给主智能体。
+    """极致精简子智能体结果——只给主智能体一句话摘要，不返回任何原始数据/中间结构。
 
-    主智能体只做编排+综合，不该背原始数据。完整结果已写入 session 文件，下游子智能体
-    (异常检测读 CSV、规则/处置读 session 目录的 *_result.json) 从文件读取，不依赖主
-    智能体回传。这里去掉体积大的原始数组（进/出水行，一周可达 53K），只留摘要+关键字段；
-    异常列表过长则截断。主智能体需要细节时可调 read_result 取完整文件。
-    这样避免大数据结果撑爆主智能体上下文/迭代预算（曾导致一周查询 max_iterations 15/15）。
+    铁律：LLM（主智能体）绝不读原始数据、不处理数据。数据是算子之间通过 SESSION_DIR
+    文件传递的。主智能体只需要知道"这步做完了、做得怎么样"来做编排决策（调下一个子智能体
+    还是生成报告）。返回完整 JSON 会撑爆上下文 token + LLM 会浪费 turn 去"分析"数据。
+
+    所以：只返回 {"status": "completed/failed", "summary": "一句话摘要"}。
+    原始数据/异常列表/违规详情/chartData 全部不进主智能体上下文。
     """
     if not isinstance(result, dict):
-        return result
-    compact = dict(result)
-    r = compact.get("result")
-    if isinstance(r, dict):
-        cr = dict(r)
-        # 数据感知：去掉原始进出水数组，只留条数 + metadata（原 168 行 ≈ 53K）
-        if isinstance(cr.get("influent"), list) or isinstance(cr.get("effluent"), list):
-            cr["influent_count"] = len(cr.get("influent") or [])
-            cr["effluent_count"] = len(cr.get("effluent") or [])
-            cr.pop("influent", None)
-            cr.pop("effluent", None)
-        # 异常列表过长则截断（保留前 20 + 总数）
-        anoms = cr.get("anomalies")
-        if isinstance(anoms, list) and len(anoms) > 20:
-            cr["anomalies_total"] = len(anoms)
-            cr["anomalies"] = anoms[:20]
-        compact["result"] = cr
+        return {"status": "failed", "summary": str(result)[:200]}
+
+    status = result.get("status", "unknown")
+    r = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
+    sub = result.get("skill_calls", [])
+
+    # 按子智能体类型生成一句话摘要
+    summary = _summarize_result(result) or "完成"
+
+    # 极致精简：只留 status + summary，不返回任何 result 内部数据
+    compact = {
+        "task_id": result.get("task_id", ""),
+        "status": status,
+        "summary": summary,
+    }
     return compact
 
 
