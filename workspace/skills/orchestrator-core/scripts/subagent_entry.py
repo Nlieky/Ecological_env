@@ -156,7 +156,11 @@ def run_subagent() -> Dict[str, Any]:
         "注意：技能已限定为你的作用域(只含与你相关的)，直接选用即可，不要反复翻阅。\n"
         "⚠️ 评判成功的唯一标准：你用 terminal 运行了脚本并产出结果文件。"
         "禁止只回复\"我已就绪\"/\"等待指令\"/\"我将执行\"之类的确认就结束——"
-        "那会被判为任务失败。读完 SKILL.md 后必须立刻调用 terminal 运行脚本。"
+        "那会被判为任务失败。读完 SKILL.md 后必须立刻调用 terminal 运行脚本。\n\n"
+        "环境已确认（不要再用 echo/ls 验证）：\n"
+        f"- HERMES_HOME = {AGENT_DIR}（你的技能在 $HERMES_HOME/skills/ 下）\n"
+        f"- SESSION_DIR = {session_dir}（上游结果文件在这里，脚本自动读）\n"
+        "直接用 SKILL.md 里给的命令运行脚本。"
     )
 
     try:
