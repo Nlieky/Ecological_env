@@ -1,132 +1,70 @@
 ---
 name: rule-reasoning-core
-description: 规则推理和违规判定。**触发条件**：当用户查询提到"违规"、"超标"、"违反标准"、"是否达标"、"插瓶"、"稀释"、"排放异常"时调用。基于异常检测结果进行法规匹配、工艺校验和专家推理，判定违规类型和嫌疑等级。需要异常检测结果作为输入。
+description: 规则推理——读取异常特征，查知识库判定 4 类违规模式（插瓶/稀释/拟合/逃避）+ 嫌疑等级矩阵。当任务涉及"违规"、"超标"、"研判"、"是否达标"、"插瓶"、"稀释"时使用。务必使用——只有规则推理能判定违规，异常检测只给特征不给违规结论。
 ---
 
-# 规则推理和违规判定技能
+# 规则推理技能
 
-## 核心规则
+## 你做什么
 
-**只做一件事：调用脚本，传递结果。不要解析，不要生成报告。**
+你调用一个脚本（`run_rule_reasoning.py`），它读取异常检测的特征 + 原始数据，查知识库判定违规模式。脚本自动完成所有工作：
+- 从 `SESSION_DIR/anomaly_result.json` 读异常特征（平稳/突变/趋势/周期/高频）
+- 从 `SESSION_DIR/data_result.json` 读原始数据（用于工艺校验）
+- 4 条工艺规则判定（pH-COD 协同 / 氨氮-总氮转化 / 质量平衡 / 多指标同步突降）
+- 法规阈值校验（超排放标准？）
+- 嫌疑矩阵（合规×工艺 → high/medium/low/none）
+- 标注缺数据（拟合缺工况 / 逃避缺停产申报）
 
-## ⚠️ 执行纪律（严格白名单，违反必失败）
+**你的工作就是：调脚本 → 确认完成。**
 
-**你只能执行下面"执行流程"里那一条 `python` 命令，敲完就停。严禁任何其他终端操作：**
-- ❌ 禁止 `cat >` / `>>` / `echo >` 写入、修改、删除任何文件——结果只能由脚本产出，你一写就会**覆盖/污染上游 anomaly_result**（曾发生：编造 anomaly_result 覆盖了真实结果）
-- ❌ 禁止 `python -c` / 内联代码 / 自己写脚本
-- ❌ 禁止 `ls` / `find` / `head` / `tail` / `grep` / `cat` 读文件或探索目录
-- ❌ 禁止 `cd` / `pwd` / `echo` 等闲逛
-- ✅ **唯一允许**：直接 `python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py"`
+## 怎么调
 
-输入（异常检测结果）会自动从 SESSION_DIR 读取，不需要你研究脚本。之前就因为 `cat >`/`python -c`/`find` 一通乱搞、烧光迭代还没跑成脚本——别重蹈覆辙。
+```bash
+python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py"
+```
+
+不需要传参数。脚本自动从 SESSION_DIR 读上游结果。
 
 ## 执行流程
 
-1. **调用脚本**
-   ```bash
-   python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py"
-   ```
+1. 调脚本（无参数）
+2. 响应："✅ 脚本执行完成"
 
-2. **确认执行完成**
-   响应："✅ 脚本执行完成"
+## 4 类违规模式（对标参考资料）
+
+| 模式 | 异常特征组合 | 工艺规则 | 初版状态 |
+|------|------------|---------|---------|
+| 插瓶干扰 | 平稳(+突变) | pH std≤0.1 且 COD std≤5.0 / 氨氮突降总氮不变 | ✅ 完整 |
+| 稀释排放 | 突变(+趋势) | 多指标同步突降 >50% / 去除率偏差 >0.2 | ✅ 完整 |
+| 人工拟合 | 趋势 | 趋势异常 + 工况无变化 | ⚠ 简化(缺工况) |
+| 恶意逃避 | — | 排放正常 + 企业申报停产 | ❌ TODO(缺停产申报) |
+
+## 嫌疑等级矩阵
+
+| | 工艺违背 | 工艺无违背 |
+|---|---|---|
+| **法规违规**（超阈值） | high | low |
+| **法规未违规** | medium | none |
+
+**异常 ≠ 违规**：异常检测给你的是特征（平稳/突变…），你查知识库判定这些特征是否构成违规。指标没超法规阈值时，只算异常不算违规。
+
+## 为什么只调脚本、不做别的
+
+**不解析 JSON / 不生成报告**：你的结果由下游处置执行直接读文件，由主智能体整合报告。
+
+**不手写文件**：你手写会覆盖上游的 `anomaly_result.json`（曾经发生过，编造的键名破坏了链式传递）。
+
+**不做异常检测**：异常特征由上游 anomaly-detection 的算子检出。你消费它的结果，不重新检测。
+
+**不生成预警/工单**：那是处置执行的活。你只输出违规判定 + 嫌疑等级 + 证据链。
 
 ## 脚本输出
 
-脚本自动保存结果到 `rule_reasoning_result.json`，包含：
-- `has_violation` (bool): 是否存在违规
-- `suspicion_level` (str): 嫌疑等级（low/medium/high/critical）
-- `suspicion_level_cn` (str): 嫌疑等级中文
-- `confidence` (float): 置信度
-- `violation_types` (list): 违规类型列表
-- `violation_type_names` (list): 违规类型中文名称
-- `evidence_points` (list): 证据点
-- `regulation_matches`: 法规匹配结果
-- `process_validation`: 工艺机理校验结果
-- `expert_reasoning`: 专家推理结果
-- `conclusion` (str): 综合结论
+保存到 `rule_reasoning_result.json`（SESSION_DIR 或子智能体默认目录），包含：
+- `suspicion_level`：嫌疑等级（high/medium/low/none）
+- `violation_types`：违规模式列表（插瓶干扰/稀释排放/…）
+- `evidence_points`：证据链（法规 + 工艺 + 专家）
+- `missing_data`：缺数据标注（工况/停产申报）
+- `regulation_matches` / `process_validation` / `expert_reasoning`
 
-**你不需要处理输出，系统会自动读取。**
-
-## 输入要求
-
-此技能需要以下输入（按优先级）：
-1. **异常检测结果** - 必需，来自 anomaly-detection 子智能体
-2. **原始数据** - 可选，用于工艺机理校验，来自 data-perception 子智能体
-
-脚本会自动查找以下位置的输入文件：
-- `SESSION_DIR/anomaly_result.json`
-- `subagents/anomaly-detection-agent/anomaly_result.json`
-- `SESSION_DIR/data_result.json`
-- `subagents/multi-dimensional-data-perception-agent/data_result.json`
-
-## 处理流程
-
-```
-异常检测结果 → 法规规则匹配 → 工艺机理校验 → 专家经验推理 → 违规判定结论
-```
-
-### 法规规则匹配
-- 城镇污水处理厂污染物排放标准 (GB 18918-2002)
-- 水污染源在线监测技术规范 (HJ 355-2019)
-- 水污染防治法
-
-### 工艺机理校验
-- 生化反应联动规则
-- 物料平衡规则
-- 相关性规则
-- 氨氮-总氮转化规则
-
-### 专家经验推理
-- 造假模式识别（插瓶干扰、稀释排放、暗管偷排等）
-- 嫌疑等级判定
-- 历史案例匹配（相似度≥0.8）
-
-## 违规类型
-
-| 类型 | 英文标识 | 特征 |
-|------|---------|------|
-| 插瓶干扰 | bottle_interference | 指标长时间恒定，接近限值 |
-| 稀释排放 | data_dilution | 多指标同步下降，水量异常增加 |
-| 暗管偷排 | secret_pipe | 进水正常，出水异常偏低 |
-| 虚假停产 | false_shutdown | 上报停产但仍有数据 |
-| 公式篡改 | formula_tampering | 数据呈人工拟合特征 |
-
-## 嫌疑等级
-
-| 等级 | 英文 | 中文 | 含义 |
-|------|------|------|------|
-| 低 | low | 低 | 存在轻微异常，需关注 |
-| 中 | medium | 中 | 存在违规嫌疑，建议核查 |
-| 高 | high | 高 | 高度疑似违规，强烈建议现场核查 |
-| 严重 | critical | 严重 | 严重违规，应立即采取措施 |
-
-## 命令行参数
-
-```bash
-# 使用默认路径
-python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py"
-
-# 指定异常检测结果路径
-python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py" --anomaly-result <path>
-
-# 指定会话目录
-python "$HERMES_HOME/skills/rule-reasoning-core/scripts/run_rule_reasoning.py" --session-dir <path>
-```
-
-## 输出路径
-
-```
-SESSION_DIR/rule_reasoning_result.json  # 如果设置了 SESSION_DIR
-subagents/rule-reasoning-agent/rule_reasoning_result.json  # 默认路径
-```
-
-## 记住
-
-- ✅ 调用脚本
-- ✅ 确认完成
-- ❌ 不要解析JSON
-- ❌ 不要生成报告
-- ❌ 不要做异常检测（由anomaly-detection负责）
-- ❌ 不要生成预警（由disposition-execution负责）
-
----
+下游处置执行链式消费此文件。
