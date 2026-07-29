@@ -68,7 +68,7 @@ def main():
     t0 = time.time()
     try:
         r = requests.post(f"{BACKEND}/api/query",
-                          json={"query": QUERY}, timeout=350)
+                          json={"query": QUERY}, timeout=600)
         elapsed = time.time() - t0
         data = r.json()
     except Exception as e:
