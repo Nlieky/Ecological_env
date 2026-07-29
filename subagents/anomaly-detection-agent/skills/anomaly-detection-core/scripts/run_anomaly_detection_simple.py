@@ -20,6 +20,12 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from shared.operators.specialized.constant_detector import ConstantDetector
+from shared.operators.specialized.change_point_detector import ChangePointDetector
+from shared.operators.specialized.trend_detector import TrendDetector
+from shared.operators.specialized.high_freq_detector import HighFreqDetector
+from shared.operators.specialized.periodicity_detector import PeriodicityDetector
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -63,6 +69,63 @@ def _fetch_influx_cn(client, bucket: str, data_type: str):
         if col != "监测时间":
             df[col] = pd.to_numeric(df[col], errors="coerce")
     return df.sort_values("监测时间").reset_index(drop=True)
+
+
+# data_result.json（数据感知产出）英文字段 → detect_anomalies 期望的中文列名。
+# 注意 data_result 用 NH3-N/flow_rate/discharge_volume/SS，与 InfluxDB 契约字段
+# (AN/flow/discharge/suspended_solids)不同，这里按 data_result 实际字段映射。
+_RESULT_FIELD_CN = {
+    "timestamp": "监测时间",
+    "pH": "pH值", "COD": "化学需氧量浓度（毫克/升）", "TN": "总氮浓度（毫克/升）",
+    "NH3-N": "氨氮浓度（毫克/升）", "TP": "总磷浓度（毫克/升）",
+    "flow_rate": "流量（升/秒）", "discharge_volume": "排放量（吨）",
+    "SS": "悬浮物浓度（毫克/升）",
+}
+
+
+def load_data_from_result():
+    """优先读 SESSION_DIR/data_result.json（数据感知已按用户时间范围取的数据）。
+
+    链式设计（CLAUDE.md 三库一体 + 链式传递）：数据感知是唯一数据入口，异常检测消费
+    它的结果，保证检测时间范围 = 用户所问（如"14-15日"），而非脚本默认的最近24h。
+    之前 main 硬编码 load_recent_data(hours=24)，导致用户问14-15日、数据感知也取了
+    14-15日，异常检测却丢掉它自己去 InfluxDB 取最近24h（7-24/25日），时间窗错位。
+    无 data_result.json 时返回 None，由 main fallback 到 load_recent_data（旧行为）。
+    返回结构与 load_recent_data 一致。
+    """
+    session_dir = os.environ.get('SESSION_DIR')
+    if not session_dir:
+        return None
+    p = Path(session_dir) / 'data_result.json'
+    if not p.exists():
+        return None
+    try:
+        d = json.loads(p.read_text(encoding='utf-8'))
+        r = d.get('result', {}) if isinstance(d, dict) else {}
+        infl = r.get('influent', []) or []
+        effl = r.get('effluent', []) or []
+        if not infl and not effl:
+            return None
+
+        def _to_df(rows):
+            if not rows:
+                return pd.DataFrame()
+            df = pd.DataFrame(rows).rename(columns=_RESULT_FIELD_CN)
+            for col in df.columns:
+                if col != "监测时间":
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+            if "监测时间" in df.columns:
+                df = df.sort_values("监测时间").reset_index(drop=True)
+            return df
+
+        df_in = _to_df(infl)
+        df_out = _to_df(effl)
+        logger.info(f"链式消费 data_result.json: 进水{len(df_in)}条 出水{len(df_out)}条")
+        return {"influent_df": df_in, "effluent_df": df_out,
+                "time_col_in": "监测时间", "time_col_out": "监测时间"}
+    except Exception as e:
+        logger.warning(f"读 data_result.json 失败，fallback InfluxDB: {e}")
+        return None
 
 
 def load_recent_data(hours: int = 24) -> dict:
@@ -163,6 +226,64 @@ def isolation_forest_anomaly(values: np.ndarray, contamination: float = 0.1) -> 
     except Exception as e:
         logger.warning(f"孤立森林检测失败，使用 Z-score 替代：{e}")
         return zscore_anomaly(values)
+
+
+def detect_features_for_series(values: np.ndarray, series_name: str) -> list:
+    """对单个序列跑 5 类特征算子 + 孤立森林评分，返回异常点列表。
+
+    每个返回的 anomaly 含: index/features/score/confidence/pattern_similarity/value。
+    可信度公式(资料): confidence = 0.6×异常分数 + 0.4×模式相似度。
+    """
+    series = pd.Series(values)
+    if len(series) < 5:
+        return []
+
+    # 5 特征算子
+    detectors = [
+        ("平稳", ConstantDetector(), "is_constant"),
+        ("突变", ChangePointDetector(), "is_change"),  # change_point 无统一 flag, 用 mask
+        ("趋势", TrendDetector(), "is_trend"),
+        ("周期", PeriodicityDetector(), "is_periodic"),
+        ("高频波动", HighFreqDetector(), "is_high_freq"),
+    ]
+    matched_features = []
+    for name, det, flag_key in detectors:
+        try:
+            mask, details = det.detect(series)
+            is_hit = details.get(flag_key, False) or (mask is not None and mask.any())
+            if is_hit:
+                matched_features.append(name)
+        except Exception as e:
+            logger.warning(f"{name} 检测失败({series_name}): {e}")
+
+    if not matched_features:
+        return []
+
+    # 孤立森林评分
+    anomaly_score = 0.0
+    try:
+        vals = series.dropna().values.reshape(-1, 1)
+        if len(vals) >= 10:
+            iso = IsolationForest(contamination=0.1, random_state=42)
+            iso.fit(vals)
+            raw = -iso.score_samples(vals)
+            mx, mn, sd = raw.max(), raw.min(), raw.std()
+            anomaly_score = float((mx - mn) / (sd + 1e-9))
+            anomaly_score = float(min(max(anomaly_score / 3.0, 0.0), 1.0))
+    except Exception as e:
+        logger.warning(f"孤立森林评分失败({series_name}): {e}")
+
+    pattern_similarity = len(matched_features) / 5.0
+    confidence = 0.6 * anomaly_score + 0.4 * pattern_similarity
+
+    return [{
+        "index": len(series) - 1,  # 整序列级特征, 用末点做锚
+        "features": matched_features,
+        "score": anomaly_score,
+        "confidence": float(confidence),
+        "pattern_similarity": float(pattern_similarity),
+        "value": float(series.iloc[-1]),
+    }]
 
 
 def detect_anomalies_in_series(values: np.ndarray, series_name: str) -> list:
@@ -266,8 +387,8 @@ def detect_anomalies(data: dict) -> dict:
                 logger.warning(f"{indicator} 数据点不足，跳过")
                 continue
 
-            # 检测异常
-            anomalies = detect_anomalies_in_series(values, f"{data_type}_{indicator}")
+            # 检测异常(调算子库: 5 特征 + 孤立森林评分 + 可信度)
+            anomalies = detect_features_for_series(values, f"{data_type}_{indicator}")
 
             # 添加元数据
             for anomaly in anomalies:
@@ -280,10 +401,11 @@ def detect_anomalies(data: dict) -> dict:
                     "data_type": data_type,
                     "indicator": indicator,
                     "timestamp": str(timestamp),
-                    "type": recognize_pattern(values, idx),
-                    "score": anomaly["score"],
-                    "value": anomaly["value"],
-                    "votes": anomaly["votes"],
+                    "features": anomaly.get("features", []),
+                    "score": anomaly.get("score", 0.0),
+                    "confidence": anomaly.get("confidence", 0.0),
+                    "pattern_similarity": anomaly.get("pattern_similarity", 0.0),
+                    "value": anomaly.get("value"),
                     "expected_range": [
                         float(np.nanpercentile(values, 25)),
                         float(np.nanpercentile(values, 75))
@@ -299,17 +421,17 @@ def detect_anomalies(data: dict) -> dict:
         "total_anomalies": len(all_anomalies),
         "by_data_type": {},
         "by_indicator": {},
-        "by_type": {}
+        "by_feature": {}
     }
 
     for anomaly in all_anomalies:
         dt = anomaly['data_type']
         ind = anomaly['indicator']
-        atype = anomaly['type']
 
         summary['by_data_type'][dt] = summary['by_data_type'].get(dt, 0) + 1
         summary['by_indicator'][ind] = summary['by_indicator'].get(ind, 0) + 1
-        summary['by_type'][atype] = summary['by_type'].get(atype, 0) + 1
+        for feat in anomaly.get('features', []):
+            summary['by_feature'][feat] = summary['by_feature'].get(feat, 0) + 1
 
     return {
         "anomalies": all_anomalies,
@@ -326,8 +448,13 @@ def main():
     task_id = f"anomaly_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     try:
-        # 1. 加载数据
-        data = load_recent_data(hours=24)
+        # 1. 加载数据：优先链式消费数据感知产出的 data_result.json（时间范围=用户所问）；
+        #    没有才 fallback 到 InfluxDB 最近 24h（旧行为）。
+        data = load_data_from_result()
+        _data_source = "data_result(链式消费数据感知)"
+        if data is None:
+            data = load_recent_data(hours=24)
+            _data_source = "influxdb_recent_24h(fallback)"
 
         if data['influent_df'] is None or len(data['influent_df']) == 0:
             if data['effluent_df'] is None or len(data['effluent_df']) == 0:
@@ -344,7 +471,7 @@ def main():
             "metadata": {
                 "subagent": "anomaly-detection-agent",
                 "timestamp": datetime.now().isoformat(),
-                "time_range": "24h",
+                "time_range": _data_source,
                 "data_points": {
                     "influent": len(data.get('influent_df', [])),
                     "effluent": len(data.get('effluent_df', []))
