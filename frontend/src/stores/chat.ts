@@ -12,6 +12,7 @@ export interface ChatMessage {
   trace?: SessionTrace | null
   streaming?: boolean
   progress?: string
+  chartData?: { charts: any[] } | null
 }
 
 let _seq = 0
@@ -66,6 +67,7 @@ export const useChatStore = defineStore('chat', () => {
       if (i >= 0) messages.value[i] = { ...messages.value[i], ...p }
     }
     const calls: { key: string; name: string; summary?: string }[] = []
+    let collectedChart: any = null
     try {
       await new Promise<void>((resolve, reject) => {
         queryService.executeStream(
@@ -73,13 +75,22 @@ export const useChatStore = defineStore('chat', () => {
           {
             onProgress: (e) => {
               const name = SUBAGENT_NAMES[e.subagent] || e.subagent
-              if (e.stage === 'done') calls.push({ key: e.subagent, name, summary: e.summary })
+              if (e.stage === 'done') {
+                calls.push({ key: e.subagent, name, summary: e.summary })
+                // 收集 chartData（异常检测优先带标注，否则数据感知）
+                if (e.chartData) collectedChart = e.chartData
+              }
               patch({ progress: e.stage === 'start' ? `正在调用「${name}」子智能体…` : `「${name}」完成${e.summary ? '（' + e.summary + '）' : ''}` })
             },
             onDelta: (t) => patch({ content: (messages.value.find((m) => m.id === aid)?.content || '') + t }),
             onDone: (content, sid) => {
               sessionId.value = sid
-              patch({ content: content || '(空回答)', streaming: false, progress: '' })
+              patch({
+                content: content || '(空回答)',
+                streaming: false,
+                progress: '',
+                chartData: collectedChart ? { charts: Array.isArray(collectedChart) ? collectedChart : (collectedChart.charts || []) } : null,
+              })
               resolve()
             },
             onError: (msg) => {

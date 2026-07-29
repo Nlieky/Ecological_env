@@ -10,7 +10,7 @@ export const queryService = {
   executeStream(
     { query, session_id }: { query: string; session_id?: string },
     cbs: {
-      onProgress?: (e: { subagent: string; stage: string; summary?: string }) => void
+      onProgress?: (e: { subagent: string; stage: string; summary?: string; chartData?: any }) => void
       onDelta?: (text: string) => void
       onDone?: (content: string, session_id: string) => void
       onError?: (message: string) => void
