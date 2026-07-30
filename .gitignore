@@ -52,8 +52,9 @@ prometheus/prometheus.exe
 prometheus/prom_data/
 grafana/prom_data/
 
-# vendored hermes（脚本生成，不入库；用 scripts/vendor_hermes.py 复现）
-shared/framework/hermes-agent/
+# vendored hermes 框架——已纳入仓库(部署需要:台式机 clone 后能直接 docker build,
+# 不用再跑 vendor_hermes.py)。pycache 等仍由上面的通用规则忽略。
+# shared/framework/hermes-agent/
 
 # Hermes 子智能体运行时产物（脚本/会话写出，可随时重生成，不入库）
 subagents/*/skills/.usage.json
