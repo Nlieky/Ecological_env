@@ -1,8 +1,0 @@
-usage: hermes [-h] [--version] [-z PROMPT] [-m MODEL] [--provider PROVIDER]
-              [-t TOOLSETS] [--resume SESSION] [--continue [SESSION_NAME]]
-              [--worktree] [--accept-hooks] [--skills SKILLS] [--yolo]
-              [--pass-session-id] [--ignore-user-config] [--ignore-rules]
-              [--tui] [--cli] [--dev]
-              {chat,model,fallback,secrets,migrate,gateway,proxy,lsp,setup,postinstall,whatsapp,slack,send,login,logout,auth,status,cron,webhook,portal,kanban,hooks,doctor,security,dump,debug,backup,checkpoints,import,config,pairing,skills,bundles,plugins,photon,curator,memory,tools,computer-use,mcp,sessions,insights,claw,version,update,uninstall,acp,profile,completion,dashboard,desktop,gui,logs,prompt-size}
-              ...
-hermes: error: argument command: invalid choice: 'api-server' (choose from chat, model, fallback, secrets, migrate, gateway, proxy, lsp, setup, postinstall, whatsapp, slack, send, login, logout, auth, status, cron, webhook, portal, kanban, hooks, doctor, security, dump, debug, backup, checkpoints, import, config, pairing, skills, bundles, plugins, photon, curator, memory, tools, computer-use, mcp, sessions, insights, claw, version, update, uninstall, acp, profile, completion, dashboard, desktop, gui, logs, prompt-size)

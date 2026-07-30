@@ -1,31 +1,31 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "SubagentOutput",
+  "description": "所有子智能体 *_result.json 的顶层信封（2026-07-30 对齐实际实现）",
   "type": "object",
   "properties": {
     "task_id": {
       "type": "string",
-      "description": "任务唯一标识符"
+      "description": "任务标识（子智能体脚本自带格式，主智能体以文件归属为准）"
     },
     "status": {
       "type": "string",
-      "enum": ["success", "failure"],
+      "enum": ["completed", "failed"],
       "description": "执行状态"
     },
     "result": {
       "type": "object",
-      "description": "执行结果"
+      "description": "各子智能体专有结果；失败时为 {\"error\": \"...\"}。详见 subagent_protocol.md"
     },
-    "errors": {
-      "type": "array",
-      "items": {"type": "string"},
-      "description": "错误信息列表"
-    },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time",
-      "description": "完成时间戳"
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "subagent": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "llm_driven": {"type": "boolean"}
+      },
+      "description": "执行元数据"
     }
   },
-  "required": ["task_id", "status"]
+  "required": ["task_id", "status", "result"]
 }

@@ -6,6 +6,6 @@ scrape_configs:
   - job_name: 'eco-monitor'
     static_configs:
       - targets:
-        - monitor:5000
+        - backend:8000      # 容器内用服务名抓 backend 的 /metrics
     scrape_interval: 10s
     metrics_path: '/metrics'

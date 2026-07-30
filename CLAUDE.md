@@ -183,7 +183,7 @@ curl http://localhost:8000/api/health
 ┌─────────────────────────────────────────────────────────────────┐
 │  ② 数据采集层                                                    │
 │  ┌──────────────┐                                             │
-│  │ dual_data_stream.py │                                        │
+│  │ InfluxDB 2.7(真实报表导入) │                                 │
 │  └──────────────┘                                             │
 └──────────────────────────────┬──────────────────────────────────┘
                                ↓
@@ -264,7 +264,7 @@ LLM_MODEL=ctgu-vlm
 
 ### 实时监测流程
 ```
-stream/dual_data_stream.py → FastAPI /api/dual-stream
+用户查询 → FastAPI /api/query → Agent 服务(主智能体身份加载)
     ↓
 Task Receiving & Parsing (master agent identity loaded)
     ↓
@@ -300,7 +300,6 @@ Natural language report + alerts
 - `backend/utils/loggers.py`: 日志记录工具函数
 
 ### 核心模块
-- `stream/dual_data_stream.py`: 双数据流发送器
 - `skills/orchestrator-core/scripts/`: 核心编排模块（tool_registration/call_subagent/subagent_entry 等）
 - `shared/configs/llm_client.py`: LLM 客户端
 - `shared/knowledge/`: 知识库

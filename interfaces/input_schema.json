@@ -1,26 +1,30 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "SubagentInput",
+  "description": "task.json —— 主智能体经 call_subagent 写入 SESSION_DIR 的任务描述（2026-07-30 对齐实际）",
   "type": "object",
   "properties": {
     "task_id": {
       "type": "string",
-      "description": "任务唯一标识符"
+      "description": "任务标识，格式 task_{timestamp}_{random}"
     },
-    "task_type": {
+    "task": {
       "type": "string",
-      "enum": ["data_perception", "anomaly_detection", "rule_reasoning", "disposition_execution"],
-      "description": "任务类型"
+      "description": "自然语言任务描述（<200 字符，太长子智能体 LLM 子进程会崩）"
     },
-    "params": {
+    "context": {
       "type": "object",
-      "description": "任务参数"
+      "description": "额外上下文（多为空；子智能体靠 SESSION_DIR 链式拿上一步数据）"
     },
-    "timestamp": {
+    "output_format": {
       "type": "string",
-      "format": "date-time",
-      "description": "任务时间戳"
+      "enum": ["json"],
+      "description": "输出格式，固定 json"
+    },
+    "timeout": {
+      "type": "number",
+      "description": "超时秒数（默认 300）"
     }
   },
-  "required": ["task_id", "task_type"]
+  "required": ["task_id", "task"]
 }

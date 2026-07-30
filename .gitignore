@@ -1,5 +1,4 @@
 .env
-middleware/.env
 .hermes/cache/
 ecological_env/
 
@@ -63,3 +62,48 @@ subagents/*/.skills_prompt_snapshot.json
 subagents/*/cache/
 subagents/*/*_result.json
 subagents/*/smoke_q*.json
+
+# 临时测试/调试文件(下划线开头,调试时随手建的)
+_*.json
+_*.png
+_*.txt
+_*.csv
+__*.mjs
+# Hermes 根级运行时残留
+auth.lock
+.skills_prompt_snapshot.json
+
+# Hermes 平台生成的目录(本项目不用)
+subagents/*/audio_cache/
+subagents/*/image_cache/
+subagents/*/cron/
+subagents/*/hooks/
+subagents/*/pairing/
+subagents/*/sandboxes/
+
+# shared 运行时输出/缓存(不提交)
+shared/outputs/*
+!shared/outputs/.gitkeep
+shared/cache/
+
+# Hermes 框架记忆(环境相关,各自积累,不入库)
+memories/
+
+# 运行时日志(不入库)
+logs/*
+!logs/.gitkeep
+
+# Hermes 平台缓存(本项目不用图像/音频生成)
+image_cache/
+audio_cache/
+
+# 根级 Hermes 平台目录 + 覆盖率报告(运行时/测试产物)
+/cron/
+/hooks/
+/cache/
+/audio_cache/
+/image_cache/
+/htmlcov/
+
+# understand-anything 技能生成的知识图谱(分析产物,可再生)
+.understand-anything/

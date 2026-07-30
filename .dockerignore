@@ -17,3 +17,53 @@ build
 .venv
 venv
 ENV
+node_modules
+ecological_env
+sessions
+_cnv*
+
+# 测试代码不进生产镜像
+tests/
+
+# 子智能体运行时残留(不进镜像)
+subagents/*/*_result.json
+subagents/*/auth.lock
+subagents/*/.skills_prompt_snapshot.json
+subagents/*/smoke_q*.json
+subagents/*/__pycache__/
+subagents/*/sessions/
+subagents/*/logs/
+subagents/*/cache/
+subagents/*/memories/
+subagents/*/audio_cache/
+subagents/*/image_cache/
+subagents/*/cron/
+subagents/*/hooks/
+subagents/*/pairing/
+subagents/*/sandboxes/
+
+shared/outputs/
+shared/cache/
+
+memories/
+
+logs/
+
+image_cache/
+audio_cache/
+
+# 根级运行时/测试产物
+cron/
+hooks/
+cache/
+audio_cache/
+image_cache/
+htmlcov/
+
+grafana/prom_data/
+
+# Prometheus 本地二进制+数据(Docker用官方镜像,不需要)
+prometheus/prometheus.exe
+prometheus/prom_data/
+
+.understand-anything/

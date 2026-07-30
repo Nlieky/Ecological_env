@@ -36,22 +36,16 @@
 
 ## 启动流程
 
+> 注：旧的 `stream/dual_data_stream.py` + Flask 中间件(5000) 数据流已废弃，监测数据现由 InfluxDB 提供，Prometheus 直接抓 backend 的 `/metrics`。
+
 ```bash
-# 1. 启动Flask中间件
-cd middleware
-python app.py
+# 1. 启动 backend(FastAPI 8000，暴露 /metrics 给 Prometheus)
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
-# 2. 启动数据流发送器（新终端）
-cd stream
-python dual_data_stream.py
+# 2. Prometheus 已在 prometheus/prometheus.yml 配好抓 backend:8000(容器化时用服务名)
+#    docker-compose 里 prometheus 服务会自动抓取
 
-# 3. 配置Prometheus抓取
-# prometheus.yml 添加:
-# scrape_configs:
-#   - job_name: 'wastewater'
-#     static_configs:
-#       - targets: ['localhost:5000']
-#     scrape_interval: 10s
+# 3. Grafana 导入下面的仪表板，数据源选 Prometheus
 ```
 
 ## Grafana导入
@@ -66,8 +60,7 @@ python dual_data_stream.py
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | /health | GET | 健康检查 |
-| /metrics | GET | Prometheus指标 |
-| /api/dual-stream | POST | 接收双数据流 |
+| /metrics | GET | Prometheus指标(backend:8000) |
 
 ## 数据滞后处理
 
