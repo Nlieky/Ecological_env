@@ -14,6 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 项目代码
 COPY . .
 
+# Hermes Agent 框架(vendored 在 shared/framework/hermes-agent/)——editable 安装,
+# 让 hermes_constants / agent.* 等顶层模块可 import(本地 venv 就是这么装的),
+# 同时拉框架的核心依赖(openai 等,requirements.txt 里没有)
+RUN pip install --no-cache-dir -e shared/framework/hermes-agent
+
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 

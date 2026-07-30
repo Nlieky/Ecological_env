@@ -1,4 +1,3 @@
-version: '3.8'
 
 # 现状架构:backend(FastAPI 8000)+ agent(主智能体 8642)+ influxdb + prometheus + grafana
 # 注意:本文件已移除对已删除的 middleware/ 目录的引用。容器化部署(网络/卷/LLM 可达性)
@@ -16,8 +15,12 @@ services:
     environment:
       # 容器内通过服务名访问 InfluxDB,覆盖 .env 里的 localhost
       - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=influxdb-local-token   # 对齐 influxdb init 创建的 token
+      # 容器内 backend 通过服务名访问 agent(覆盖 .env 的 localhost:8642)
+      - AGENT_SERVICE_URL=http://agent:8642
     depends_on:
       - influxdb
+      - agent
     restart: unless-stopped
     networks: [eco-net]
 
@@ -30,9 +33,36 @@ services:
     env_file: .env
     environment:
       - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=influxdb-local-token
+      - HERMES_TOTAL_TIMEOUT=600
     depends_on:
       - influxdb
     restart: unless-stopped
+    networks: [eco-net]
+
+  # 前端(Vue 多阶段构建 → nginx 托管, /api 反代到 backend)
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"           # 访问 http://localhost:8080
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks: [eco-net]
+
+  # InfluxDB 数据一次性导入(real-time/*.xls)——容器化后 bucket 是空的,首启导入
+  influxdb-init:
+    build: .
+    command: ["sh", "-c", "until curl -sf http://influxdb:8086/health >/dev/null; do echo waiting influxdb; sleep 2; done; python shared/data/import_to_influxdb.py"]
+    environment:
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=influxdb-local-token
+      - INFLUXDB_ORG=ecological_env
+      - INFLUXDB_BUCKET=monitoring-data
+    depends_on:
+      - influxdb
+    restart: "no"           # 一次性,导完就退出
     networks: [eco-net]
 
   # ========== 数据支撑层 ==========
@@ -50,6 +80,7 @@ services:
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=influxdb-local-token
     volumes:
       - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2     # 配置(org/bucket/token)也持久化,down/up 不丢
     restart: unless-stopped
     networks: [eco-net]
 
@@ -72,7 +103,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3000:3000"
+      - "3001:3000"            # 主机 3000 被占,改用 3001
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -92,5 +123,6 @@ networks:
 
 volumes:
   influxdb-data:
+  influxdb-config:
   prometheus-data:
   grafana-data:

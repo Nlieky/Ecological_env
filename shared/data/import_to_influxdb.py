@@ -102,7 +102,7 @@ def main() -> int:
         all_points.extend(pts)
 
     print(f"\n写入 {len(all_points)} points → bucket '{bucket}' (org={org}, url={url}) ...")
-    client = InfluxDBClient(url=url, token=token, org=org)
+    client = InfluxDBClient(url=url, token=token, org=org, timeout=120000)  # 120s,默认10s写大批量会超时
     write_api = client.write_api(write_options=SYNCHRONOUS)
     for i in range(0, len(all_points), BATCH):
         write_api.write(bucket=bucket, record=all_points[i:i + BATCH])
