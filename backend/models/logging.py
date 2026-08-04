@@ -35,6 +35,7 @@ class MasterAgentDecisionLog(Base):
     id = Column(Integer, primary_key=True)
     timestamp = Column(DateTime, default=func.now(), index=True)
     session_id = Column(String(64), index=True)  # 会话ID
+    turn_id = Column(String(64), index=True, nullable=True)  # 单次查询轮次ID(贯穿本轮 decision+execution)
     user_query = Column(Text)  # 用户查询
     intent = Column(String(64))  # 意图识别结果
     decision_path = Column(JSON)  # 决策路径
@@ -50,6 +51,7 @@ class SubAgentExecutionLog(Base):
     id = Column(Integer, primary_key=True)
     timestamp = Column(DateTime, default=func.now(), index=True)
     session_id = Column(String(64), index=True)
+    turn_id = Column(String(64), index=True, nullable=True)  # 单次查询轮次ID
     subagent_name = Column(String(64), index=True)  # 子智能体名称
     input_params = Column(JSON)  # 输入参数
     output_result = Column(JSON)  # 输出结果

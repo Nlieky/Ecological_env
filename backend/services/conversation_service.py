@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 
 from backend.database.session import SessionLocal
-from backend.models.conversation import Conversation, ConversationMessage, ConversationStatus
+from backend.models.conversation import Conversation, ConversationMessage, ConversationStatus, MessageRole
 from backend.models.api import ConversationCreateRequest
 
 
@@ -62,23 +62,31 @@ class ConversationService:
             db.close()
     
     def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
-        """获取对话详情
-        
+        """获取对话详情（含消息历史）
+
         Args:
             conversation_id: 对话ID
-            
+
         Returns:
-            对话详情字典，不存在返回None
+            对话详情字典（含 messages 列表），不存在返回None
         """
         db = self.get_db_session()
         try:
             conversation = db.query(Conversation).filter(
                 Conversation.id == conversation_id
             ).first()
-            
+
             if not conversation:
                 return None
-            
+
+            # 拉取该对话下的全部消息，按时间正序排列
+            messages = (
+                db.query(ConversationMessage)
+                .filter(ConversationMessage.conversation_id == conversation_id)
+                .order_by(ConversationMessage.timestamp.asc())
+                .all()
+            )
+
             return {
                 "id": conversation.id,
                 "user_id": conversation.user_id,
@@ -86,7 +94,16 @@ class ConversationService:
                 "status": conversation.status.value,
                 "started_at": conversation.started_at.isoformat() if conversation.started_at else None,
                 "ended_at": conversation.ended_at.isoformat() if conversation.ended_at else None,
-                "message_count": conversation.message_count
+                "message_count": conversation.message_count,
+                "messages": [
+                    {
+                        "role": msg.role.value if hasattr(msg.role, "value") else str(msg.role),
+                        "content": msg.content,
+                        "tool_call_info": msg.tool_call_info,
+                        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                    }
+                    for msg in messages
+                ],
             }
         finally:
             db.close()
@@ -184,5 +201,126 @@ class ConversationService:
         except Exception as e:
             db.rollback()
             raise e
+        finally:
+            db.close()
+
+    def get_or_create_conversation(
+        self,
+        conversation_id: str,
+        title: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> Conversation:
+        """按主键获取对话，不存在则创建。
+
+        供 /api/query 复用：用 session_id 作为 conversation_id，
+        同一 session 的多轮问答会追加到同一条对话记录。
+
+        Args:
+            conversation_id: 对话ID（通常为 session_id）
+            title: 标题（首次创建时生效，默认 "新对话"）
+            user_id: 用户ID
+
+        Returns:
+            Conversation ORM 实例
+        """
+        db = self.get_db_session()
+        try:
+            conversation = db.query(Conversation).filter(
+                Conversation.id == conversation_id
+            ).first()
+
+            if conversation is None:
+                conversation = Conversation(
+                    id=conversation_id,
+                    user_id=user_id,
+                    title=title or "新对话",
+                    status=ConversationStatus.ACTIVE,
+                    started_at=datetime.now(),
+                )
+                db.add(conversation)
+                db.commit()
+                db.refresh(conversation)
+
+            return conversation
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def record_exchange(
+        self,
+        conversation_id: str,
+        user_query: str,
+        assistant_response: str,
+        title: Optional[str] = None,
+        tool_call_info: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """原子地记录一轮问答（user + assistant 两条消息）。
+
+        供 /api/query 在拿到 Agent 响应后调用，把真实问答写入
+        conversations / conversation_messages 表，使前端聊天历史能看到
+        真实内容。用 session_id 作为 conversation_id：同一 session 的多轮
+        问答追加到同一条对话；标题取自首条提问。
+
+        Args:
+            conversation_id: 对话ID（通常为 session_id）
+            user_query: 用户提问
+            assistant_response: Agent 返回的回答
+            title: 对话标题（仅首次创建时生效，默认截取首条提问前 40 字）
+            tool_call_info: 附加在 assistant 消息上的元数据（如来源、耗时）
+
+        Returns:
+            {"conversation_id": ..., "user_message_id": ..., "assistant_message_id": ...}
+        """
+        if title is None:
+            title = user_query[:40] + ("..." if len(user_query) > 40 else "")
+
+        db = self.get_db_session()
+        try:
+            conversation = db.query(Conversation).filter(
+                Conversation.id == conversation_id
+            ).first()
+
+            if conversation is None:
+                conversation = Conversation(
+                    id=conversation_id,
+                    title=title,
+                    status=ConversationStatus.ACTIVE,
+                    started_at=datetime.now(),
+                )
+                db.add(conversation)
+                db.flush()  # 拿到主键，后续消息可引用同一事务内的 conversation
+
+            now = datetime.now()
+            user_message = ConversationMessage(
+                id=f"msg_{uuid.uuid4().hex[:12]}",
+                conversation_id=conversation.id,
+                role=MessageRole.USER,
+                content=user_query,
+                timestamp=now,
+            )
+            assistant_message = ConversationMessage(
+                id=f"msg_{uuid.uuid4().hex[:12]}",
+                conversation_id=conversation.id,
+                role=MessageRole.ASSISTANT,
+                content=assistant_response,
+                tool_call_info=tool_call_info,
+                timestamp=now,
+            )
+            db.add(user_message)
+            db.add(assistant_message)
+
+            conversation.message_count = (conversation.message_count or 0) + 2
+            db.commit()
+
+            return {
+                "conversation_id": conversation.id,
+                "user_message_id": user_message.id,
+                "assistant_message_id": assistant_message.id,
+            }
+        except Exception:
+            db.rollback()
+            raise
         finally:
             db.close()

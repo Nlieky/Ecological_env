@@ -259,7 +259,16 @@ LLM_MODEL=ctgu-vlm
 # 备用：美团 LongCat-2.0（OpenAI 兼容 API，已在 .env 注释保留）
 ```
 
-### 启动服务（3 个服务，按顺序）
+### 启动服务（按顺序；InfluxDB 是数据层，必须先起）
+
+**⓪ InfluxDB（数据层，端口 8086）：**
+
+```bash
+# 首次或更新报表：把真实 xls 放到 shared/data/real-time/，再导入到 InfluxDB（幂等覆盖）
+ecological_env/Scripts/python.exe shared/data/import_to_influxdb.py
+# 启动 InfluxDB（Windows 示例：D:\influxdb2-2.7.12-windows\influxd.exe）
+<influxdb 安装目录>/influxd
+```
 
 **① 智能体服务（Hermes 主智能体，端口 8642）：**
 
@@ -357,7 +366,15 @@ curl http://localhost:8000/metrics
 
 ## 测试
 
-### 运行测试
+### 演示前冒烟测试（一键跑通全链路，推荐演示前必跑）
+
+```bash
+ecological_env/Scripts/python.exe scripts/smoke_test.py
+```
+
+发标准查询，自动断言：服务健康 + 主智能体调用了子智能体 + 审计按 `turn_id` 落库且一致 + `output_result` 含结构化 evidence（异常/违规/预警/数据条数）。**演示前跑一遍，确认今天改的东西没回归。**
+
+### 单元/集成测试
 
 ```bash
 # 主智能体身份文件测试
@@ -400,7 +417,7 @@ python scripts/test_master_calls_subagent.py
 
 ---
 
-**版本**：v2.3.0
-**最后更新**：2026-07-23
+**版本**：v2.4.0
+**最后更新**：2026-07-28
 **Python**：3.12.12
 **LLM**：ctgu-vlm（本地部署，OpenAI 兼容 API）

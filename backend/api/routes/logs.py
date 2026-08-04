@@ -112,22 +112,51 @@ async def query_logs(
 async def get_session_trace(session_id: str, db: Session = Depends(get_db)):
     """获取完整会话的证据链"""
 
-    # 查询主智能体决策
-    master_log = db.query(MasterAgentDecisionLog).filter(
+    # 同一 session_id 下可能有多轮问答（共用 session_id），每轮各有一条 master_decision
+    # + 若干 subagent_execution。早期用 .first() 取最早 decision、.all() 取全部 execution，
+    # 导致：决策路径取到最早那条（可能为空→前端全黑）、执行记录跨轮混杂（如"你好呀"轮
+    # 却显示别的轮的异常检测）。改为取【最新一轮】的 decision，并按 timestamp（>= 该轮
+    # decision）只取该轮的执行/算子/LLM 记录——一轮内 decision 先写、execution 紧随其后，
+    # 故 execution.timestamp >= 该轮 decision.timestamp；下一轮 decision 更晚，串行查询下
+    # 窗口可靠。
+    decisions = db.query(MasterAgentDecisionLog).filter(
         MasterAgentDecisionLog.session_id == session_id
-    ).first()
+    ).order_by(MasterAgentDecisionLog.timestamp.desc()).all()
+    master_log = decisions[0] if decisions else None
 
-    # 查询子智能体执行
-    subagent_logs = db.query(SubAgentExecutionLog).filter(
-        SubAgentExecutionLog.session_id == session_id
-    ).all()
+    # 子智能体执行：优先按【turn_id】精确取本轮 execution（turn_id 贯穿一次查询的
+    # decision+execution，多轮/并发都不串）。无 turn_id 的旧数据 fallback：按最新一轮
+    # decision_path 里的子智能体名各取最新一条。
+    subagent_logs = []
+    if master_log is not None and getattr(master_log, "turn_id", None):
+        subagent_logs = db.query(SubAgentExecutionLog).filter(
+            SubAgentExecutionLog.session_id == session_id,
+            SubAgentExecutionLog.turn_id == master_log.turn_id,
+        ).order_by(SubAgentExecutionLog.id.asc()).all()
+    elif master_log is not None:
+        import json as _json
+        _called: List[str] = []
+        _dp = master_log.decision_path
+        if isinstance(_dp, str):
+            try:
+                _dp = _json.loads(_dp)
+            except Exception:
+                _dp = []
+        if isinstance(_dp, list):
+            _called = [str(x) for x in _dp]
+        for _name in _called:
+            _e = db.query(SubAgentExecutionLog).filter(
+                SubAgentExecutionLog.session_id == session_id,
+                SubAgentExecutionLog.subagent_name == _name,
+            ).order_by(SubAgentExecutionLog.id.desc()).first()
+            if _e:
+                subagent_logs.append(_e)
 
-    # 查询算子调用
+    # 算子调用 / LLM 调用：暂取全部（这两类跨轮混杂用户未感知，且无 decision_path 直接关联；
+    # 后续如需精确可加 turn_id 贯穿 decision+execution+operator+llm）。
     operator_logs = db.query(OperatorCallLog).filter(
         OperatorCallLog.session_id == session_id
     ).all()
-
-    # 查询 LLM 调用
     llm_logs = db.query(LLMCallLog).filter(
         LLMCallLog.session_id == session_id
     ).all()

@@ -17,7 +17,17 @@ const props = defineProps<{ trace: SessionTrace }>()
 const md = computed(() => props.trace.master_decision)
 const rawPath = computed(() => (md.value?.decision_path as string[] | undefined) ?? [])
 const STEPS = ['数据感知', '异常检测', '规则推理', '研判处置']
-const steps = computed(() => STEPS.map((name, i) => ({ name, done: i < (rawPath.value.length || 0) })))
+// decision_path 存的是英文 key（multi-dimensional-data-perception 等），映射到中文模板
+// 名后再判定高亮——避免按数组长度误高亮前 N 个固定模板（旧逻辑 length=3 就高亮
+// "感知/异常/规则"，哪怕第3个实际是"异常检测"）。
+const KEY_CN: Record<string, string> = {
+  'multi-dimensional-data-perception': '数据感知',
+  'anomaly-detection': '异常检测',
+  'rule-reasoning': '规则推理',
+  'disposition-execution': '研判处置',
+}
+const calledSet = computed(() => new Set((rawPath.value || []).map((p) => KEY_CN[p] ?? p)))
+const steps = computed(() => STEPS.map((name) => ({ name, done: calledSet.value.has(name) })))
 </script>
 
 <style scoped>

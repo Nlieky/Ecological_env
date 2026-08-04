@@ -56,13 +56,15 @@ def log_master_decision(
     decision_path: List[str],
     subagents_called: List[str],
     reasoning_summary: str,
-    total_latency_ms: float
+    total_latency_ms: float,
+    turn_id: Optional[str] = None
 ):
     """记录主智能体决策"""
     db = SessionLocal()
     try:
         log = MasterAgentDecisionLog(
             session_id=session_id,
+            turn_id=turn_id,
             user_query=user_query,
             intent=intent,
             decision_path=decision_path,
@@ -86,13 +88,15 @@ def log_subagent_execution(
     output_result: Dict,
     execution_time_ms: float,
     status: str,
-    error_message: Optional[str] = None
+    error_message: Optional[str] = None,
+    turn_id: Optional[str] = None
 ):
     """记录子智能体执行"""
     db = SessionLocal()
     try:
         log = SubAgentExecutionLog(
             session_id=session_id,
+            turn_id=turn_id,
             subagent_name=subagent_name,
             input_params=input_params,
             output_result=output_result,
