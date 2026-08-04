@@ -108,3 +108,6 @@ audio_cache/
 
 # understand-anything 技能生成的知识图谱(分析产物,可再生)
 .understand-anything/
+
+# 真实监测报表(内部数据,不入库,各机自己上传到 shared/data/real-time/)
+shared/data/real-time/*.xls
