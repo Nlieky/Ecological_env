@@ -258,6 +258,18 @@ def register_orchestrator_tools(agent):
                 "result_file": {"type": "string", "description": "结果文件名"}
             }, "required": ["result_file"]}
         }},
+        {"type": "function", "function": {
+            "name": "run_detector",
+            "description": "对监测数据跑异常检测算法并在大屏标注。当用户指令是检测类动作(如'检测pH平稳异常''检测COD突变''用孤立森林检测')时调用。纯问答(如'pH是多少')不要调。",
+            "parameters": {"type": "object", "properties": {
+                "algorithm": {"type": "string", "enum": ["constant", "changepoint", "iforest"],
+                              "description": "算法: constant=平稳/恒定检测, changepoint=突变检测, iforest=孤立森林离群检测"},
+                "indicator": {"type": "string", "enum": ["pH", "COD", "TN", "NH3-N", "TP", "SS"],
+                              "description": "监测指标"},
+                "start": {"type": "string", "description": "开始日期 YYYY-MM-DD"},
+                "end": {"type": "string", "description": "结束日期 YYYY-MM-DD"}
+            }, "required": ["algorithm", "indicator", "start", "end"]}
+        }},
     ]
     existing = {t.get('function', {}).get('name') for t in agent.tools if isinstance(t, dict)}
     for s in _ORCH_SCHEMAS:
@@ -286,6 +298,7 @@ def register_orchestrator_tools(agent):
             ("list_subagents", _list_subagents_handler, _ORCH_SCHEMAS[1]["function"]),
             ("create_session", _create_session_handler, _ORCH_SCHEMAS[2]["function"]),
             ("read_result", _read_result_handler, _ORCH_SCHEMAS[3]["function"]),
+            ("run_detector", _run_detector_handler, _ORCH_SCHEMAS[4]["function"]),
         ]
         for _n, _h, _sch in _OVR:
             _hg.register(
@@ -392,6 +405,34 @@ def _read_result_handler(*args, **kwargs) -> str:
     }, ensure_ascii=False)
 
 
+def _run_detector_handler(*args, **kwargs) -> str:
+    """run_detector 工具处理器：直接 subprocess 跑轻量算子脚本(1-3秒,不经LLM)。"""
+    import subprocess
+    if args and isinstance(args[0], dict):
+        params = args[0]
+    elif 'function_args' in kwargs:
+        params = kwargs['function_args']
+    elif args and len(args) >= 2 and isinstance(args[1], dict):
+        params = args[1]
+    else:
+        params = kwargs
+
+    script = Path(__file__).resolve().parents[2] / "action-command-core" / "scripts" / "run_detector.py"
+    cmd = [sys.executable, str(script),
+           "--algorithm", str(params.get("algorithm", "constant")),
+           "--indicator", str(params.get("indicator", "pH")),
+           "--start", str(params.get("start", "")),
+           "--end", str(params.get("end", ""))]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=60)
+        return r.stdout.strip() or json.dumps(
+            {"status": "failed", "error": r.stderr[-300:]}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"status": "failed", "error": f"run_detector 执行失败: {e}"},
+                          ensure_ascii=False)
+
+
 # 导出函数
 __all__ = [
     "register_orchestrator_tools",
@@ -415,7 +456,8 @@ def handle_orchestrator_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> 
             "call_subagent": _call_subagent_handler,
             "list_subagents": _list_subagents_handler,
             "create_session": _create_session_handler,
-            "read_result": _read_result_handler
+            "read_result": _read_result_handler,
+            "run_detector": _run_detector_handler
         }
 
         if tool_name not in tool_handlers:
