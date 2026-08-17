@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { conversationsService } from '@/api/modules/conversations'
 import { queryService } from '@/api/modules/query'
+import { useActionStore } from './action'
 import type { ConversationListItem, ConversationDetail, SessionTrace } from '@/api/types/api.types'
 
 export interface ChatMessage {
@@ -90,6 +91,9 @@ export const useChatStore = defineStore('chat', () => {
               }
               patch({ progress: e.stage === 'start' ? `正在调用「${name}」子智能体…` : `「${name}」完成${e.summary ? '（' + e.summary + '）' : ''}` })
             },
+            onAction: (actionData) => {
+              if (actionData) useActionStore().dispatch(actionData)
+            },
             onDelta: (t) => patch({ content: (messages.value.find((m) => m.id === aid)?.content || '') + t }),
             onDone: (content, sid) => {
               sessionId.value = sid
@@ -99,6 +103,9 @@ export const useChatStore = defineStore('chat', () => {
                 progress: '',
                 chartData: collectedChart ? { charts: Array.isArray(collectedChart) ? collectedChart : (collectedChart.charts || []) } : null,
               })
+              // 非流式兼容：回复第一行是 actionData JSON 时也 dispatch（UI 动作没走 SSE action 事件）
+              const m = (content || '').match(/^\s*(\{[\s\S]*?\})\s*\n/)
+              if (m) { try { const a = JSON.parse(m[1]); if (a.cmd) useActionStore().dispatch(a) } catch { /* 非 JSON 忽略 */ } }
               resolve()
             },
             onError: (msg) => {

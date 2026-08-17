@@ -11,6 +11,7 @@ export const queryService = {
     { query, session_id }: { query: string; session_id?: string },
     cbs: {
       onProgress?: (e: { subagent: string; stage: string; summary?: string; chartData?: any }) => void
+      onAction?: (actionData: { cmd: string; [k: string]: unknown } | null) => void
       onDelta?: (text: string) => void
       onDone?: (content: string, session_id: string) => void
       onError?: (message: string) => void
@@ -41,6 +42,7 @@ export const queryService = {
             let evt: { type: string; [k: string]: unknown }
             try { evt = JSON.parse(line.slice(6)) } catch { continue }
             if (evt.type === 'progress') cbs.onProgress?.(evt as any)
+            else if (evt.type === 'action') cbs.onAction?.((evt.actionData as any) ?? null)
             else if (evt.type === 'delta') cbs.onDelta?.((evt.text as string) ?? '')
             else if (evt.type === 'done') { cbs.onDone?.((evt.content as string) ?? '', (evt.session_id as string) ?? ''); return }
             else if (evt.type === 'error') { cbs.onError?.((evt.message as string) ?? '未知错误'); return }
