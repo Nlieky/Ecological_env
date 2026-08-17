@@ -18,8 +18,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# 项目根(skills/action-command-core/scripts/ 上 4 层)
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+# 项目根：向上找含 shared/+workspace/ 的目录(标记法，位置无关)。
+# 之前 parents[4] 多退一层到 E:\project 导致 .env 和 shared/ 都找不到。
+def _find_project_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "shared").is_dir() and (parent / "workspace").is_dir():
+            return parent
+    return Path(__file__).resolve().parents[3]  # 兜底
+
+_root = _find_project_root()
+sys.path.insert(0, str(_root))
+if str(Path.cwd()) not in sys.path:
+    sys.path.insert(0, str(Path.cwd()))
 
 # 指标名映射:data_result 键名(前端/算子用) ↔ InfluxDB 契约字段
 INDICATOR_FIELDS = {"pH": "pH", "COD": "COD", "TN": "TN",
@@ -29,7 +39,7 @@ INDICATOR_FIELDS = {"pH": "pH", "COD": "COD", "TN": "TN",
 def load_series(indicator: str, start: str, end: str) -> pd.Series:
     """从 InfluxDB 取指定指标、时间范围的进出水序列(拼接,进水优先)。"""
     from dotenv import load_dotenv
-    load_dotenv(Path(__file__).resolve().parents[4] / ".env")
+    load_dotenv(_root / ".env")
 
     from influxdb_client import InfluxDBClient
     from shared.data.influxdb_query import fetch_wastewater_df
