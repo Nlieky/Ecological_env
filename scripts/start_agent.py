@@ -495,6 +495,10 @@ def query_stream(request: QueryRequest):
             except Exception:
                 yield ": keepalive\n\n"  # 队列空（还在跑），SSE 注释行防连接 idle
                 continue
+            # action 事件透传：progress 事件带 action 字段时，拆成独立的 action 事件发给前端
+            if evt.get("type") == "progress" and evt.get("action"):
+                action_evt = {"type": "action", "actionData": evt["action"]}
+                yield f"data: {_json.dumps(action_evt, ensure_ascii=False)}\n\n"
             yield f"data: {_json.dumps(evt, ensure_ascii=False)}\n\n"
             if evt.get("type") in ("done", "error"):
                 break

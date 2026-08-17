@@ -46,11 +46,12 @@ read_result = bridge_module.read_result
 _current_progress_queue = None
 
 
-def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=None, evidence=None, chartData=None):
+def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=None, evidence=None, chartData=None, action=None):
     """向当前请求的队列 push 进度事件（非流式时队列为 None，no-op）。
 
     evidence: 结构化证据（异常前几条/违规判定/预警级别），供审计证据链展示；
-    chartData: 报告可视化数据（ECharts option 列表），供前端渲染曲线。
+    chartData: 报告可视化数据（ECharts option 列表），供前端渲染曲线；
+    action: 动作指令数据（actionData，如 run_detector 标注），供前端 Dispatcher 执行。
     """
     if _current_progress_queue is None:
         return
@@ -63,6 +64,8 @@ def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=N
         evt["evidence"] = evidence
     if chartData:
         evt["chartData"] = chartData
+    if action:
+        evt["action"] = action
     try:
         _current_progress_queue.put(evt)
     except Exception:
@@ -426,7 +429,17 @@ def _run_detector_handler(*args, **kwargs) -> str:
     try:
         r = subprocess.run(cmd, capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=60)
-        return r.stdout.strip() or json.dumps(
+        out_str = r.stdout.strip()
+        # 透传 action 事件给前端（run_detector 的 actionData → 大屏标注）
+        try:
+            out = json.loads(out_str) if out_str else {}
+            if isinstance(out, dict) and out.get("actionData"):
+                _emit_progress("action-command", "done",
+                               summary=f"检出 {len(out.get('anomalies') or [])} 个异常",
+                               action=out["actionData"])
+        except Exception:
+            pass
+        return out_str or json.dumps(
             {"status": "failed", "error": r.stderr[-300:]}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"status": "failed", "error": f"run_detector 执行失败: {e}"},
