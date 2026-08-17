@@ -1,27 +1,36 @@
 <template>
-  <div>
-    <div class="seg">
-      <button :class="{ on: mode === 'plant' }" @click="mode = 'plant'">单厂 · 全指标</button>
-      <button :class="{ on: mode === 'overview' }" @click="mode = 'overview'">全厂总览</button>
+  <div class="dash-layout">
+    <!-- 左：厂区目录树(真实数据,点击进单厂看板) -->
+    <div class="dash-side">
+      <div class="dash-side-ttl">厂区目录</div>
+      <PlantTree @select="goPlant" />
     </div>
-    <template v-if="mode === 'plant'">
-      <CockpitFilterBar :last-update="realtime.lastUpdate" />
-      <div v-if="groups" class="matrix-wrap">
-        <IndicatorMatrix :groups="groups" />
-        <AnomalyList :groups="groups" />
+    <!-- 右：原有内容 -->
+    <div class="dash-main">
+      <div class="seg">
+        <button :class="{ on: mode === 'plant' }" @click="mode = 'plant'">单厂 · 全指标</button>
+        <button :class="{ on: mode === 'overview' }" @click="mode = 'overview'">全厂总览</button>
       </div>
-      <div v-else-if="realtime.loading || isLoadingHistory" class="loading">加载中…</div>
-      <div v-else class="error">
-        ⚠ 数据加载失败（后端 / InfluxDB 可能未连接）
-        <button class="retry-btn" @click="retry">重试</button>
-      </div>
-    </template>
-    <PlantOverviewGrid v-else :plants="plants" />
+      <template v-if="mode === 'plant'">
+        <CockpitFilterBar :last-update="realtime.lastUpdate" />
+        <div v-if="groups" class="matrix-wrap">
+          <IndicatorMatrix :groups="groups" />
+          <AnomalyList :groups="groups" />
+        </div>
+        <div v-else-if="realtime.loading || isLoadingHistory" class="loading">加载中…</div>
+        <div v-else class="error">
+          ⚠ 数据加载失败（后端 / InfluxDB 可能未连接）
+          <button class="retry-btn" @click="retry">重试</button>
+        </div>
+      </template>
+      <PlantOverviewGrid v-else :plants="plants" />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { useRealtimeStore } from '@/stores/realtime'
 import { useAppStore } from '@/stores/app'
 import { monitoringService } from '@/api/modules/monitoring'
@@ -32,7 +41,13 @@ import CockpitFilterBar from '@/components/cockpit/CockpitFilterBar.vue'
 import IndicatorMatrix from '@/components/cockpit/IndicatorMatrix.vue'
 import AnomalyList from '@/components/cockpit/AnomalyList.vue'
 import PlantOverviewGrid from '@/components/cockpit/PlantOverviewGrid.vue'
+import PlantTree from '@/components/cockpit/PlantTree.vue'
 import type { HistoryData, PlantData } from '@/api/types/api.types'
+
+const router = useRouter()
+function goPlant(id: string) {
+  router.push(`/plants/${encodeURIComponent(id)}`)
+}
 
 const realtime = useRealtimeStore()
 const app = useAppStore()
@@ -76,6 +91,12 @@ watch(() => app.dashboardFilters.timeWindow, () => void loadHistory())
 </script>
 
 <style scoped>
+.dash-layout { display: flex; gap: 16px; align-items: flex-start }
+.dash-side { width: 230px; flex-shrink: 0; background: var(--card-bg, #fff);
+  border: 1px solid var(--brd, #e2e8f0); border-radius: 13px; padding: 10px 8px }
+.dash-side-ttl { font-size: 11px; color: var(--text-muted, #94a3b8); letter-spacing: .5px;
+  padding: 2px 6px 8px }
+.dash-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px }
 .seg { display: inline-flex; background: var(--card-bg); border: 1px solid var(--brd); border-radius: 11px; padding: 4px; margin-bottom: 14px; }
 .seg button { background: transparent; border: 0; color: var(--text-secondary); font-size: 13px; padding: 7px 16px; border-radius: 8px; cursor: pointer; font-family: inherit; }
 .seg button.on { color: #04121a; background: linear-gradient(135deg, var(--cyan), #5fb9ff); font-weight: 600; }
