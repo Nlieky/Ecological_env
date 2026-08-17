@@ -130,6 +130,10 @@ app.include_router(v1_data.realtime.router, prefix="/api/v1")
 app.include_router(v1_data.history.router, prefix="/api/v1")
 app.include_router(v1_conversations.conversations.router, prefix="/api/v1")
 
+# 多厂区仪表盘(真实数据:目录树+单厂看板)
+from backend.api.v1.plants import routes as v1_plants_routes
+app.include_router(v1_plants_routes.router, prefix="/api/v1")
+
 
 # 全局异常处理器
 @app.exception_handler(BackendException)
