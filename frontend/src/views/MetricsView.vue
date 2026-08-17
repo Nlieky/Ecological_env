@@ -41,7 +41,10 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import echarts from '@/lib/echarts'
 import { monitoringService } from '@/api/modules/monitoring'
+import { useActionStore } from '@/stores/action'
 import type { HistoryRecord } from '@/api/types/api.types'
+
+const actionStore = useActionStore()
 
 const INDICATORS = [
   { key: 'pH', label: 'pH', desc: '酸碱度', unit: '' },
@@ -90,6 +93,17 @@ function renderChart() {
   const xs = records.value.map((r) => r.timestamp.replace('T', ' ').slice(5, 16)) // MM-DD HH:mm
   const infl = records.value.map((r) => r.influent?.[indicator.value] ?? null)
   const effl = records.value.map((r) => r.effluent?.[indicator.value] ?? null)
+
+  // AI 动作标注：run_detector 的异常点 → 出水曲线 markPoint（值+类型标签）
+  const ann = actionStore.annotations.filter((a) => a.value != null)
+  const markPointData = ann.map((a) => ({
+    coord: [a.timestamp.slice(5, 16), a.value],
+    value: a.type,
+    symbolSize: 42,
+    itemStyle: { color: '#ef4444' },
+    label: { show: true, formatter: a.type, fontSize: 10, color: '#fff' },
+  }))
+
   chart.setOption({
     tooltip: { trigger: 'axis' },
     legend: { data: ['进水', '出水'], top: 4, textStyle: { color: '#64748b', fontSize: 12 } },
@@ -102,7 +116,8 @@ function renderChart() {
       { name: '进水', type: 'line', smooth: true, symbol: 'none', data: infl, lineStyle: { width: 2 },
         itemStyle: { color: '#6366f1' }, areaStyle: { color: 'rgba(99,102,241,.08)' } },
       { name: '出水', type: 'line', smooth: true, symbol: 'none', data: effl, lineStyle: { width: 2 },
-        itemStyle: { color: '#10b981' } },
+        itemStyle: { color: '#10b981' },
+        ...(markPointData.length ? [{ markPoint: { data: markPointData, symbol: 'circle' } }] : []) },
     ],
   })
 }
@@ -120,6 +135,29 @@ async function load() {
 
 watch(indicator, renderChart)
 watch(timeWindow, load)
+
+// ── AI 助手动作指令响应 ──────────────────────────────────────
+// action store 的状态由 chat store 的 onAction 回调 dispatch（AI 助手说话 → 大屏变化）
+
+// 指标切换："只看pH" → indicator 变 pH（支持中文名→key 映射）
+const CN_TO_KEY: Record<string, IndKey> = { 'pH': 'pH', '酸碱度': 'pH', 'COD': 'COD', '化学需氧量': 'COD',
+  'TN': 'TN', '总氮': 'TN', 'AN': 'AN', '氨氮': 'AN', 'NH3-N': 'AN', 'TP': 'TP', '总磷': 'TP' }
+watch(() => actionStore.indicators, (v) => {
+  if (v && v.length) {
+    const key = CN_TO_KEY[v[0]] ?? (v[0] as IndKey)
+    if (INDICATORS.some((i) => i.key === key)) indicator.value = key
+  }
+}, { immediate: true })
+
+// 时间范围切换："看最近一周" → timeWindow 变化（7d/30d 超出本视图窗口，映射提示）
+watch(() => actionStore.timeRange, (v) => {
+  if (!v) return
+  if (v === '1h' || v === '6h' || v === '24h') timeWindow.value = v
+  else console.info('[MetricsView] 时间范围', v, '超出本视图窗口(1h/6h/24h)，忽略')
+})
+
+// 算法标注：run_detector 结果 → 曲线上 markPoint 高亮异常点
+watch(() => actionStore.annotations, () => renderChart(), { deep: true })
 
 onMounted(async () => {
   if (chartEl.value) chart = echarts.init(chartEl.value)
