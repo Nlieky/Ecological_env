@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""动作指令算法执行脚本——主智能体 run_detector 工具直接 subprocess 调用。
+
+不经 LLM：取数(InfluxDB) + 跑算子 + 输出结果与 actionData，1-3 秒。
+用法:
+    python run_detector.py --algorithm constant --indicator pH --start 2026-07-14 --end 2026-07-14
+输出(stdout, JSON):
+    {"status":"completed","anomalies":[...],"summary":{...},
+     "actionData":{"cmd":"run_detector","annotations":[...]}}
+"""
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+# 项目根(skills/action-command-core/scripts/ 上 4 层)
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
+# 指标名映射:data_result 键名(前端/算子用) ↔ InfluxDB 契约字段
+INDICATOR_FIELDS = {"pH": "pH", "COD": "COD", "TN": "TN",
+                    "NH3-N": "AN", "TP": "TP", "SS": "suspended_solids"}
+
+
+def load_series(indicator: str, start: str, end: str) -> pd.Series:
+    """从 InfluxDB 取指定指标、时间范围的进出水序列(拼接,进水优先)。"""
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[4] / ".env")
+
+    from influxdb_client import InfluxDBClient
+    from shared.data.influxdb_query import fetch_wastewater_df
+
+    url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
+    token = os.environ.get("INFLUXDB_TOKEN")
+    org = os.environ.get("INFLUXDB_ORG", "ecological_env")
+    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+    field = INDICATOR_FIELDS.get(indicator, indicator)
+
+    client = InfluxDBClient(url=url, token=token, org=org, timeout=30_000)
+    try:
+        frames = []
+        for side in ("influent", "effluent"):
+            df = fetch_wastewater_df(client, bucket, side, [field])
+            if df is not None and not df.empty:
+                s = df[field].dropna()
+                s.index.name = "timestamp"
+                frames.append(s)
+        if not frames:
+            return pd.Series(dtype=float)
+        full = pd.concat(frames)
+        start_dt = pd.to_datetime(start)
+        end_dt = pd.to_datetime(end)
+        if end_dt == end_dt.normalize():  # end 只给日期 → 补到当天 23:59:59
+            end_dt = end_dt + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        return full[(full.index >= start_dt) & (full.index <= end_dt)]
+    finally:
+        client.close()
+
+
+def run_algorithm(algorithm: str, series: pd.Series) -> list:
+    """跑指定算子,返回异常点列表 [{timestamp,value,type,segment}]。"""
+    if algorithm == "constant":
+        from shared.operators.specialized.constant_detector import ConstantDetector
+        mask, _ = ConstantDetector().detect(series)
+        types = ["平稳"]
+    elif algorithm == "changepoint":
+        from shared.operators.specialized.change_point_detector import ChangePointDetector
+        mask, _ = ChangePointDetector().detect(series)
+        types = ["突变"]
+    elif algorithm == "iforest":
+        from sklearn.ensemble import IsolationForest
+        vals = series.values.reshape(-1, 1)
+        iso = IsolationForest(contamination=0.1, random_state=42).fit(vals)
+        mask = iso.predict(vals) == -1
+        types = ["离群"]
+    else:
+        raise ValueError(f"未知算法: {algorithm}")
+
+    out = []
+    for idx in np.where(mask)[0]:
+        ts = series.index[idx]
+        out.append({
+            "timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
+            "value": round(float(series.iloc[idx]), 2),
+            "type": types[0],
+            "segment": "unknown",
+        })
+    return out
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--algorithm", required=True,
+                        choices=["constant", "changepoint", "iforest"])
+    parser.add_argument("--indicator", required=True,
+                        help="pH/COD/TN/NH3-N/TP/SS")
+    parser.add_argument("--start", required=True)
+    parser.add_argument("--end", required=True)
+    args = parser.parse_args()
+
+    try:
+        series = load_series(args.indicator, args.start, args.end)
+        if series.empty or len(series) < 10:
+            print(json.dumps({"status": "failed",
+                              "error": f"数据不足({len(series)}条),无法检测"},
+                             ensure_ascii=False))
+            return 1
+
+        anomalies = run_algorithm(args.algorithm, series)
+        result = {
+            "status": "completed",
+            "anomalies": anomalies,
+            "summary": {"algorithm": args.algorithm,
+                        "indicator": args.indicator,
+                        "total": len(anomalies),
+                        "time_range": f"{args.start} 至 {args.end}"},
+            "actionData": {
+                "cmd": "run_detector",
+                "indicator": args.indicator,
+                "annotations": anomalies,
+            },
+        }
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, ensure_ascii=False))
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
