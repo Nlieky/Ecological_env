@@ -263,3 +263,33 @@ export interface SessionTrace {
   operator_calls: Record<string, any>[]
   llm_calls: Record<string, any>[]
 }
+
+// ── 多厂区仪表盘 ──
+export interface PlantNode {
+  plant_id: string
+  status: 'online' | 'offline'
+  data_types: string[]
+  latest_time: string
+  point_count: number
+}
+export interface PlantDistrict { name: string; plants: PlantNode[] }
+export interface PlantCity { name: string; districts: PlantDistrict[] }
+export interface PlantTree { cities: PlantCity[]; ungrouped: PlantNode[] }
+
+export interface IndicatorTrendPoint { time: string; value: number }
+export interface PlantIndicator {
+  label: string
+  unit: string
+  limit: number | [number, number] | null
+  influent: number | null
+  effluent: number | null
+  status: 'normal' | 'warning' | 'nodata'
+  series: { influent: IndicatorTrendPoint[]; effluent: IndicatorTrendPoint[] }
+}
+export interface PlantDashboard {
+  plant_id: string
+  window_hours: number
+  indicators: Record<string, PlantIndicator>
+  influent_points: number
+  effluent_points: number
+}
