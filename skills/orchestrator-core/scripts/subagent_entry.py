@@ -178,7 +178,7 @@ def run_subagent() -> Dict[str, Any]:
             raise ValueError("LLM_API_KEY 或 OPENAI_API_KEY 环境变量未设置")
 
         logger.info(f"[LLM] 开始处理任务: {task_id}")
-        _smi = _gp("subagent_max_iterations", default=8)
+        _smi = _gp("subagent_max_iterations", default=6)
         agent = AIAgent(
             base_url=llm_base_url, api_key=llm_api_key, model=llm_model,
             load_soul_identity=True, skip_context_files=False, skip_memory=False,

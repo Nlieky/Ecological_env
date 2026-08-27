@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 PARAM_REGISTRY: dict = {
     "hermes_total_timeout": {"default": 300, "type": "int", "effect": "restart",
         "reader": "scripts/start_agent.py", "env_key": "HERMES_TOTAL_TIMEOUT",
-        "desc": "主智能体单次会话总超时(秒)"},
+        "desc": "主智能体单次会话总超时(秒)（注意:当前 hermes v0.16 引擎未读取此 env，为预留参数）"},
     "subagent_timeout": {"default": 600, "type": "int", "effect": "restart",
         "reader": "call_subagent.py", "env_key": "SUBAGENT_TIMEOUT",
         "desc": "单个子智能体 subprocess 超时(秒)"},
@@ -30,7 +30,7 @@ PARAM_REGISTRY: dict = {
     "master_max_iterations": {"default": 15, "type": "int", "effect": "restart",
         "reader": "scripts/start_agent.py", "env_key": None,
         "desc": "主智能体最大迭代轮数"},
-    "subagent_max_iterations": {"default": 8, "type": "int", "effect": "restart",
+    "subagent_max_iterations": {"default": 6, "type": "int", "effect": "restart",
         "reader": "subagent_entry.py", "env_key": None,
         "desc": "子智能体最大迭代轮数"},
     "llm_base_url": {"default": "http://172.16.12.41:30000/v1", "type": "str", "effect": "restart",

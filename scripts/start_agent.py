@@ -34,7 +34,18 @@ os.environ['HERMES_HOME'] = str(project_root)
 # pipeline 现已确定性+快（~30-60s），total_timeout 从 2400s 降回 300s（服务级上限）。
 # 必须在 import AIAgent（触发 conversation_loop 加载、读取默认值）之前设置。
 # 参数中心：DB 优先读 hermes_total_timeout（未配置时 300）。
-from backend.services.agent_params import get_param as _gp
+# 注意：不能用 `from backend.services.agent_params import get_param`——那会先执行
+# backend/services/__init__.py（→ agent_service → 模块级 import AIAgent），破坏
+# "先设 env 再 import AIAgent" 的时序。按文件路径直接加载，绕过包 __init__
+# （与下方 tool_registration 的既有做法一致）。
+# 实情：vendored hermes v0.16 引擎并不读取 HERMES_TOTAL_TIMEOUT env——此设置无害，
+# 保留作向前兼容（未来引擎读取时即生效），参数中心同步标注为预留。
+import importlib.util as _ilu
+_ap_path = project_root / "backend" / "services" / "agent_params.py"
+_ap_spec = _ilu.spec_from_file_location("agent_params_standalone", _ap_path)
+_ap_mod = _ilu.module_from_spec(_ap_spec)
+_ap_spec.loader.exec_module(_ap_mod)
+_gp = _ap_mod.get_param
 os.environ['HERMES_TOTAL_TIMEOUT'] = str(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=300))
 
 from shared.framework.hermes_agent.run_agent import AIAgent
