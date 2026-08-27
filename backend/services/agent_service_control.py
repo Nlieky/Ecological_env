@@ -1,8 +1,9 @@
 # backend/services/agent_service_control.py
 """agent 服务(8642)生命周期：kill + detached 重启 + health 轮询。
 
-Windows：DETACHED_PROCESS|CREATE_NEW_CONSOLE 开独立控制台窗口（日志可见），
-venv python 跑 scripts/start_agent.py。绝不 kill backend 自身。
+Windows：CREATE_NEW_CONSOLE 开独立控制台窗口（日志可见）——只此一个 flag，
+DETACHED_PROCESS 与它互斥并用会让 CreateProcess 直接抛 WinError 87。venv
+python 跑 scripts/start_agent.py。绝不 kill backend 自身。
 """
 import os
 import subprocess
@@ -20,12 +21,22 @@ def _pids_by_port(port: int) -> list:
         for c in psutil.net_connections(kind="tcp"):
             if c.laddr and c.laddr.port == port and c.status == "LISTEN" and c.pid:
                 return [c.pid]
-    except ImportError:
-        pass
-    # netstat 兜底（psutil 未装）
+    except Exception:
+        pass  # psutil 未装 / Linux AccessDenied 等，一律走 netstat 兜底
+    # netstat 兜底：分列解析，本地地址列（第2列，形如 0.0.0.0:8642 / [::]:8642）
+    # 按最后一段精确匹配端口——防 18642 这类后缀包含式误杀；PID 在最后一列。
     out = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True).stdout
-    return [int(l.split()[-1]) for l in out.splitlines()
-            if f":{port}" in l and "LISTENING" in l]
+    pids = []
+    for line in out.splitlines():
+        cols = line.split()
+        if len(cols) < 5 or "LISTENING" not in line:
+            continue
+        addr = cols[1]  # Local Address
+        if addr.rsplit(":", 1)[-1] == str(port):
+            pid = cols[-1]
+            if pid.isdigit():
+                pids.append(int(pid))
+    return list(dict.fromkeys(pids))  # IPv4/IPv6 同端口同 PID 去重
 
 
 def get_status() -> dict:
@@ -36,8 +47,9 @@ def get_status() -> dict:
     except Exception as e:
         alive, detail = False, str(e)[:120]
     pids = _pids_by_port(AGENT_PORT)
+    from backend.services.agent_params import get_param
     return {"alive": alive, "port": AGENT_PORT, "pids": pids, "detail": detail,
-            "model": os.getenv("LLM_MODEL", "")}
+            "model": get_param("llm_model", env_key="LLM_MODEL", default="")}
 
 
 def restart_agent(confirm: bool) -> dict:
@@ -53,18 +65,23 @@ def restart_agent(confirm: bool) -> dict:
                 p.wait(timeout=5)
             except Exception:
                 p.kill()
-        except ImportError:
-            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
         except Exception:
+            # psutil 未装/进程已消失等：taskkill 兜底。单个 PID 失败不中断其余。
             subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
     time.sleep(1)
-    # detached 新进程：独立控制台窗口，继承当前 env（含 .env 变量）
+    # detached 新进程：独立控制台窗口，继承当前 env（含 .env 变量）。
+    # 只用 CREATE_NEW_CONSOLE——DETACHED_PROCESS 与它互斥并用会让
+    # CreateProcess 直接抛 WinError 87（参数错误），旧进程已杀、新进程起不来。
     env = dict(os.environ)
     flags = 0
     if os.name == "nt":
-        flags = 0x00000008 | 0x00000010  # DETACHED_PROCESS | CREATE_NEW_CONSOLE
-    subprocess.Popen([str(VENV_PY), str(PROJECT_ROOT / "scripts" / "start_agent.py")],
-                     cwd=str(PROJECT_ROOT), env=env, creationflags=flags)
+        flags = 0x00000010  # CREATE_NEW_CONSOLE
+    try:
+        subprocess.Popen([str(VENV_PY), str(PROJECT_ROOT / "scripts" / "start_agent.py")],
+                         cwd=str(PROJECT_ROOT), env=env, creationflags=flags)
+    except OSError as exc:
+        return {"ok": False, "error": f"启动 agent 进程失败: {exc}",
+                "old_pids": old_pids}
     # 轮询 health 最多 60s（LLM 客户端初始化要几秒）
     for _ in range(60):
         time.sleep(1)

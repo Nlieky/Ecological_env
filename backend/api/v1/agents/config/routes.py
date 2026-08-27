@@ -52,9 +52,13 @@ def save_file(body: FileBody):
 
 
 @router.get("/agents/config/files/history")
-async def file_history(entity: str, file: str, limit: int = 20):
+def file_history(entity: str, file: str, limit: int = 20):
+    """sync def：git log 阻塞 subprocess（最坏 30s 超时），async 会卡事件循环。"""
     from backend.services.identity_files import list_history
-    return {"success": True, "data": list_history(entity, file, limit)}
+    try:
+        return {"success": True, "data": list_history(entity, file, limit)}
+    except PermissionError as e:
+        raise HTTPException(400, str(e))
 
 
 class RevertBody(BaseModel):
@@ -135,13 +139,17 @@ async def put_params(body: ParamsBody):
                 int(v)
             except (TypeError, ValueError):
                 errors.append(f"{k} 必须是整数")
-        if PARAM_REGISTRY[k]["type"] == "secret" and (v is None or v == ""):
-            continue  # 密钥空=不改
+        if v is None and PARAM_REGISTRY[k]["type"] != "secret":
+            errors.append(f"{k} 不接受 null")
     if errors:
         raise HTTPException(400, detail={"message": "参数校验失败", "errors": errors})
+    applied = []
     for k, v in body.params.items():
+        if PARAM_REGISTRY[k]["type"] == "secret" and (v is None or v == ""):
+            continue  # 密钥空=不改（防清库）
         set_param(k, str(v))
-    restart_needed = any(PARAM_REGISTRY[k]["effect"] == "restart" for k in body.params)
+        applied.append(k)
+    restart_needed = any(PARAM_REGISTRY[k]["effect"] == "restart" for k in applied)
     return {"success": True, "restart_needed": restart_needed}
 
 
@@ -179,7 +187,8 @@ def llm_test(body: LLMTestBody):
 
 # ── 服务管理 ───────────────────────────────────────────────────
 @router.get("/agents/config/service/status")
-async def service_status():
+def service_status():
+    """sync def：psutil/netstat 找 PID + httpx health 探测（3s）都是阻塞调用。"""
     from backend.services.agent_service_control import get_status
     return {"success": True, "data": get_status()}
 
