@@ -22,6 +22,17 @@ def _project_root() -> Path:
     return p.parents[3]  # 兜底
 
 
+def _param(key, env_key, default):
+    """DB 优先读参数(backend 参数中心)；backend 不可导入时走 env——
+    call_subagent 在 agent 服务进程内跑(tool_registration 已把项目根加进 sys.path)，
+    正常都能导入。"""
+    try:
+        from backend.services.agent_params import get_param
+        return get_param(key, env_key=env_key, default=default)
+    except Exception:
+        return os.getenv(env_key, str(default))
+
+
 # 子智能体路径映射（完整名称和简化名称）
 SUBAGENT_PATHS = {
     # 完整名称
@@ -286,7 +297,7 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
         # 区分是哪个子智能体；不再每个子智能体目录各放一份 entry.py）。
         # 子智能体自身是一次完整 AIAgent 会话（多轮 LLM），ctgu-vlm 单次调用又慢，
         # 实测异常检测子智能体曾 >300s。默认 600s（可由 SUBAGENT_TIMEOUT 覆盖）。
-        subagent_timeout = int(os.getenv('SUBAGENT_TIMEOUT', '600'))
+        subagent_timeout = int(_param("subagent_timeout", "SUBAGENT_TIMEOUT", 600))
         shared_entry = Path(__file__).parent / "subagent_entry.py"
         result = subprocess.run(
             [python_exe, str(shared_entry)],

@@ -21,7 +21,15 @@ router = APIRouter()
 
 # Agent服务配置（从settings读取）
 AGENT_SERVICE_URL = settings.AGENT_SERVICE_URL
-AGENT_TIMEOUT = settings.AGENT_TIMEOUT
+
+
+def _agent_timeout() -> int:
+    """每请求读 DB（参数中心可在线调，立即生效）；异常走 settings。"""
+    try:
+        from backend.services.agent_params import get_param
+        return int(get_param("agent_timeout", env_key="AGENT_TIMEOUT", default=settings.AGENT_TIMEOUT))
+    except Exception:
+        return settings.AGENT_TIMEOUT
 
 # 对话历史服务：把 /api/query 的真实问答落入 conversations 表
 conversation_service = ConversationService()
@@ -80,7 +88,7 @@ def execute_query(request: QueryRequest):
                 "query": request.query,
                 "session_id": session_id
             },
-            timeout=AGENT_TIMEOUT
+            timeout=_agent_timeout()
         )
 
         if agent_response.status_code != 200:
@@ -255,7 +263,7 @@ async def query_stream(request: QueryRequest):
         decision_order = []        # 按调用顺序去重的子智能体名
         stream_chart_data = None  # 收集 chartData（落对话历史供历史会话恢复）
         buf = ""
-        timeout = httpx.Timeout(AGENT_TIMEOUT, connect=10.0)
+        timeout = httpx.Timeout(_agent_timeout(), connect=10.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(
                 "POST",

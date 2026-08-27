@@ -33,7 +33,9 @@ load_dotenv()
 os.environ['HERMES_HOME'] = str(project_root)
 # pipeline 现已确定性+快（~30-60s），total_timeout 从 2400s 降回 300s（服务级上限）。
 # 必须在 import AIAgent（触发 conversation_loop 加载、读取默认值）之前设置。
-os.environ.setdefault('HERMES_TOTAL_TIMEOUT', '300')
+# 参数中心：DB 优先读 hermes_total_timeout（未配置时 300）。
+from backend.services.agent_params import get_param as _gp
+os.environ['HERMES_TOTAL_TIMEOUT'] = str(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=300))
 
 from shared.framework.hermes_agent.run_agent import AIAgent
 
@@ -85,10 +87,10 @@ class AgentService:
     def initialize(self):
         """初始化主智能体实例"""
         try:
-            # 从环境变量获取LLM配置
-            model = os.getenv("LLM_MODEL", "ctgu-vlm")
-            base_url = os.getenv("LLM_BASE_URL", "http://172.16.12.41:30000/v1")
-            api_key = os.getenv("LLM_API_KEY", "")
+            # LLM 配置：参数中心 DB 优先 → env → default
+            model = _gp("llm_model", env_key="LLM_MODEL", default="ctgu-vlm")
+            base_url = _gp("llm_base_url", env_key="LLM_BASE_URL", default="http://172.16.12.41:30000/v1")
+            api_key = _gp("llm_api_key", env_key="LLM_API_KEY", default="")
 
             logger.info(f"初始化主智能体: model={model}, base_url={base_url}")
 
@@ -102,10 +104,10 @@ class AgentService:
                 load_soul_identity=True
             )
 
-            # 设置最大迭代次数为15（4子智能体pipeline需要更多轮次）
+            # 设置最大迭代次数（4子智能体pipeline需要更多轮次；参数中心可调）
             if hasattr(self.master_agent, 'max_iterations'):
-                self.master_agent.max_iterations = 15
-                logger.info("✅ 设置最大迭代次数为15")
+                self.master_agent.max_iterations = _gp("master_max_iterations", default=15)
+                logger.info(f"✅ 设置最大迭代次数为 {self.master_agent.max_iterations}")
 
             # 注册orchestrator工具到AIAgent
             try:

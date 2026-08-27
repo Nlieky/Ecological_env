@@ -164,17 +164,25 @@ def run_subagent() -> Dict[str, Any]:
     )
 
     try:
-        llm_base_url = os.environ.get('LLM_BASE_URL') or os.environ.get('OPENAI_BASE_URL')
-        llm_api_key = os.environ.get('LLM_API_KEY') or os.environ.get('OPENAI_API_KEY')
-        llm_model = os.environ.get('LLM_MODEL', 'LongCat-2.0')
+        # LLM 配置：参数中心 DB 优先 → env（default 层保留原 OPENAI_* 兜底，与原 or 链一致）
+        try:
+            from backend.services.agent_params import get_param as _gp
+        except Exception:
+            _gp = lambda key, env_key=None, default=None: os.environ.get(env_key, default) if env_key else default
+        llm_base_url = _gp("llm_base_url", env_key="LLM_BASE_URL",
+                           default=os.environ.get('OPENAI_BASE_URL'))
+        llm_api_key = _gp("llm_api_key", env_key="LLM_API_KEY",
+                          default=os.environ.get('OPENAI_API_KEY'))
+        llm_model = _gp("llm_model", env_key="LLM_MODEL", default="ctgu-vlm")
         if not llm_api_key:
             raise ValueError("LLM_API_KEY 或 OPENAI_API_KEY 环境变量未设置")
 
         logger.info(f"[LLM] 开始处理任务: {task_id}")
+        _smi = _gp("subagent_max_iterations", default=8)
         agent = AIAgent(
             base_url=llm_base_url, api_key=llm_api_key, model=llm_model,
             load_soul_identity=True, skip_context_files=False, skip_memory=False,
-            enabled_toolsets=["skills", "terminal"], session_id=task_id, max_iterations=6,
+            enabled_toolsets=["skills", "terminal"], session_id=task_id, max_iterations=_smi,
         )
         response = agent.run_conversation(user_message)
         logger.info(f"[LLM] 任务完成")
