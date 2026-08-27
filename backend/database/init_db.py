@@ -24,6 +24,7 @@ from backend.models.conversation import (
     MasterDecision,
     SubagentCall
 )
+from backend.models.agent_config import AgentRuntimeParam
 
 
 def init_db():
@@ -45,6 +46,7 @@ def init_db():
     print("  - conversation_messages")
     print("  - master_decisions")
     print("  - subagent_calls")
+    print("  - agent_runtime_params")
 
 
 if __name__ == "__main__":
