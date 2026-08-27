@@ -4,7 +4,7 @@
       <div class="pc-t">厂区配置</div>
       <div class="pc-a">
         <button class="btn" @click="validate" :disabled="saving">校验</button>
-        <button class="btn primary" @click="save" :disabled="saving">{{ saving ? '保存中…' : '保存' }}</button>
+        <button class="btn primary" @click="save" :disabled="saving || !loaded">{{ saving ? '保存中…' : '保存' }}</button>
       </div>
     </div>
     <div v-if="errors.length" class="pc-errs">
@@ -104,6 +104,9 @@ const cfg = reactive<PlantConfig>({ hierarchy: {}, report_name_map: {}, plant_co
 const errors = ref<string[]>([])
 const saving = ref(false)
 const addPid = ref('')
+// 加载成功才允许保存：load 失败时 cfg 是空骨架，此时保存会把空配置写盘——
+// 整厂层级/别名/报表映射全被擦掉。拦截器只弹通用错误，这里补 disabled 硬闸。
+const loaded = ref(false)
 
 // 层级里出现过的所有厂（plant_configs 添加下拉的选项源）
 const allPlants = computed(() => {
@@ -116,7 +119,11 @@ async function load() {
   try {
     const r: any = await agentConfigService.getPlants()
     Object.assign(cfg, (r as any).data ?? r)
-  } catch { /* axios 拦截器已弹错 */ }
+    loaded.value = true
+  } catch (e: any) {
+    // 拦截器弹的是通用网络错误，这里明确告知"没加载到就不能保存"
+    ElMessage.error('厂区配置加载失败：保存已禁用（防误擦除）— ' + (e?.message || e))
+  }
 }
 
 async function validate() {
@@ -152,33 +159,41 @@ async function ask(title: string, dflt = ''): Promise<string | null> {
 
 async function addCity() {
   const name = await ask('市名（如 枝江市）'); if (!name) return
+  if (cfg.hierarchy[name]) { ElMessage.warning(`「${name}」已存在`); return }
   cfg.hierarchy[name] = {}
 }
 function delCity(c: string) { delete cfg.hierarchy[c] }
 async function addZone(c: string) {
   const name = await ask('厂区名'); if (!name) return
+  if (cfg.hierarchy[c][name]) { ElMessage.warning(`「${name}」已存在`); return }
   cfg.hierarchy[c][name] = []
 }
 function delZone(c: string, z: string) { delete cfg.hierarchy[c][z] }
 async function addPlant(c: string, z: string) {
   const name = await ask('厂名（必须与 InfluxDB plant_id 完全一致）'); if (!name) return
+  if (cfg.hierarchy[c][z].includes(name)) { ElMessage.warning(`「${name}」已存在`); return }
   cfg.hierarchy[c][z].push(name)
 }
 function delPlant(c: string, z: string, i: number) { cfg.hierarchy[c][z].splice(i, 1) }
 async function addAlias() {
   const k = await ask('别名（用户会怎么说，如 金桥）'); if (!k) return
+  if (cfg.plant_aliases[k] !== undefined) { ElMessage.warning(`「${k}」已存在`); return }
   cfg.plant_aliases[k] = ''
 }
 function delAlias(k: string) { delete cfg.plant_aliases[k] }
 function renameAlias(oldK: string, newK: string) {
   const k = newK.trim()
   if (!k || k === oldK) return // 空/未改名：保留原键（防误删）
+  if (cfg.plant_aliases[k] !== undefined) { // 改名撞上已有键：直接覆盖会静默丢掉对方的值
+    ElMessage.warning(`「${k}」已存在`); return
+  }
   const v = cfg.plant_aliases[oldK]
   delete cfg.plant_aliases[oldK]
   cfg.plant_aliases[k] = v
 }
 async function addReport() {
   const k = await ask('报表文件名主体'); if (!k) return
+  if (cfg.report_name_map[k] !== undefined) { ElMessage.warning(`「${k}」已存在`); return }
   cfg.report_name_map[k] = ''
 }
 function delReport(k: string) { delete cfg.report_name_map[k] }
