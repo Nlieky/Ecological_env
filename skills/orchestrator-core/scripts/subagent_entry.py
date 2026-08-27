@@ -108,6 +108,26 @@ def _read_script_result(session_dir, result_filename):
     return None
 
 
+# 厂名别名→plant_id 全称(与库内一致;兜底默认=内置两厂)
+_PLANT_ALIASES = {
+    "金桥": "当阳市金桥污水处理厂一期",
+    "当阳市金桥污水处理厂一期": "当阳市金桥污水处理厂一期",
+    "洗舱站": "洗舱站污水排放口",
+    "洗舱站污水排放口": "洗舱站污水排放口",
+}
+# 别名表来源升级(2026-08-27):优先读 plant-hierarchy.yaml 的 plant_aliases 段
+# (配置中心可在线管理,新厂接入零代码),yaml 不可用时退回上面的内置两厂(向后兼容)。
+try:
+    import yaml as _yaml
+    _cfg_p = AGENT_DIR.parent.parent / "shared" / "data" / "plant-hierarchy.yaml"
+    if _cfg_p.exists():
+        _raw_aliases = (_yaml.safe_load(_cfg_p.read_text(encoding="utf-8")) or {}).get("plant_aliases")
+        if isinstance(_raw_aliases, dict) and _raw_aliases:
+            _PLANT_ALIASES = {**_PLANT_ALIASES, **_raw_aliases}
+except Exception:
+    pass
+
+
 def _extract_skill_calls(response) -> list:
     """从 run_conversation 的 messages 提取 skill 工具调用(skill_view/skills_list/skill_manage)。
     OpenAI 格式: assistant message.tool_calls=[{function:{name,arguments}}]。

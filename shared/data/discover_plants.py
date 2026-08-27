@@ -75,13 +75,19 @@ def build_tree() -> Dict:
     }
     节点: {"plant_id", "status": "online"|"offline",
            "data_types", "latest_time", "point_count}
+    yaml 顶层保留键(report_name_map/plant_configs/plant_aliases)不参与层级遍历。
     """
     discovered = {p["plant_id"]: p for p in discover_plants()}
     hierarchy = load_hierarchy()
+    # 配置型顶层键排除(report_name_map/plant_configs/plant_aliases 是映射不是层级)
+    _RESERVED = {"report_name_map", "plant_configs", "plant_aliases"}
+    hierarchy = {k: v for k, v in (hierarchy or {}).items() if k not in _RESERVED}
 
     cities = []
     assigned = set()
     for city, districts in (hierarchy or {}).items():
+        if not isinstance(districts, dict):
+            continue
         dist_nodes = []
         for dist, plant_names in (districts or {}).items():
             plant_nodes = []
