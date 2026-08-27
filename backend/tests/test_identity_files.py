@@ -55,6 +55,38 @@ def test_save_creates_commit(repo):
     assert hist[0]["commit"] and len(hist[0]["commit"]) >= 7
 
 
+def test_git_unavailable_degrades(repo, monkeypatch):
+    """git 二进制缺失（如精简 Docker 镜像）：save 不抛异常，文件照常写盘 + 降级 .bak。"""
+    import backend.services.identity_files as idf
+    from backend.services.identity_files import read_file
+
+    # 模拟 git 二进制缺失：FileNotFoundError 的真正源头是 subprocess.run
+    def boom(*a, **kw):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(idf.subprocess, "run", boom)
+    new = read_file("master", "MEMORY.md")["content"] + "\n<!-- 无 git 环境 -->"
+    r = idf.save_file("master", "MEMORY.md", new, "无git保存")
+    assert r["degraded"] is True and r["commit"] is None
+    assert read_file("master", "MEMORY.md")["content"] == new  # 文件已写盘，不是 500
+    baks = list((repo / "workspace" / "backups").glob("MEMORY.*.bak"))
+    assert len(baks) == 1  # 降级备份已产生
+
+
+def test_save_no_change(repo):
+    """内容未变的保存：no_change=True，不产生新 commit / 不落 .bak。"""
+    from backend.services.identity_files import read_file, save_file
+    cur = read_file("master", "MEMORY.md")["content"]
+    before = subprocess.run(["git", "rev-list", "--count", "HEAD"], cwd=repo,
+                            capture_output=True, text=True).stdout.strip()
+    r = save_file("master", "MEMORY.md", cur, "无改动")
+    after = subprocess.run(["git", "rev-list", "--count", "HEAD"], cwd=repo,
+                           capture_output=True, text=True).stdout.strip()
+    assert r["no_change"] is True and r["degraded"] is False
+    assert before == after  # git log 数量不变
+    assert not (repo / "workspace" / "backups").exists()
+
+
 def test_revert_restores_content(repo):
     from backend.services.identity_files import read_file, save_file, list_history, revert_file
     orig = read_file("master", "MEMORY.md")["content"]

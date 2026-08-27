@@ -7,10 +7,15 @@ git 不可用时降级 .bak（同目录 backups/，保最近 10 份）——测�
 """
 import subprocess
 import shutil
+import threading
 from datetime import datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# 并发 save 串行化：add→commit→rev-parse 三步不是原子的，两个请求交错会产生
+# "nothing to commit"（改动被对方 commit 带走）→ 误报 degraded。锁住整个 git 段。
+_save_lock = threading.Lock()
 
 ENTITY_META = {
     "master": {"label": "主智能体", "icon": "🧠", "dir": "workspace"},
@@ -77,8 +82,17 @@ def read_file(entity: str, file: str) -> dict:
 
 
 def _git(args: list, cwd: Path = None) -> subprocess.CompletedProcess:
-    return subprocess.run(["git"] + args, cwd=cwd or PROJECT_ROOT, capture_output=True,
-                          text=True, encoding="utf-8", errors="replace", timeout=30)
+    """跑 git 子进程；二进制缺失/超时等异常不抛出，伪造 rc=127 结果让调用方降级。
+
+    FileNotFoundError(git 未装，如精简 Docker 镜像) 是 OSError 子类，TimeoutExpired
+    单列——统一转成失败 CompletedProcess，save_file 的 degraded 分支即可接管。
+    """
+    try:
+        return subprocess.run(["git"] + args, cwd=cwd or PROJECT_ROOT, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace", timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(args=["git"] + args, returncode=127, stdout="",
+                                           stderr=str(exc)[:200])
 
 
 def _backup_degraded(p: Path):
@@ -93,20 +107,30 @@ def _backup_degraded(p: Path):
 
 
 def save_file(entity: str, file: str, content: str, message: str = "") -> dict:
-    """原子写（tmp+rename）+ git 快照（只 add 本文件）。"""
+    """原子写（tmp+rename）+ git 快照（只 add 本文件）。
+
+    - 内容未变：跳过写盘与 git，返回 no_change=True（否则 "nothing to commit" 会被
+      误判为失败 → 无意义 .bak + 误导性 degraded 警告）。
+    - git add 不检查返回值：add 失败会让 commit 失败，由 degraded 分支兜底。
+    """
     p = _resolve(entity, file)
+    if p.exists() and p.read_text(encoding="utf-8") == content:
+        rel_nc = p.relative_to(PROJECT_ROOT).as_posix()
+        return {"commit": None, "degraded": False, "no_change": True, "detail": f"内容未变: {rel_nc}"}
     tmp = p.with_suffix(p.suffix + ".tmp")
     tmp.write_text(content, encoding="utf-8")
     tmp.replace(p)  # 原子替换
     rel = p.relative_to(PROJECT_ROOT).as_posix()
     msg = f"config(web): {rel} — {message or '在线编辑'}"
-    r = _git(["add", "--", rel])
-    c = _git(["commit", "-m", msg, "--", rel])
-    if c.returncode != 0:
-        _backup_degraded(p)
-        return {"commit": None, "degraded": True, "detail": (c.stderr or c.stdout).strip()[:200]}
-    h = _git(["rev-parse", "--short", "HEAD"])
-    return {"commit": h.stdout.strip() if h.returncode == 0 else None, "degraded": False}
+    with _save_lock:
+        _git(["add", "--", rel])
+        c = _git(["commit", "-m", msg, "--", rel])
+        if c.returncode != 0:
+            _backup_degraded(p)
+            return {"commit": None, "degraded": True, "no_change": False,
+                    "detail": (c.stderr or c.stdout).strip()[:200]}
+        h = _git(["rev-parse", "--short", "HEAD"])
+    return {"commit": h.stdout.strip() if h.returncode == 0 else None, "degraded": False, "no_change": False}
 
 
 def list_history(entity: str, file: str, limit: int = 20) -> list:

@@ -47,6 +47,8 @@ anomaly_result.csv
 
 # Editor/dev backups
 *.bak
+# 身份文件在线编辑的原子写临时文件(save_file: tmp+rename)
+*.md.tmp
 # Prometheus 二进制(vendored) + TSDB 数据，不入库
 prometheus/prometheus.exe
 prometheus/prom_data/
