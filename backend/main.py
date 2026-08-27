@@ -134,6 +134,10 @@ app.include_router(v1_conversations.conversations.router, prefix="/api/v1")
 from backend.api.v1.plants import routes as v1_plants_routes
 app.include_router(v1_plants_routes.router, prefix="/api/v1")
 
+# 智能体配置中心(身份文件/厂区配置/运行参数/服务管理)
+from backend.api.v1.agents.config import routes as v1_agentcfg_routes
+app.include_router(v1_agentcfg_routes.router, prefix="/api/v1")
+
 
 # 全局异常处理器
 @app.exception_handler(BackendException)
