@@ -24,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { agentConfigService, type AgentEntity } from '@/api/modules/agentConfig'
 import EntityTree from '@/components/agents/config/EntityTree.vue'
 import EntityOverview from '@/components/agents/config/EntityOverview.vue'
@@ -60,6 +60,12 @@ async function openFileFromOverview(f: string) {
 }
 
 function goRestart() { activeEntity.value = '__service__' }
+
+// 修 tab 残留：master 的 params tab → 切到子智能体/厂区/服务时，tab 值还在 'params'
+// 但 tab 栏已无该选项（无激活项）。实体变化后当前 tab 不在可用列表 → 归位 overview。
+watch(activeEntity, () => {
+  if (!tabsFor.value.includes(tab.value)) tab.value = 'overview'
+})
 
 onMounted(async () => {
   try {
