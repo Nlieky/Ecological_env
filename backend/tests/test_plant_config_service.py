@@ -45,6 +45,14 @@ def test_validate_reports_errors(yaml_env):
     assert any("不存在" in e or "别名" in e for e in errs)
 
 
+def test_alias_longest_match_wins(yaml_env):
+    # 短别名不应遮蔽长别名：金桥 vs 金桥二期
+    yaml_env.save_section("plant_aliases", {"金桥二期": "当阳市金桥污水处理厂二期",
+                                            "金桥": "当阳市金桥污水处理厂一期"})
+    assert yaml_env.resolve_alias("金桥二期的数据") == "当阳市金桥污水处理厂二期"
+    assert yaml_env.resolve_alias("金桥的COD") == "当阳市金桥污水处理厂一期"
+
+
 def test_roundtrip_preserves_hierarchy(yaml_env):
     data = yaml_env.load_plant_config()
     data["hierarchy"]["枝江市"]["新厂区"] = ["测试排放口"]

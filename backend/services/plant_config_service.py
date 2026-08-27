@@ -5,7 +5,6 @@ yaml 顶层四段：hierarchy(市→区→厂[]) / report_name_map / plant_confi
 _RESERVED 与 shared/data/discover_plants.py 保持一致——新厂自动发现不被配置段干扰。
 """
 import os
-from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -49,7 +48,8 @@ def save_section(section: str, value) -> None:
 
 
 def save_config(data: dict) -> dict:
-    """整份保存（页面保存按钮）：合并四段，保留未知段不动。"""
+    """整份保存（页面保存按钮）：合并四段。非保留顶层键视为层级，保存时整体替换
+    （未来新增配置段须同步 _RESERVED，与 discover_plants.py 双处约定）。"""
     with open(YAML_PATH, encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
     for k, v in data.items():
@@ -94,7 +94,8 @@ def resolve_alias(alias_text: str):
     aliases = cfg.get("plant_aliases") or {}
     merged = dict(_BUILTIN_ALIASES)
     merged.update(aliases)
-    for alias, pid in merged.items():
+    # 按 alias 长度降序（最长匹配优先）：防止"金桥"遮蔽"金桥二期"
+    for alias, pid in sorted(merged.items(), key=lambda kv: len(kv[0]), reverse=True):
         if alias in alias_text:
             return pid
     return None
