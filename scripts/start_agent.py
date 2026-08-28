@@ -50,6 +50,13 @@ os.environ['HERMES_TOTAL_TIMEOUT'] = str(_gp("hermes_total_timeout", env_key="HE
 
 from shared.framework.hermes_agent.run_agent import AIAgent
 
+# 配置中心 V2 接线：策略表(DB 优先) + 供应商表。放 AIAgent import 之后——
+# backend/services/__init__ 会链式 import agent_service(其模块级 import AIAgent)，
+# 此时 HERMES_HOME/HERMES_TOTAL_TIMEOUT 已设、AIAgent 已加载(sys.modules 缓存命中)，
+# 不破坏上方"先设 env 再 import AIAgent"的时序。
+from backend.services.agent_strategy import get_strategy as _gst
+from backend.services import llm_providers as _lp
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -98,10 +105,18 @@ class AgentService:
     def initialize(self):
         """初始化主智能体实例"""
         try:
-            # LLM 配置：参数中心 DB 优先 → env → default
+            # LLM 读取链:策略 default_llm_provider → providers 表行 → get_param/env 兜底
             model = _gp("llm_model", env_key="LLM_MODEL", default="ctgu-vlm")
             base_url = _gp("llm_base_url", env_key="LLM_BASE_URL", default="http://172.16.12.41:30000/v1")
             api_key = _gp("llm_api_key", env_key="LLM_API_KEY", default="")
+            try:
+                _lp.seed_defaults()
+                _prov = _lp.resolve_default()
+                if _prov:
+                    model, base_url, api_key = _prov["model"], _prov["base_url"], _prov["api_key"]
+                    logger.info(f"使用默认供应商: {_prov['name']}")
+            except Exception as _e:
+                logger.warning(f"provider 解析失败,走 env/get_param 兜底: {_e}")
 
             logger.info(f"初始化主智能体: model={model}, base_url={base_url}")
 
@@ -137,6 +152,9 @@ class AgentService:
                 logger.warning(f"⚠️ Orchestrator工具注册失败: {e}")
                 import traceback
                 traceback.print_exc()
+
+            # 风格策略注入句柄:每次 run_conversation 前调用(策略即时生效,见 _apply_style_strategy)
+            self._apply_style = lambda: _apply_style_strategy(self.master_agent)
 
             logger.info("✅ 主智能体初始化成功")
             return True
@@ -285,6 +303,7 @@ class AgentService:
                 _tool_reg._current_progress_queue = _trace_q
             try:
                 self._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
+                _apply_style_strategy(self.master_agent)   # /query 路径:风格策略即时生效
                 result = self.master_agent.run_conversation(
                     user_message=query,
                     conversation_history=conversation_history,
@@ -362,6 +381,29 @@ class AgentService:
                 "success": False,
                 "error": str(e)
             }
+
+
+def _apply_style_strategy(agent):
+    """回答风格策略 → ephemeral_system_prompt(运行时每次 API 调用拼接,立即生效,
+    不污染 _cached_system_prompt 缓存)。空策略不设置。"""
+    try:
+        parts = []
+        if _gst("language_constraint") == "zh":
+            parts.append("回答必须使用中文。")
+        if _gst("conclusion_first", True):
+            parts.append("回答结论先行；数据用表格呈现；细节后置。")
+        if _gst("confidence_labeling", True):
+            parts.append("判定类结论必须标注置信级别（疑似/确认）。")
+        stop = _gst("orchestration_stop_level", "auto")
+        if stop and stop != "auto":
+            _cap = {"data": "①数据感知", "anomaly": "②异常检测", "violation": "③规则推理"}[stop]
+            parts.append(f"编排上限：本次最多推进到{_cap}即停，不自动调用更深层子智能体。")
+        if parts:
+            agent.ephemeral_system_prompt = "【执行策略】\n" + "\n".join(f"- {p}" for p in parts)
+        else:
+            agent.ephemeral_system_prompt = None
+    except Exception as e:
+        logger.warning(f"风格策略注入失败(忽略): {e}")
 
 
 # 全局服务实例
@@ -480,6 +522,7 @@ def query_stream(request: QueryRequest):
             return
         try:
             agent_service._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
+            _apply_style_strategy(agent_service.master_agent)   # /query/stream 路径:风格策略即时生效
             history = agent_service.session_histories.get(session_id)
             result = agent_service.master_agent.run_conversation(
                 user_message=request.query,

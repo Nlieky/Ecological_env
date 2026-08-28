@@ -24,6 +24,16 @@ project_root = _project_root()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+
+def _strategy(key, default):
+    """DB 优先读策略(配置中心·策略tab)；backend 不可导入时走默认。"""
+    try:
+        from backend.services.agent_strategy import get_strategy
+        return get_strategy(key, default)
+    except Exception:
+        return default
+
+
 # 导入工具桥接——bridge 现与本文件同目录(scripts/)，按文件路径加载最稳
 import importlib.util
 
