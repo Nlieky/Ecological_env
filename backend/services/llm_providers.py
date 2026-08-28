@@ -1,6 +1,8 @@
 # backend/services/llm_providers.py
 """LLM 供应商 CRUD + tested_ok 闸门 + 默认供应商解析。
 
+api_key 明文存 SQLite（本地单机场景，与 .env 同级）；仅接口层脱敏显示。
+
 默认供应商的"名字"存 agent_strategy 的 default_llm_provider 键（属策略域），
 本模块提供读取/校验/联动的完整链路：
   set_default_provider(name)  校验 tested_ok 后写策略表
@@ -27,7 +29,11 @@ def _open_session():
 
 
 def seed_defaults() -> None:
-    """预置 ctgu-vlm（启用）+ LongCat-2.0（禁用）。幂等。"""
+    """预置 ctgu-vlm（启用）+ LongCat-2.0（禁用）。幂等。
+
+    首启两进程并发 seed 时败者收 IntegrityError → rollback 吞掉（行已由胜者插入），
+    不让它冒泡成 500。"""
+    from sqlalchemy.exc import IntegrityError
     from backend.models.agent_config import LLMProvider
     with _open_session() as s:
         for name, base_url, model, enabled in [
@@ -36,7 +42,10 @@ def seed_defaults() -> None:
         ]:
             if s.get(LLMProvider, name) is None:
                 s.add(LLMProvider(name=name, base_url=base_url, model=model, enabled=enabled))
-        s.commit()
+                try:
+                    s.commit()
+                except IntegrityError:
+                    s.rollback()
 
 
 def _mask(v: str) -> str:
@@ -92,12 +101,14 @@ def delete_provider(name: str) -> None:
 
 
 def mark_tested(name: str, ok: bool) -> None:
+    """记录测试连接结果。状态转换操作，拼错名不该静默 no-op → raise KeyError。"""
     from backend.models.agent_config import LLMProvider
     with _open_session() as s:
         row = s.get(LLMProvider, name)
-        if row:
-            row.tested_ok = bool(ok)
-            s.commit()
+        if row is None:
+            raise KeyError(f"供应商不存在: {name}")
+        row.tested_ok = bool(ok)
+        s.commit()
 
 
 def eligible_default_providers() -> list:

@@ -88,3 +88,19 @@ def test_resolve_default_chain(db_session, monkeypatch):
     from backend.services import llm_providers as svc
     monkeypatch.setattr(svc, "get_default_provider_name", lambda: "ghost")
     assert resolve_default() is None
+
+
+def test_resolve_default_disabled_returns_none(db_session):
+    """enabled=False 的默认供应商：eligible 只看 tested_ok，可被设默认；resolve 消费 enabled 闸门。"""
+    from backend.services.llm_providers import upsert_provider, mark_tested, set_default_provider, resolve_default
+    upsert_provider("deepseek", base_url="http://x/v1", api_key="k", model="m", enabled=False)
+    mark_tested("deepseek", ok=True)
+    set_default_provider("deepseek")            # tested_ok 达标即可设
+    assert resolve_default() is None            # 但禁用行不可被解析使用
+
+
+def test_mark_tested_unknown_name_raises(db_session):
+    """状态转换操作拼错名不该静默 no-op。"""
+    from backend.services.llm_providers import mark_tested
+    with pytest.raises(KeyError, match="供应商不存在"):
+        mark_tested("ghost", ok=True)
