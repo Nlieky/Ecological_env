@@ -24,7 +24,7 @@ from backend.models.conversation import (
     MasterDecision,
     SubagentCall
 )
-from backend.models.agent_config import AgentRuntimeParam, AgentStrategy  # noqa: F401
+from backend.models.agent_config import AgentRuntimeParam, AgentStrategy, LLMProvider  # noqa: F401
 
 
 def init_db():
