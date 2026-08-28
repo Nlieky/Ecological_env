@@ -135,6 +135,22 @@ class AgentService:
                 self.master_agent.max_iterations = _gp("master_max_iterations", default=15)
                 logger.info(f"✅ 设置最大迭代次数为 {self.master_agent.max_iterations}")
 
+            # MCP 工具发现(配置中心·MCP tab 写 config.yaml 的 mcp_servers)。
+            # upstream 已把 import 副作用移除(#16856),必须显式调;失败不拖垮主智能体。
+            mcp_toolsets = []
+            try:
+                if str(project_root / "shared" / "framework" / "hermes-agent") not in sys.path:
+                    sys.path.insert(0, str(project_root / "shared" / "framework" / "hermes-agent"))
+                from tools.mcp_tool import discover_mcp_tools, _load_mcp_config
+                _mcp_cfg = _load_mcp_config()
+                mcp_toolsets = [f"mcp-{n}" for n, c in _mcp_cfg.items()
+                                if str(c.get("enabled", True)).lower() != "false"]
+                if mcp_toolsets:
+                    _names = discover_mcp_tools()
+                    logger.info(f"MCP 已连接: {mcp_toolsets}, 工具 {_names}")
+            except Exception as _e:
+                logger.warning(f"MCP 发现失败(跳过): {_e}")
+
             # 注册orchestrator工具到AIAgent
             try:
                 # 修复导入路径：使用orchestrator-core而非orchestrator_core
@@ -152,6 +168,22 @@ class AgentService:
                 logger.warning(f"⚠️ Orchestrator工具注册失败: {e}")
                 import traceback
                 traceback.print_exc()
+
+            # MCP 工具进 agent.tools(第 1 层,conversation_loop 只认 agent.tools)。
+            # 放 tool_registration 精简之后执行,避免被 _KEEP_NAMES 过滤掉。
+            # registry API(vendored tools/registry.py 实测):get_tool_names_for_toolset(name)
+            # + get_definitions(tool_names: Set[str])——按工具集名取名再取 schema。
+            try:
+                from tools.registry import registry as _reg
+                _mcp_names: set = set()
+                for _ts in mcp_toolsets:
+                    _mcp_names.update(_reg.get_tool_names_for_toolset(_ts))
+                _mcp_defs = _reg.get_definitions(_mcp_names) if _mcp_names else []
+                if _mcp_defs:
+                    self.master_agent.tools.extend(_mcp_defs)
+                    logger.info(f"MCP 工具已挂载: {[t['function']['name'] for t in _mcp_defs]}")
+            except Exception as _e:
+                logger.warning(f"MCP 工具挂载失败: {_e}")
 
             # 风格策略注入句柄:每次 run_conversation 前调用(策略即时生效,见 _apply_style_strategy)
             self._apply_style = lambda: _apply_style_strategy(self.master_agent)
