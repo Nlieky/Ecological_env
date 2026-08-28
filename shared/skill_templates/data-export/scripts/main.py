@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-# 注: parents[4] 对应模板/技能目录层级; 若安装到子智能体目录(subagents/<x>/skills/...)需改 parents[5]
+# 注: parents[4] 对应模板库位置层级; 安装到主智能体(skills/<n>/...)改 parents[3]; 安装到子智能体(subagents/<x>/skills/...)改 parents[5]
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT))
 from shared.data.influxdb_query import fetch_wastewater_df  # noqa: E402

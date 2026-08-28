@@ -10,7 +10,7 @@ from pathlib import Path
 
 from jinja2 import Template
 
-# 注: parents[4] 对应模板/技能目录层级; 若安装到子智能体目录(subagents/<x>/skills/...)需改 parents[5]
+# 注: parents[4] 对应模板库位置层级; 安装到主智能体(skills/<n>/...)改 parents[3]; 安装到子智能体(subagents/<x>/skills/...)改 parents[5]
 SESSION_DIR = Path(__file__).resolve().parents[4] / "sessions"
 TEMPLATE = Template("""# {{ title }}
 
