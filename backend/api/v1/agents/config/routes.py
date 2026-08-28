@@ -2,15 +2,20 @@
 """智能体配置中心 REST API（spec §3.1）。
 
 分组：实体/身份文件(git快照) / 厂区配置(yaml) / 运行参数(SQLite) / LLM测试 / 服务管理。
+V2 追加：执行策略(+参数并入) / 技能管理(git快照) / MCP 接入 / LLM供应商。
 
 ⚠️ 路由函数 async/sync 的取舍（Task 3 审查结论，与 /query 踩过的坑同款）：
 内部是阻塞 subprocess（git 最坏 90s）/阻塞 HTTP（llm_test 10s）/60s 轮询的，
 一律用 **sync def**——FastAPI 自动丢线程池，事件循环不卡；纯内存/单查 DB 的
-保持 async def。
+保持 async def。技能的写操作（保存/新建/启停/删除/安装）都带 git 快照 subprocess，
+同样 sync def。
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+
+from backend.services.agent_params import PARAM_REGISTRY, get_param, mask_secret
+from backend.services.agent_strategy import STRATEGY_REGISTRY
 
 router = APIRouter(tags=["智能体配置"])
 
@@ -202,3 +207,311 @@ def service_restart(body: RestartBody):
     """sync def：内部 kill + 60s health 轮询，async 会长时间卡死事件循环。"""
     from backend.services.agent_service_control import restart_agent
     return restart_agent(body.confirm)
+
+
+# ══════════ V2: 执行策略（参数并入展示，存储仍分域） ══════════
+@router.get("/agents/config/strategy")
+async def get_strategy_all():
+    from backend.services.agent_strategy import list_grouped
+    # 运行参数并入策略页展示（存储仍走 agent_params 表,接口不变）
+    params = []
+    for key, spec in PARAM_REGISTRY.items():
+        v = get_param(key, env_key=spec.get("env_key"), default=spec.get("default"))
+        params.append({"key": key,
+                       "value": mask_secret(v) if spec["type"] == "secret" else v,
+                       "default": spec.get("default"), "type": spec["type"],
+                       "effect": spec["effect"], "desc": spec.get("desc", "")})
+    return {"success": True, "data": {"groups": list_grouped(), "params": params}}
+
+
+class StrategyBody(BaseModel):
+    items: dict  # {key: value}; 空/None=不改（含 secret/ref）
+
+
+@router.put("/agents/config/strategy")
+async def put_strategy(body: StrategyBody):
+    from backend.services.agent_strategy import set_strategy
+    from backend.services.llm_providers import eligible_default_providers
+    invalid = [k for k in body.items if k not in STRATEGY_REGISTRY]
+    if invalid:
+        raise HTTPException(400, f"未知策略: {invalid}")
+    errors = []
+    for k, v in body.items.items():
+        spec = STRATEGY_REGISTRY[k]
+        if v is None or v == "":
+            continue  # 空=不改
+        if spec["type"] == "enum" and v not in spec.get("choices", ()):
+            errors.append(f"{k} 必须是 {spec['choices']} 之一")
+        if spec["type"] == "int":
+            try:
+                int(v)
+            except (TypeError, ValueError):
+                errors.append(f"{k} 必须是整数")
+        if k == "default_llm_provider" and v and v not in eligible_default_providers():
+            errors.append(f"供应商 {v} 未通过测试连接,不能设为默认")
+    if errors:
+        raise HTTPException(400, detail={"message": "策略校验失败", "errors": errors})
+    for k, v in body.items.items():
+        if v is None or v == "":
+            continue
+        set_strategy(k, str(v))
+    restart_needed = any(STRATEGY_REGISTRY[k]["effect"] == "restart" for k in body.items)
+    return {"success": True, "restart_needed": restart_needed}
+
+
+# ══════════ V2: 技能管理 ══════════
+@router.get("/agents/config/skills")
+async def get_skills(entity: str):
+    from backend.services.skill_service import list_skills, list_templates
+    try:
+        return {"success": True, "data": {"skills": list_skills(entity),
+                                          "templates": list_templates()}}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class SkillFileBody(BaseModel):
+    entity: str
+    name: str
+    content: str
+    message: Optional[str] = ""
+
+
+@router.get("/agents/config/skills/file")
+async def get_skill_file(entity: str, name: str):
+    from backend.services.skill_service import read_skill_md
+    try:
+        return {"success": True, "data": read_skill_md(entity, name)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+
+
+@router.put("/agents/config/skills/file")
+def put_skill_file(body: SkillFileBody):
+    """sync def：git 快照 subprocess + _save_lock 串行段。"""
+    from backend.services.skill_service import save_skill_md
+    try:
+        return {"success": True, "data": save_skill_md(body.entity, body.name, body.content, body.message or "")}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+
+
+class SkillCreateBody(BaseModel):
+    entity: str
+    name: str
+    description: str
+    skeleton: str = "empty"
+
+
+@router.post("/agents/config/skills/create")
+def create_skill(body: SkillCreateBody):
+    """sync def：落盘 + git 快照 subprocess。"""
+    from backend.services.skill_service import create_skill
+    try:
+        return {"success": True, "data": create_skill(body.entity, body.name, body.description, body.skeleton)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class SkillActionBody(BaseModel):
+    entity: str
+    name: str
+
+
+@router.post("/agents/config/skills/disable")
+def disable_skill(body: SkillActionBody):
+    """sync def：rename + git 快照 subprocess。"""
+    from backend.services.skill_service import disable_skill
+    try:
+        disable_skill(body.entity, body.name)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except FileExistsError as e:
+        raise HTTPException(409, str(e))
+
+
+@router.post("/agents/config/skills/enable")
+def enable_skill(body: SkillActionBody):
+    """sync def：rename + git 快照 subprocess。"""
+    from backend.services.skill_service import enable_skill
+    try:
+        enable_skill(body.entity, body.name)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except FileExistsError as e:
+        raise HTTPException(409, str(e))
+
+
+@router.delete("/agents/config/skills")
+def delete_skill(entity: str, name: str):
+    """sync def：rmtree + git 快照 subprocess。"""
+    from backend.services.skill_service import delete_skill
+    try:
+        delete_skill(entity, name)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+
+
+class TemplateInstallBody(BaseModel):
+    template: str
+    entity: str
+
+
+@router.post("/agents/config/skills/install")
+def install_template(body: TemplateInstallBody):
+    """sync def：copytree + git 快照 subprocess。"""
+    from backend.services.skill_service import install_template
+    try:
+        return {"success": True, "data": install_template(body.template, body.entity)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except FileExistsError as e:
+        raise HTTPException(409, str(e))
+
+
+# ══════════ V2: MCP 接入 ══════════
+@router.get("/agents/config/mcp")
+async def get_mcp():
+    from backend.services.mcp_config_service import list_servers, list_presets
+    return {"success": True, "data": {"servers": list_servers(masked=True), "presets": list_presets()}}
+
+
+class McpServerBody(BaseModel):
+    name: str
+    config: dict
+
+
+@router.put("/agents/config/mcp")
+async def put_mcp(body: McpServerBody):
+    from backend.services.mcp_config_service import upsert_server, validate_server
+    errs = validate_server(body.config)
+    if errs:
+        raise HTTPException(400, detail={"message": "MCP 配置校验失败", "errors": errs})
+    upsert_server(body.name, body.config)
+    return {"success": True, "restart_needed": True}
+
+
+@router.delete("/agents/config/mcp")
+async def delete_mcp(name: str):
+    from backend.services.mcp_config_service import delete_server
+    delete_server(name)
+    return {"success": True, "restart_needed": True}
+
+
+class McpTestBody(BaseModel):
+    config: dict
+
+
+@router.post("/agents/config/mcp/test")
+def mcp_test(body: McpTestBody):
+    """sync def：一次性 stdio MCP 客户端 subprocess（connect_timeout 最坏 120s）。"""
+    from backend.services.mcp_config_service import test_connect
+    return test_connect(body.config)
+
+
+class McpPresetBody(BaseModel):
+    name: str
+
+
+@router.post("/agents/config/mcp/preset")
+async def install_mcp_preset(body: McpPresetBody):
+    from backend.services.mcp_config_service import install_preset
+    try:
+        return {"success": True, "data": install_preset(body.name), "restart_needed": True}
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+
+
+# ══════════ V2: LLM 供应商 ══════════
+@router.get("/agents/config/providers")
+async def get_providers():
+    from backend.services.llm_providers import list_providers, seed_defaults, eligible_default_providers, get_default_provider_name
+    seed_defaults()
+    return {"success": True, "data": {"providers": list_providers(masked=True),
+                                      "eligible": eligible_default_providers(),
+                                      "current_default": get_default_provider_name()}}
+
+
+class ProviderBody(BaseModel):
+    name: str
+    base_url: str
+    api_key: Optional[str] = None   # None/空=不修改已有 key
+    model: str
+    enabled: bool = True
+
+
+@router.put("/agents/config/providers")
+async def put_provider(body: ProviderBody):
+    from backend.services.llm_providers import upsert_provider, get_provider_row
+    key = body.api_key
+    if not key:
+        existing = get_provider_row(body.name)
+        key = existing["api_key"] if existing else ""
+    upsert_provider(body.name, body.base_url, key, body.model, body.enabled)
+    return {"success": True}
+
+
+@router.delete("/agents/config/providers")
+async def delete_provider(name: str):
+    from backend.services.llm_providers import delete_provider
+    delete_provider(name)
+    return {"success": True}
+
+
+class ProviderTestBody(BaseModel):
+    name: str
+
+
+@router.post("/agents/config/providers/test")
+def provider_test(body: ProviderTestBody):
+    """sync def：阻塞 HTTP 真请求（timeout 10s）。先判存在再 mark_tested
+    （mark_tested 对不存在的 name 抛 KeyError，404 兜在前面）。"""
+    import time
+    import httpx
+    from backend.services.llm_providers import get_provider_row, mark_tested
+    row = get_provider_row(body.name)
+    if row is None:
+        raise HTTPException(404, f"供应商不存在: {body.name}")
+    t0 = time.time()
+    try:
+        r = httpx.post(f"{row['base_url'].rstrip('/')}/chat/completions",
+                       headers={"Authorization": f"Bearer {row['api_key']}"},
+                       json={"model": row["model"], "messages": [{"role": "user", "content": "hi"}],
+                             "max_tokens": 1},
+                       timeout=10.0)
+        ok = r.status_code == 200
+        mark_tested(body.name, ok)
+        return {"ok": ok, "latency_ms": int((time.time() - t0) * 1000),
+                "error": None if ok else f"HTTP {r.status_code}: {r.text[:150]}"}
+    except Exception as e:
+        mark_tested(body.name, False)
+        return {"ok": False, "latency_ms": int((time.time() - t0) * 1000), "error": str(e)[:150]}
+
+
+class DefaultProviderBody(BaseModel):
+    name: str
+
+
+@router.post("/agents/config/providers/default")
+async def set_default(body: DefaultProviderBody):
+    from backend.services.llm_providers import set_default_provider
+    try:
+        set_default_provider(body.name)
+        return {"success": True, "restart_needed": True}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
