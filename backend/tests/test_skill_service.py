@@ -89,3 +89,71 @@ def test_delete_skill(env):
     svc.create_skill("master", "del-skill", "待删", skeleton="empty")
     svc.delete_skill("master", "del-skill")
     assert not (env / "skills" / "del-skill").exists()
+
+
+def _git_out(env, *args):
+    return subprocess.run(["git"] + list(args), cwd=env, capture_output=True,
+                          text=True, encoding="utf-8").stdout
+
+
+def test_path_traversal_rejected(env):
+    """名字校验必须挡住路径穿越/尾换行（delete/install 的攻击面）。"""
+    from backend.services import skill_service as svc
+    victim = env / "workspace"                        # 放一个诱饵目录看是否被穿越删除
+    victim.mkdir()
+    (victim / "SOUL.md").write_text("decoy", encoding="utf-8")
+    with pytest.raises(ValueError):
+        svc.delete_skill("master", "../workspace")     # 不许穿越删目录
+    with pytest.raises(ValueError):
+        svc.install_template("../x", "master")         # 模板名同样校验
+    with pytest.raises(ValueError):
+        svc.create_skill("master", "abc\n", "尾换行", skeleton="empty")
+    assert (victim / "SOUL.md").exists()               # 诱饵毫发无损
+
+
+def test_delete_snapshot_complete(env):
+    """删除先落盘再 add -A 暂存删除：git log 有 D 记录、git status 干净。"""
+    from backend.services import skill_service as svc
+    svc.create_skill("master", "snap-del", "待删", skeleton="empty")
+    svc.delete_skill("master", "snap-del")
+    rel = "skills/snap-del"
+    log = _git_out(env, "log", "--diff-filter=D", "--name-only", "--pretty=format:", "--", rel)
+    assert f"{rel}/SKILL.md" in log                     # 删除被记录
+    assert _git_out(env, "status", "--porcelain", "--", rel).strip() == ""  # 无残留 D
+
+
+def test_disable_enable_snapshot_complete(env):
+    """禁用/启用后旧路径删除+新路径都已暂存提交，git status 干净。"""
+    from backend.services import skill_service as svc
+    svc.create_skill("master", "snap-rt", "往返", skeleton="empty")
+    svc.disable_skill("master", "snap-rt")
+    both = ["skills/snap-rt", "skills/snap-rt.disabled"]
+    assert _git_out(env, "status", "--porcelain", "--", *both).strip() == ""
+    assert _git_out(env, "log", "--diff-filter=D", "--name-only",
+                    "--pretty=format:", "--", "skills/snap-rt").strip() != ""
+    svc.enable_skill("master", "snap-rt")
+    assert _git_out(env, "status", "--porcelain", "--", *both).strip() == ""
+
+
+def test_save_no_change_shortcircuit(env):
+    from backend.services import skill_service as svc
+    svc.create_skill("master", "nc-skill", "原描述", skeleton="empty")
+    cur = svc.read_skill_md("master", "nc-skill")["content"]
+    r = svc.save_skill_md("master", "nc-skill", cur)
+    assert r.get("no_change") is True and r.get("degraded") is False
+
+
+def test_disable_enable_twin_conflict(env):
+    """孪生目录已存在时给出清晰 FileExistsError，且不动原目录。"""
+    from backend.services import skill_service as svc
+    svc.create_skill("master", "twin-a", "甲", skeleton="empty")
+    (env / "skills" / "twin-a.disabled").mkdir()
+    with pytest.raises(FileExistsError):
+        svc.disable_skill("master", "twin-a")
+    assert (env / "skills" / "twin-a" / "SKILL.md").exists()   # 原目录未被动
+    svc.create_skill("master", "twin-b", "乙", skeleton="empty")
+    svc.disable_skill("master", "twin-b")
+    (env / "skills" / "twin-b").mkdir()                        # 启用目标已被占
+    with pytest.raises(FileExistsError):
+        svc.enable_skill("master", "twin-b")
+    assert (env / "skills" / "twin-b.disabled" / "SKILL.md").exists()
