@@ -6,25 +6,21 @@
 Filesystem 类 server 的目录边界只允许项目内 shared/ 子路径（防开盘符根/项目根）。
 """
 import copy
-import re
+import os
 import sys
 from pathlib import Path
-
-import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _HERMES_ROOT = PROJECT_ROOT / "shared" / "framework" / "hermes-agent"
 
-_ALLOWED_DIR_RE = re.compile(r"^[A-Za-z]:[/\\][^\s:*?\"<>|]*$")
-
-
-def _hermes_home() -> Path:
-    import os
-    p = Path(os.environ.get("HERMES_HOME", str(PROJECT_ROOT)))
-    return p
-
 
 def _load_hermes_cli():
+    # 钉死 HERMES_HOME 到项目根：本机可能有持久用户级 HERMES_HOME（如 D:\Hermes），
+    # 不钉死则 backend 进程读写用户目录、而 agent 服务（start_agent.py 显式设项目根）
+    # 读项目根——写入/读取完全分裂，功能静默失效。backend 的 config 管理
+    # 语义上就是管理 agent 的项目根配置，此钉死与 start_agent 保持一致。
+    # 必须在 import hermes_cli 之前设置；get_hermes_home() 每次调用时读 env，故后续同样生效。
+    os.environ["HERMES_HOME"] = str(PROJECT_ROOT)
     if str(_HERMES_ROOT) not in sys.path:
         sys.path.insert(0, str(_HERMES_ROOT))
     from hermes_cli import config as hc
@@ -79,12 +75,18 @@ def validate_server(cfg: dict) -> list:
         errs.append("stdio 传输必须提供 command")
     if transport in ("http", "sse") and not cfg.get("url"):
         errs.append(f"{transport} 传输必须提供 url")
+    # 目录边界：resolve 后按路径组件前缀比对到项目内 shared/（纯子串检查会放过
+    # D:/other/shared/x；纯字符串前缀会放过 …/shared_evil）。
+    allowed_root = (PROJECT_ROOT / "shared").resolve()
     for d in cfg.get("allowed_dirs") or []:
-        dd = str(d).replace("\\", "/")
-        if not _ALLOWED_DIR_RE.match(str(d)) or ":/" not in dd:
+        try:
+            dd = Path(str(d)).resolve()
+        except Exception:
             errs.append(f"目录边界必须是绝对路径: {d}")
-        elif "/shared/" not in dd and not dd.endswith("/shared"):
-            errs.append(f"目录边界只允许项目内 shared/ 子路径: {d}")
+            continue
+        if dd.is_absolute() and dd.is_relative_to(allowed_root):
+            continue
+        errs.append(f"目录边界只允许项目内 shared/ 子路径: {d}")
     return errs
 
 
@@ -126,30 +128,30 @@ def install_preset(name: str) -> dict:
 
 
 def test_connect(cfg: dict) -> dict:
-    """起一次性 stdio MCP 客户端握手 + tools/list。仅支持 stdio（预置全是）。"""
+    """起一次性 stdio MCP 客户端握手 + tools/list。仅支持 stdio（预置全是）。
+
+    MCP stdio 传输是换行分隔 JSON-RPC（NDJSON），不是 LSP 的 Content-Length 帧；
+    必须先发 notifications/initialized 再 tools/list；用 bytes 模式避免 Windows CRLF 转换。
+    """
+    import json as _json
     import subprocess
     cmd = [cfg.get("command")] + list(cfg.get("args") or [])
-    env_cfg = cfg.get("env") or {}
     try:
-        import os
         env = dict(os.environ)
-        for k, v in env_cfg.items():
+        for k, v in (cfg.get("env") or {}).items():
             env[k] = os.path.expandvars(v)
-        # MCP 握手走 JSON-RPC over stdio：initialize + tools/list
-        import json
-        init = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
-                           "params": {"protocolVersion": "2024-11-05",
-                                      "capabilities": {},
-                                      "clientInfo": {"name": "eco-config", "version": "1.0"}}})
-        lst = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        r = subprocess.run(cmd, input=f"Content-Length: {len(init)}\r\n\r\n{init}"
-                                       f"Content-Length: {len(lst)}\r\n\r\n{lst}",
-                           capture_output=True, text=True, timeout=cfg.get("connect_timeout", 60),
-                           env=env)
-        out = r.stdout or ""
-        ok = r.returncode == 0 and "tools" in out and "result" in out
-        n_tools = out.count('"name"')
-        return {"ok": ok, "tools_seen": n_tools if ok else 0,
-                "error": None if ok else (r.stderr or "握手无 tools 响应")[:200]}
+        init = _json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                            "params": {"protocolVersion": "2024-11-05", "capabilities": {},
+                                       "clientInfo": {"name": "eco-config", "version": "1.0"}}})
+        ready = _json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        lst = _json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        payload = init + "\n" + ready + "\n" + lst + "\n"
+        r = subprocess.run(cmd, input=payload.encode("utf-8"), capture_output=True,
+                           timeout=cfg.get("connect_timeout", 120), env=env)
+        out = (r.stdout or b"").decode("utf-8", errors="replace")
+        ok = '"tools"' in out and '"result"' in out
+        n = out.count('"name"')
+        return {"ok": ok, "tools_seen": n if ok else 0,
+                "error": None if ok else ((r.stderr or b"").decode("utf-8", "replace") or "握手无 tools 响应")[:200]}
     except Exception as e:
         return {"ok": False, "tools_seen": 0, "error": str(e)[:200]}

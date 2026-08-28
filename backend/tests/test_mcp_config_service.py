@@ -1,6 +1,6 @@
 # backend/tests/test_mcp_config_service.py
-"""mcp_config_service 单测：读写往返(只动 mcp_servers 段)/脱敏/校验/预置清单。
-临时 HERMES_HOME（monkeypatch env），不碰真实 config.yaml。"""
+"""mcp_config_service 单测：读写往返(只动 mcp_servers 段)/脱敏/校验/预置清单/HERMES_HOME 钉死。
+临时 HERMES_HOME + 临时 PROJECT_ROOT（monkeypatch），不碰真实 config.yaml。"""
 import os, sys
 from pathlib import Path
 import pytest
@@ -16,7 +16,8 @@ def home(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text(
         "model:\n  default: ctgu-vlm\nagent:\n  max_turns: 60\n", encoding="utf-8")
     import backend.services.mcp_config_service as svc
-    monkeypatch.setattr(svc, "_hermes_home", lambda: tmp_path)
+    # 服务会把 HERMES_HOME 钉死到 PROJECT_ROOT——fixture 同步钉到 tmp，保证不碰真实根
+    monkeypatch.setattr(svc, "PROJECT_ROOT", tmp_path)
     return tmp_path
 
 
@@ -65,9 +66,38 @@ def test_validate(home):
     errs = svc.validate_server({"transport": "stdio", "command": "npx", "args": ["-y", "p"],
                                 "allowed_dirs": ["E:\\"]})
     assert any("目录" in e for e in errs)   # 绝对不能开放盘符根
+    good = str(svc.PROJECT_ROOT / "shared" / "knowledge")
     errs = svc.validate_server({"transport": "stdio", "command": "npx", "args": ["-y", "p"],
-                                "allowed_dirs": ["E:/project/Ecological_env/shared/knowledge"]})
+                                "allowed_dirs": [good]})
     assert errs == []
+
+
+def test_validate_rejects_foreign_shared(home):
+    """/shared/ 纯子串检查会放过 D:/other/shared/x——必须 resolve 后前缀比对到项目内 shared/。"""
+    import backend.services.mcp_config_service as svc
+    errs = svc.validate_server({"transport": "stdio", "command": "npx", "args": ["-y", "p"],
+                                "allowed_dirs": ["D:/other/shared/x"]})
+    assert any("目录" in e for e in errs)
+    # 前缀边界逃逸（shared_evil 不是 shared 子路径）也必须拒
+    evil = str(svc.PROJECT_ROOT / "shared_evil")
+    errs = svc.validate_server({"transport": "stdio", "command": "npx", "args": ["-y", "p"],
+                                "allowed_dirs": [evil]})
+    assert any("目录" in e for e in errs)
+
+
+def test_pins_to_project_root_over_env(tmp_path, monkeypatch):
+    """本机有持久 HKCU HERMES_HOME=D:\Hermes——写入必须钉死项目根，不能跟随 env 分裂。"""
+    fake_home = tmp_path / "fake-hermes-home"      # 模拟 D:\Hermes
+    fake_home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(fake_home))
+    proj = tmp_path / "projroot"                   # 模拟项目根
+    proj.mkdir()
+    import backend.services.mcp_config_service as svc
+    monkeypatch.setattr(svc, "PROJECT_ROOT", proj)
+    svc.upsert_server("fetch", {"command": "npx", "args": ["-y", "pkg"]})
+    assert (proj / "config.yaml").exists()             # 写进了项目根
+    assert not (fake_home / "config.yaml").exists()    # 没有跟 env 跑去假 home
+    assert "fetch" in svc.list_servers()               # 读回也走项目根
 
 
 def test_presets(home):
