@@ -25,6 +25,29 @@ export interface PlantConfig {
 /** 通用响应包裹 */
 export interface ApiResponse<T> { success: boolean; data: T }
 
+// ── V2 类型 ──
+export interface StrategyItem {
+  key: string; value: boolean | string | number; default: unknown
+  type: 'bool' | 'enum' | 'int' | 'str' | 'ref'; effect: 'immediate' | 'restart'
+  desc: string; choices?: string[]
+}
+export interface StrategyData { groups: Record<string, StrategyItem[]>; params: ParamItem[] }
+export interface SkillItem {
+  name: string; display_name: string; description: string
+  scripts: string[]; enabled: boolean
+}
+export interface TemplateItem { name: string; description: string; has_scripts: boolean }
+export interface McpServerCfg {
+  command?: string; args?: string[]; env?: Record<string, string>
+  url?: string; headers?: Record<string, string>; transport?: string
+  timeout?: number; connect_timeout?: number; enabled?: boolean
+}
+export interface McpPreset { name: string; title: string; transport: string; desc: string; config: McpServerCfg }
+export interface ProviderRow {
+  name: string; base_url: string; model: string
+  api_key: string; enabled: boolean; tested_ok: boolean
+}
+
 export const agentConfigService = {
   /** 实体列表（主智能体+4子智能体） */
   entities: () => api.get<unknown, ApiResponse<AgentEntity[]>>('/v1/agents/config/entities'),
@@ -74,4 +97,54 @@ export const agentConfigService = {
   /** 重启 agent 服务（confirm=true） */
   serviceRestart: () =>
     api.post<unknown, { success?: boolean; ok?: boolean; [k: string]: unknown }>('/v1/agents/config/service/restart', { confirm: true }),
+
+  // ── V2: 策略 ──
+  /** 策略（分组）+ 运行参数（并入策略页展示,存储仍走 agent_params 表） */
+  getStrategy: () => api.get<unknown, { success: boolean; data: StrategyData }>('/v1/agents/config/strategy'),
+
+  /** 批量保存策略；空值=不改（含 secret/ref） */
+  saveStrategy: (items: Record<string, string | boolean | number>) =>
+    api.put<unknown, { success: boolean; restart_needed: boolean }>('/v1/agents/config/strategy', { items }),
+
+  // ── V2: 技能 ──
+  getSkills: (entity: string) =>
+    api.get<unknown, { success: boolean; data: { skills: SkillItem[]; templates: TemplateItem[] } }>('/v1/agents/config/skills', { params: { entity } }),
+  readSkillFile: (entity: string, name: string) =>
+    api.get<unknown, { success: boolean; data: FileContent }>('/v1/agents/config/skills/file', { params: { entity, name } }),
+  saveSkillFile: (body: { entity: string; name: string; content: string; message?: string }) =>
+    api.put<unknown, { success: boolean; data: { commit: string | null; degraded: boolean } }>('/v1/agents/config/skills/file', body),
+  createSkill: (body: { entity: string; name: string; description: string; skeleton: string }) =>
+    api.post<unknown, { success: boolean; data: { name: string; path: string } }>('/v1/agents/config/skills/create', body),
+  disableSkill: (body: { entity: string; name: string }) =>
+    api.post<unknown, { success: boolean }>('/v1/agents/config/skills/disable', body),
+  enableSkill: (body: { entity: string; name: string }) =>
+    api.post<unknown, { success: boolean }>('/v1/agents/config/skills/enable', body),
+  deleteSkill: (entity: string, name: string) =>
+    api.delete<unknown, { success: boolean }>('/v1/agents/config/skills', { params: { entity, name } }),
+  installTemplate: (body: { template: string; entity: string }) =>
+    api.post<unknown, { success: boolean; data: { ok: boolean; skill: string } }>('/v1/agents/config/skills/install', body),
+
+  // ── V2: MCP ──
+  getMcp: () =>
+    api.get<unknown, { success: boolean; data: { servers: Record<string, McpServerCfg>; presets: McpPreset[] } }>('/v1/agents/config/mcp'),
+  putMcp: (body: { name: string; config: McpServerCfg }) =>
+    api.put<unknown, { success: boolean; restart_needed: boolean }>('/v1/agents/config/mcp', body),
+  deleteMcp: (name: string) =>
+    api.delete<unknown, { success: boolean }>('/v1/agents/config/mcp', { params: { name } }),
+  testMcp: (config: McpServerCfg) =>
+    api.post<unknown, { ok: boolean; tools_seen?: number; error?: string | null }>('/v1/agents/config/mcp/test', { config }),
+  installMcpPreset: (name: string) =>
+    api.post<unknown, { success: boolean; restart_needed: boolean }>('/v1/agents/config/mcp/preset', { name }),
+
+  // ── V2: LLM 供应商 ──
+  getProviders: () =>
+    api.get<unknown, { success: boolean; data: { providers: ProviderRow[]; eligible: string[]; current_default: string } }>('/v1/agents/config/providers'),
+  putProvider: (body: { name: string; base_url: string; api_key?: string; model: string; enabled: boolean }) =>
+    api.put<unknown, { success: boolean }>('/v1/agents/config/providers', body),
+  deleteProvider: (name: string) =>
+    api.delete<unknown, { success: boolean }>('/v1/agents/config/providers', { params: { name } }),
+  testProvider: (name: string) =>
+    api.post<unknown, { ok: boolean; latency_ms?: number; error?: string | null }>('/v1/agents/config/providers/test', { name }),
+  setDefaultProvider: (name: string) =>
+    api.post<unknown, { success: boolean; restart_needed: boolean }>('/v1/agents/config/providers/default', { name }),
 }
