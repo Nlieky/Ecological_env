@@ -11,3 +11,12 @@ class AgentRuntimeParam(Base):
     key = Column(String(64), primary_key=True)
     value = Column(Text, nullable=False, default="")
     updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
+
+
+class AgentStrategy(Base):
+    """智能体执行策略（编排/守卫/风格/动作通道/默认供应商）。key/value 字符串存储，
+    读取方经 agent_strategy.get_strategy 按类型转换；无行=用内置默认。"""
+    __tablename__ = "agent_strategy"
+    key = Column(String(64), primary_key=True)
+    value = Column(Text, nullable=False, default="")
+    updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
