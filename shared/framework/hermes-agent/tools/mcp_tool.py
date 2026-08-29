@@ -2637,8 +2637,14 @@ def _make_tool_handler(server_name: str, tool_name: str, tool_timeout: float):
         async def _call():
             async with server._rpc_lock:
                 result = await server.session.call_tool(tool_name, arguments=args)
-            # MCP CallToolResult has .content (list of content blocks) and .isError
-            if result.isError:
+            # MCP CallToolResult has .content (list of content blocks) and error flag.
+            # 兼容两代 SDK: 旧版是 camelCase isError, mcp>=1.10 是 snake_case is_error
+            # (本地补丁 2026-08-29: vendored 代码假设旧版,装 mcp 2.1.1 后 AttributeError
+            #  导致所有 MCP 工具调用失败,LLM 学会了"工具不存在"的幻觉)
+            _is_err = getattr(result, "isError", None)
+            if _is_err is None:
+                _is_err = getattr(result, "is_error", False)
+            if _is_err:
                 error_text = ""
                 for block in (result.content or []):
                     if hasattr(block, "text"):
@@ -2674,7 +2680,10 @@ def _make_tool_handler(server_name: str, tool_name: str, tool_timeout: float):
             # MCP spec: content is model-oriented (text), structuredContent
             # is machine-oriented (JSON metadata).  For an AI agent, content
             # is the primary payload; structuredContent supplements it.
+            # 同上兼容: 新 SDK 是 structured_content(本地补丁 2026-08-29)
             structured = getattr(result, "structuredContent", None)
+            if structured is None:
+                structured = getattr(result, "structured_content", None)
             if structured is not None:
                 if text_result:
                     return json.dumps({
