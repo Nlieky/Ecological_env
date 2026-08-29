@@ -71,18 +71,55 @@
       </div>
     </div>
 
-    <!-- 市场 -->
+    <!-- 市场：本地模板 + 外部搜索（skills.sh / GitHub 官方源）双页签 -->
     <div v-if="showMarket" class="sk-mask" @click.self="showMarket = false">
       <div class="sk-modal wide">
-        <div class="sk-mh">技能市场（仓库内置模板库）</div>
-        <div v-for="t in templates" :key="t.name" class="sk-tpl">
-          <div>
-            <div class="sk-tname">📦 {{ t.name }}</div>
-            <div class="sk-tdesc">{{ t.description }}</div>
-          </div>
-          <button class="btn primary xs" @click="install(t.name)"
-                  :disabled="installed.has(t.name)">{{ installed.has(t.name) ? '已安装' : '安装' }}</button>
+        <div class="sk-mh">技能市场
+          <span class="mk-tabs">
+            <button class="mk-tab" :class="{ on: mkTab === 'local' }" @click="mkTab = 'local'">内置模板</button>
+            <button class="mk-tab" :class="{ on: mkTab === 'hub' }" @click="mkTab = 'hub'">外部搜索</button>
+          </span>
         </div>
+
+        <template v-if="mkTab === 'local'">
+          <div v-for="t in templates" :key="t.name" class="sk-tpl">
+            <div>
+              <div class="sk-tname">📦 {{ t.name }}</div>
+              <div class="sk-tdesc">{{ t.description }}</div>
+            </div>
+            <button class="btn primary xs" @click="install(t.name)"
+                    :disabled="installed.has(t.name)">{{ installed.has(t.name) ? '已安装' : '安装' }}</button>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="mk-search">
+            <input v-model="hubQuery" class="sk-in" placeholder="搜外部技能（skills.sh 两万+ / GitHub 官方源），如：pdf / excel / crawl"
+                   @keyup.enter="searchHub" />
+            <button class="btn primary xs" @click="searchHub" :disabled="hubSearching">
+              {{ hubSearching ? '搜索中…' : '搜索' }}
+            </button>
+          </div>
+          <div v-if="hubError" class="mk-huberr">{{ hubError }}</div>
+          <div v-if="hubResults.length" class="mk-hublist">
+            <div v-for="h in hubResults" :key="h.identifier" class="sk-tpl">
+              <div>
+                <div class="sk-tname">🌐 {{ h.name }}
+                  <span class="mk-trust" :class="h.trust_level">{{ trustLabel(h.trust_level) }}</span>
+                  <span class="mk-src">{{ h.source }}</span>
+                </div>
+                <div class="sk-tdesc">{{ h.description || '（无描述）' }}</div>
+              </div>
+              <button class="btn xs primary" @click="installFromHub(h)"
+                      :disabled="hubInstalling === h.identifier || installed.has(h.name)">
+                {{ hubInstalling === h.identifier ? '安装中…' : installed.has(h.name) ? '已安装' : '安装' }}
+              </button>
+            </div>
+          </div>
+          <div v-else-if="hubSearched && !hubSearching" class="mk-hubempty">没有匹配结果，换个关键词</div>
+          <div v-else class="mk-hubempty">输入关键词搜索外部社区技能（trust=官方源的更可靠）</div>
+        </template>
+
         <div class="sk-mf"><button class="btn" @click="showMarket = false">关闭</button></div>
       </div>
     </div>
@@ -92,7 +129,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { agentConfigService, type SkillItem, type TemplateItem } from '@/api/modules/agentConfig'
+import { agentConfigService, type SkillItem, type TemplateItem, type HubSkillItem } from '@/api/modules/agentConfig'
 
 const props = defineProps<{ entity: string }>()
 
@@ -105,6 +142,42 @@ const saving = ref(false)
 const showDiff = ref(false)
 const showCreate = ref(false)
 const showMarket = ref(false)
+// ── 外部市场（skills.sh / GitHub 官方源）──
+const mkTab = ref<'local' | 'hub'>('local')
+const hubQuery = ref('')
+const hubResults = ref<HubSkillItem[]>([])
+const hubSearching = ref(false)
+const hubSearched = ref(false)
+const hubError = ref('')
+const hubInstalling = ref('')
+
+function trustLabel(t: string): string {
+  return { trusted: '可信源', community: '社区', builtin: '内置' }[t] || t
+}
+
+async function searchHub() {
+  if (!hubQuery.value.trim()) return
+  hubSearching.value = true; hubError.value = ''; hubResults.value = []
+  try {
+    const r: any = await agentConfigService.skillHubSearch(hubQuery.value.trim())
+    hubResults.value = (r.data ?? r) as HubSkillItem[]
+    hubSearched.value = true
+  } catch (e: any) {
+    hubError.value = '搜索失败（外网可达性）：' + (e?.message || e)
+  } finally { hubSearching.value = false }
+}
+
+async function installFromHub(h: HubSkillItem) {
+  hubInstalling.value = h.identifier
+  try {
+    const r: any = await agentConfigService.skillHubInstall(h.identifier, props.entity)
+    const d = r.data ?? r
+    ElMessage.success(`已安装 ${d.name}（来源 ${d.source}${d.degraded ? '，git 快照降级' : ''}）`)
+    await load()
+  } catch (e: any) {
+    ElMessage.error('安装失败：' + (e?.response?.data?.detail || e?.message || e))
+  } finally { hubInstalling.value = '' }
+}
 const createForm = ref({ name: '', description: '', skeleton: 'empty' })
 const disabledSkills = ref<string[]>([])
 const installed = computed(() => new Set(skills.value.map(s => s.name)))
@@ -241,6 +314,23 @@ async function del(name: string) {
   font-family: ui-monospace, monospace; outline: none }
 .sk-sel { font-size: 12.5px; padding: 7px 10px; border: 1px solid var(--brd); border-radius: 7px }
 .sk-mf { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px }
+/* 市场双页签 + 外部搜索 */
+.mk-tabs { display: inline-flex; gap: 2px; margin-left: 14px }
+.mk-tab { border: 1px solid var(--brd); background: #fff; font-size: 12px; padding: 4px 13px;
+  cursor: pointer; color: var(--text-secondary); border-radius: 7px }
+.mk-tab:first-child { border-radius: 7px 0 0 7px }
+.mk-tab:last-child { border-radius: 0 7px 7px 0; margin-left: -1px }
+.mk-tab.on { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600 }
+.mk-search { display: flex; gap: 8px; margin: 4px 0 12px }
+.mk-search .sk-in { flex: 1 }
+.mk-huberr { font-size: 12px; color: #dc2626; margin-bottom: 8px }
+.mk-hublist { max-height: 380px; overflow: auto }
+.mk-hubempty { font-size: 12px; color: var(--text-muted); padding: 18px 0; text-align: center }
+.mk-trust { font-size: 10px; padding: 1px 7px; border-radius: 5px; margin-left: 7px; font-weight: 600 }
+.mk-trust.trusted { background: #ecfdf5; color: #047857 }
+.mk-trust.community { background: #fffbeb; color: #92400e }
+.mk-trust.builtin { background: #eef2ff; color: var(--primary) }
+.mk-src { font-size: 10.5px; color: var(--text-muted); margin-left: 7px }
 .sk-tpl { display: flex; justify-content: space-between; align-items: center; gap: 12px;
   padding: 11px 0; border-bottom: 1px dashed var(--brd) }
 .sk-tname { font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 600 }

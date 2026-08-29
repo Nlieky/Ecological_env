@@ -3,6 +3,30 @@
   <div class="mp">
     <div class="mp-t">外部 MCP 接入 <span class="mp-sub">改动需重启 agent 生效</span></div>
 
+    <!-- 市场：npm 搜索（MCP server 事实上的分发中心） -->
+    <div class="mp-sec-t">市场 <span class="mp-market-hint">搜索 npm 上的 MCP server</span></div>
+    <div class="mp-market">
+      <input v-model="marketQuery" class="mp-in mk" placeholder="搜 MCP，如：地图 / chart / playwright / hotnews"
+             @keyup.enter="searchMarket" />
+      <button class="btn primary xs" @click="searchMarket" :disabled="mkSearching">
+        {{ mkSearching ? '搜索中…' : '搜索' }}
+      </button>
+    </div>
+    <div v-if="mkError" class="mp-mkerr">{{ mkError }}</div>
+    <div v-if="marketResults.length" class="mp-mklist">
+      <div v-for="m in marketResults" :key="m.name" class="mp-mkrow">
+        <div class="mp-mkk">
+          <div class="mp-mkname">{{ m.name }} <span class="mp-mkver">v{{ m.version }}</span></div>
+          <div class="mp-mkdesc" :title="m.description">{{ m.description }}</div>
+        </div>
+        <button class="btn xs primary" @click="installFromMarket(m)"
+                :disabled="mkInstalling === m.name || installedPkgs.has(m.name)">
+          {{ mkInstalling === m.name ? '安装中…' : installedPkgs.has(m.name) ? '已安装' : '安装' }}
+        </button>
+      </div>
+    </div>
+    <div v-else-if="mkSearched && !mkSearching" class="mp-empty">没有匹配的 MCP 包，换个关键词试试</div>
+
     <div class="mp-sec-t">预置（一键安装）</div>
     <div class="mp-grid">
       <div v-for="p in presets" :key="p.name" class="mp-card">
@@ -74,7 +98,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { agentConfigService, type McpServerCfg, type McpPreset } from '@/api/modules/agentConfig'
+import { agentConfigService, type McpServerCfg, type McpPreset, type McpMarketItem } from '@/api/modules/agentConfig'
 
 defineEmits<{ (e: 'restart'): void }>()
 
@@ -87,12 +111,51 @@ const addForm = ref({ name: '', transport: 'stdio', command: 'npx', argsStr: '',
 const testedAdd = ref<null | boolean>(null)
 const lastAddTest = ref<{ ok: boolean; tools_seen?: number; error?: string | null } | null>(null)
 
-onMounted(async () => {
+// ── 市场 ──
+const marketQuery = ref('')
+const marketResults = ref<McpMarketItem[]>([])
+const mkSearching = ref(false)
+const mkSearched = ref(false)
+const mkError = ref('')
+const mkInstalling = ref('')
+const installedPkgs = ref(new Set<string>())
+
+async function reloadServers() {
   const r: any = await agentConfigService.getMcp()
   const d = r.data ?? r
   servers.value = d.servers
-  presets.value = d.presets
-})
+  // 已安装包名集合（args 里含该包名的即视为已装）
+  const pkgs = new Set<string>()
+  Object.values(d.servers as Record<string, McpServerCfg>).forEach((c) => {
+    (c.args || []).forEach(a => { if (typeof a === 'string' && !a.startsWith('-')) pkgs.add(a) })
+  })
+  installedPkgs.value = pkgs
+}
+
+async function searchMarket() {
+  if (!marketQuery.value.trim()) return
+  mkSearching.value = true; mkError.value = ''; marketResults.value = []
+  try {
+    const r: any = await agentConfigService.mcpMarketSearch(marketQuery.value.trim())
+    marketResults.value = (r.data ?? r) as McpMarketItem[]
+    mkSearched.value = true
+  } catch (e: any) {
+    mkError.value = '搜索失败：' + (e?.message || e)
+  } finally { mkSearching.value = false }
+}
+
+async function installFromMarket(m: McpMarketItem) {
+  mkInstalling.value = m.name
+  try {
+    await agentConfigService.mcpMarketInstall(m.name)
+    ElMessage.success(`已安装 ${m.name}（需测试连接 + 重启生效）`)
+    await reloadServers()
+  } catch (e: any) {
+    ElMessage.error('安装失败：' + (e?.response?.data?.detail || e?.message || e))
+  } finally { mkInstalling.value = '' }
+}
+
+onMounted(reloadServers)
 
 function buildCfg(): McpServerCfg {
   const f = addForm.value
@@ -175,6 +238,19 @@ async function add() {
 .mp-sec-t { font-size: 13px; font-weight: 700; margin: 18px 0 10px; display: flex; align-items: center; gap: 8px }
 .mp-sec-t::before { content: ''; width: 3px; height: 14px; background: var(--primary); border-radius: 2px }
 .mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px }
+/* 市场 */
+.mp-market-hint { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 8px }
+.mp-market { display: flex; gap: 8px; margin-bottom: 10px }
+.mp-market .mk { flex: 1; max-width: 460px }
+.mp-mkerr { font-size: 12px; color: #dc2626; margin-bottom: 8px }
+.mp-mklist { border: 1px solid var(--brd); border-radius: 10px; margin-bottom: 6px }
+.mp-mkrow { display: flex; align-items: center; gap: 12px; padding: 9px 13px; border-bottom: 1px solid var(--brd) }
+.mp-mkrow:last-child { border-bottom: none }
+.mp-mkk { flex: 1; min-width: 0 }
+.mp-mkname { font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 600 }
+.mp-mkver { font-size: 10px; color: var(--text-muted); font-weight: 400; margin-left: 5px }
+.mp-mkdesc { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 .mp-card { border: 1px solid var(--brd); border-radius: 11px; padding: 13px; background: #fff }
 .mp-name { font-size: 13.5px; font-weight: 700 }
 .mp-badge { font-size: 10px; background: #eef2ff; color: var(--primary); padding: 2px 7px; border-radius: 5px; margin-left: 6px; font-weight: 600 }

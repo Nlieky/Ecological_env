@@ -437,6 +437,59 @@ async def install_mcp_preset(body: McpPresetBody):
         raise HTTPException(404, str(e))
 
 
+# ── MCP 市场（npm 事实上是 MCP server 分发中心）──
+class MarketSearchBody(BaseModel):
+    query: str
+
+
+@router.post("/agents/config/mcp/market/search")
+def mcp_market_search(body: MarketSearchBody):
+    """sync def：httpx 外呼 npm mirror。"""
+    from backend.services.mcp_config_service import market_search
+    return {"success": True, "data": market_search(body.query)}
+
+
+class MarketInstallBody(BaseModel):
+    package: str
+
+
+@router.post("/agents/config/mcp/market/install")
+def mcp_market_install(body: MarketInstallBody):
+    from backend.services.mcp_config_service import market_install
+    try:
+        return {"success": True, "data": market_install(body.package), "restart_needed": True}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ── 技能外部市场（hermes Skills Hub：skills.sh 2万+ / GitHub 官方源）──
+class HubSearchBody(BaseModel):
+    query: str
+
+
+@router.post("/agents/config/skills/hub/search")
+def skill_hub_search(body: HubSearchBody):
+    """sync def：外呼 skills.sh / GitHub。"""
+    from backend.services.skill_hub_service import search
+    return {"success": True, "data": search(body.query)}
+
+
+class HubInstallBody(BaseModel):
+    identifier: str
+    entity: str
+
+
+@router.post("/agents/config/skills/hub/install")
+def skill_hub_install(body: HubInstallBody):
+    from backend.services.skill_hub_service import install
+    try:
+        return {"success": True, "data": install(body.identifier, body.entity)}
+    except (FileNotFoundError, FileExistsError) as e:
+        raise HTTPException(409 if isinstance(e, FileExistsError) else 404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 # ══════════ V2: LLM 供应商 ══════════
 @router.get("/agents/config/providers")
 async def get_providers():

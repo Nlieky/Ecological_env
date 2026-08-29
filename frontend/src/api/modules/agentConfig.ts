@@ -47,6 +47,14 @@ export interface ProviderRow {
   name: string; base_url: string; model: string
   api_key: string; enabled: boolean; tested_ok: boolean
 }
+export interface McpMarketItem {
+  name: string; version: string; description: string
+  publisher: string; links: string
+}
+export interface HubSkillItem {
+  name: string; description: string; source: string
+  identifier: string; trust_level: string; repo?: string | null
+}
 
 export const agentConfigService = {
   /** 实体列表（主智能体+4子智能体） */
@@ -135,6 +143,18 @@ export const agentConfigService = {
     api.post<unknown, { ok: boolean; tools_seen?: number; error?: string | null }>('/v1/agents/config/mcp/test', { config }),
   installMcpPreset: (name: string) =>
     api.post<unknown, { success: boolean; restart_needed: boolean }>('/v1/agents/config/mcp/preset', { name }),
+
+  // ── V2.1: MCP 市场（npm）──
+  mcpMarketSearch: (query: string) =>
+    api.post<unknown, { success: boolean; data: McpMarketItem[] }>('/v1/agents/config/mcp/market/search', { query }),
+  mcpMarketInstall: (packageName: string) =>
+    api.post<unknown, { success: boolean; data: { ok: boolean; name: string; package: string }; restart_needed: boolean }>('/v1/agents/config/mcp/market/install', { package: packageName }),
+
+  // ── V2.1: 技能外部市场（skills.sh / GitHub 官方源）──
+  skillHubSearch: (query: string) =>
+    api.post<unknown, { success: boolean; data: HubSkillItem[] }>('/v1/agents/config/skills/hub/search', { query }),
+  skillHubInstall: (identifier: string, entity: string) =>
+    api.post<unknown, { success: boolean; data: { ok: boolean; name: string; path: string; trust_level: string; source: string; degraded: boolean } }>('/v1/agents/config/skills/hub/install', { identifier, entity }),
 
   // ── V2: LLM 供应商 ──
   getProviders: () =>

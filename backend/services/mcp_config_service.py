@@ -6,9 +6,12 @@
 Filesystem 类 server 的目录边界只允许项目内 shared/ 子路径（防开盘符根/项目根）。
 """
 import copy
+import logging
 import os
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _HERMES_ROOT = PROJECT_ROOT / "shared" / "framework" / "hermes-agent"
@@ -130,6 +133,58 @@ def install_preset(name: str) -> dict:
             upsert_server(p["name"], copy.deepcopy(p["config"]))
             return {"ok": True, "name": name}
     raise FileNotFoundError(f"预置不存在: {name}")
+
+
+# ── MCP 市场：npm 事实上是 MCP server 的分发中心（官方/社区都发 npm 包）────
+# 走国内 mirror 的 search API（无鉴权、带中文描述），安装=搜索结果一键写 mcp_servers。
+
+_NPM_SEARCH = "https://registry.npmmirror.com/-/v1/search"
+
+
+def market_search(query: str, limit: int = 12) -> list:
+    """npm 搜 MCP server。查询词自动补 mcp 提精度，结果过滤保留含 mcp 的包。"""
+    import httpx
+    q = query.strip() or "mcp server"
+    if "mcp" not in q.lower():
+        q = f"mcp {q}"
+    try:
+        r = httpx.get(_NPM_SEARCH, params={"text": q, "size": limit * 2}, timeout=10.0)
+        r.raise_for_status()
+        objs = r.json().get("objects", [])
+    except Exception as e:
+        logger.warning("npm 市场搜索失败: %s", e)
+        return []
+    out = []
+    for o in objs:
+        p = o.get("package", {})
+        name = p.get("name", "")
+        desc = (p.get("description") or "").strip()
+        if "mcp" not in name.lower() and "mcp" not in desc.lower():
+            continue   # 查询词撞上无关包（如纯 "server"）时过滤
+        out.append({
+            "name": name,
+            "version": p.get("version", ""),
+            "description": desc[:160] or "（无描述）",
+            "publisher": ((p.get("publisher") or {}).get("username") or ""),
+            "links": (p.get("links") or {}).get("npm", ""),
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def market_install(package: str, timeout: int = 60) -> dict:
+    """市场安装：npm 包名 → npx 启动配置写入 mcp_servers。安装后仍需测试+重启。"""
+    import re
+    if not re.fullmatch(r"@[a-z0-9-]+/[a-z0-9._-]+|[a-z0-9][a-z0-9._-]*", package):
+        raise ValueError(f"非法 npm 包名: {package}")
+    name = package.rsplit("/", 1)[-1].removesuffix("-mcp").removesuffix("-server")
+    if not name:
+        name = package.replace("/", "-").replace("@", "")
+    cfg = {"command": "npx", "args": ["-y", package], "timeout": timeout}
+    upsert_server(name, cfg)
+    return {"ok": True, "name": name, "package": package}
+
 
 
 def test_connect(cfg: dict) -> dict:
