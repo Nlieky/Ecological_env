@@ -94,13 +94,18 @@ def validate_server(cfg: dict) -> list:
 PRESETS = [
     {"name": "fetch", "title": "Fetch 网页抓取", "transport": "stdio",
      "desc": "抓取法规/环保标准网页原文",
-     "config": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"],
-                "timeout": 60, "connect_timeout": 30}},
+     # 官方 @modelcontextprotocol/server-fetch 已从 npm 下架(404,2026-08 实测),
+     # 用社区同款 @kazuph/mcp-fetch(mirror 有,工具 mcp_fetch 同名)
+     "config": {"command": "npx", "args": ["-y", "@kazuph/mcp-fetch"],
+                "timeout": 60, "connect_timeout": 90}},
     {"name": "influxdb", "title": "InfluxDB 时序查询", "transport": "stdio",
      "desc": "即席查监测数据/元数据（只读）",
-     "config": {"command": "npx", "args": ["-y", "@influxdata/influxdb3-mcp"],
-                "timeout": 120, "connect_timeout": 60,
-                "env": {"INFLUXDB_TOKEN": "${INFLUXDB_READ_TOKEN}"}}},
+     # 官方 @influxdata/influxdb3-mcp 未上架 npm(404)，用社区 influxdb-mcp-server
+     # (v0.2.0,需 INFLUXDB_TOKEN/INFLUXDB_URL env；token 从 .env 的 INFLUXDB_TOKEN 兜底)
+     "config": {"command": "npx", "args": ["-y", "influxdb-mcp-server"],
+                "timeout": 120, "connect_timeout": 90,
+                "env": {"INFLUXDB_TOKEN": "${INFLUXDB_TOKEN}",
+                        "INFLUXDB_URL": "http://localhost:8086"}}},
     {"name": "filesystem", "title": "Filesystem 知识库读写", "transport": "stdio",
      "desc": "读写 shared/knowledge 知识库（目录边界锁定）",
      "config": {"command": "npx",
