@@ -1,14 +1,15 @@
 <!-- frontend/src/views/AgentConfigView.vue -->
 <template>
   <div class="cfg">
-    <!-- 第一级导航：实体横排（主智能体/4子智能体/厂区配置/服务管理） -->
+    <!-- 第一级导航：实体横排（主智能体/4子智能体/技能/MCP/供应商/厂区配置/服务管理）
+         MCP 与供应商是全局能力(只服务主智能体进程)，提到一级——不挂在某个实体下 -->
     <div class="nav-entities">
       <button v-for="e in navItems" :key="e.name" class="nav-e"
               :class="{ active: activeEntity === e.name }" @click="switchEntity(e.name)">
         <span class="nav-icon">{{ e.icon }}</span>{{ e.label }}
       </button>
     </div>
-    <!-- 第二级导航：当前实体的 tab -->
+    <!-- 第二级导航：智能体实体的 tab（MCP/供应商已提一级，这里不再出现） -->
     <div class="tabs" v-if="isEntity">
       <button v-for="t in tabsFor" :key="t" class="tab"
               :class="{ active: tab === t }" @click="switchTab(t)">
@@ -23,8 +24,8 @@
       </div>
       <SkillsPanel v-else-if="isEntity && tab === 'skills'" :entity="activeEntity" />
       <StrategyPanel v-else-if="isEntity && tab === 'strategy'" @restart="goRestart" />
-      <McpPanel v-else-if="isEntity && tab === 'mcp'" @restart="goRestart" />
-      <ProvidersPanel v-else-if="isEntity && tab === 'providers'" @restart="goRestart" />
+      <McpPanel v-else-if="activeEntity === '__mcp__'" @restart="goRestart" />
+      <ProvidersPanel v-else-if="activeEntity === '__providers__'" @restart="goRestart" />
       <PlantsConfigPanel v-else-if="activeEntity === '__plants__'" />
       <ServiceControl v-else-if="activeEntity === '__service__'" />
       <div v-else class="loading">加载中…</div>
@@ -61,15 +62,20 @@ const isEntity = computed(() => entities.value.some(e => e.name === activeEntity
 const currentEntity = computed(() => entities.value.find(e => e.name === activeEntity.value))
 const tabsFor = computed(() =>
   activeEntity.value === 'master'
-    ? ['overview', 'files', 'skills', 'strategy', 'mcp', 'providers']
+    ? ['overview', 'files', 'skills', 'strategy']
     : ['overview', 'files', 'skills', 'strategy'])
 
-// 顶部一级导航项 = 5 个智能体实体 + 2 个全局入口
+// 顶部一级导航项 = 5 个智能体实体 + MCP/供应商（全局能力）+ 厂区 + 服务
 const navItems = computed(() => [
   ...(entities.value as AgentEntity[]),
+  { name: '__mcp__', label: 'MCP', icon: '🔌' },
+  { name: '__providers__', label: '供应商', icon: '🌐' },
   { name: '__plants__', label: '厂区配置', icon: '⚙️' },
   { name: '__service__', label: '服务管理', icon: '🔄' },
 ])
+
+// 一级直达入口（无二级 tab）
+const DIRECT_ENTITIES = ['__mcp__', '__providers__', '__plants__', '__service__']
 
 function switchEntity(name: string) {
   if (activeEntity.value === name) return
@@ -105,7 +111,7 @@ onMounted(async () => {
   try {
     const r: any = await agentConfigService.entities()
     entities.value = (r.data ?? r) as AgentEntity[]
-    if (!isEntity.value && q.entity && q.entity !== '__plants__' && q.entity !== '__service__') {
+    if (!isEntity.value && q.entity && !DIRECT_ENTITIES.includes(q.entity)) {
       activeEntity.value = 'master'   // 非法 entity 回落
     }
     // tab 与实体不匹配（如子智能体选了 mcp）回落 overview
