@@ -134,8 +134,13 @@ def test_connect(cfg: dict) -> dict:
     必须先发 notifications/initialized 再 tools/list；用 bytes 模式避免 Windows CRLF 转换。
     """
     import json as _json
+    import shutil
     import subprocess
-    cmd = [cfg.get("command")] + list(cfg.get("args") or [])
+    # Windows 下 npx/npm 是 .cmd 批处理，subprocess 不经 shell 时报 WinError 2——
+    # 用 shutil.which 把 command 解析成磁盘真实路径（含 .cmd/.exe 扩展）。
+    _raw = cfg.get("command") or ""
+    _resolved = shutil.which(_raw) or _raw
+    cmd = [_resolved] + list(cfg.get("args") or [])
     try:
         env = dict(os.environ)
         for k, v in (cfg.get("env") or {}).items():

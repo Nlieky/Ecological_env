@@ -9,6 +9,7 @@ api_key 明文存 SQLite（本地单机场景，与 .env 同级）；仅接口�
   resolve_default()           策略名 → providers 行（None=无可用，调用方走 env 兜底）
 """
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -31,21 +32,37 @@ def _open_session():
 def seed_defaults() -> None:
     """预置 ctgu-vlm（启用）+ LongCat-2.0（禁用）。幂等。
 
+    api_key 从 .env 的 LLM_API_KEY 带出（页面不手填就能直接测试连接）；已有行的
+    key 不覆盖（用户在页面改过就以页面为准）。
     首启两进程并发 seed 时败者收 IntegrityError → rollback 吞掉（行已由胜者插入），
     不让它冒泡成 500。"""
+    import os
     from sqlalchemy.exc import IntegrityError
     from backend.models.agent_config import LLMProvider
+    env_key = os.environ.get("LLM_API_KEY") or ""
+    # backend 进程 load_dotenv 过 env 里有；防御性再读一次 .env（backend/core/config 的模式）
+    if not env_key:
+        try:
+            from dotenv import dotenv_values
+            env_key = dotenv_values(
+                Path(__file__).resolve().parents[2] / ".env").get("LLM_API_KEY") or ""
+        except Exception:
+            pass
     with _open_session() as s:
-        for name, base_url, model, enabled in [
-            ("ctgu-vlm", "http://172.16.12.41:30000/v1", "ctgu-vlm", True),
-            ("LongCat-2.0", "https://api.longcat.chat/openai/v1", "LongCat-2.0", False),
+        for name, base_url, model, enabled, key in [
+            ("ctgu-vlm", "http://172.16.12.41:30000/v1", "ctgu-vlm", True, env_key),
+            ("LongCat-2.0", "https://api.longcat.chat/openai/v1", "LongCat-2.0", False, ""),
         ]:
-            if s.get(LLMProvider, name) is None:
-                s.add(LLMProvider(name=name, base_url=base_url, model=model, enabled=enabled))
-                try:
-                    s.commit()
-                except IntegrityError:
-                    s.rollback()
+            row = s.get(LLMProvider, name)
+            if row is None:
+                s.add(LLMProvider(name=name, base_url=base_url, model=model,
+                                  enabled=enabled, api_key=key))
+            elif not row.api_key and key and name == "ctgu-vlm":
+                row.api_key = key   # 已存在但空 → 补上 env key（不覆盖用户填过的）
+            try:
+                s.commit()
+            except IntegrityError:
+                s.rollback()
 
 
 def _mask(v: str) -> str:
