@@ -1,13 +1,15 @@
 <!-- frontend/src/views/AgentConfigView.vue -->
 <template>
   <div class="cfg">
-    <!-- 第一级导航：实体横排（主智能体/4子智能体/技能/MCP/供应商/厂区配置/服务管理）
-         MCP 与供应商是全局能力(只服务主智能体进程)，提到一级——不挂在某个实体下 -->
+    <!-- 第一级导航：药丸标签（前 5 项=智能体实体 ｜ 后 4 项=全局能力，竖线分组） -->
     <div class="nav-entities">
-      <button v-for="e in navItems" :key="e.name" class="nav-e"
-              :class="{ active: activeEntity === e.name }" @click="switchEntity(e.name)">
-        <span class="nav-icon">{{ e.icon }}</span>{{ e.label }}
-      </button>
+      <template v-for="(e, i) in navItems" :key="e.name">
+        <span v-if="i === entityCount" class="nav-sep"></span>
+        <button class="nav-e" :class="{ active: activeEntity === e.name }"
+                @click="switchEntity(e.name)">
+          <span class="nav-icon">{{ e.icon }}</span>{{ e.label }}
+        </button>
+      </template>
     </div>
     <!-- 第二级导航：智能体实体的 tab（MCP/供应商已提一级，这里不再出现） -->
     <div class="tabs" v-if="isEntity">
@@ -65,7 +67,7 @@ const tabsFor = computed(() =>
     ? ['overview', 'files', 'skills', 'strategy']
     : ['overview', 'files', 'skills', 'strategy'])
 
-// 顶部一级导航项 = 5 个智能体实体 + MCP/供应商（全局能力）+ 厂区 + 服务
+// 顶部一级导航项 = 5 个智能体实体 ｜ MCP/供应商/厂区/服务（全局能力，竖线分组）
 const navItems = computed(() => [
   ...(entities.value as AgentEntity[]),
   { name: '__mcp__', label: 'MCP', icon: '🔌' },
@@ -73,6 +75,7 @@ const navItems = computed(() => [
   { name: '__plants__', label: '厂区配置', icon: '⚙️' },
   { name: '__service__', label: '服务管理', icon: '🔄' },
 ])
+const entityCount = computed(() => entities.value.length)   // 分隔线位置
 
 // 一级直达入口（无二级 tab）
 const DIRECT_ENTITIES = ['__mcp__', '__providers__', '__plants__', '__service__']
@@ -130,24 +133,32 @@ watch(activeEntity, (v) => {
 .cfg { display: flex; flex-direction: column; height: calc(100vh - 110px);
   background: var(--card-bg); border: 1px solid var(--brd); border-radius: 13px;
   overflow: hidden; box-shadow: var(--card-shadow) }
-/* 一级：实体横排导航 */
-.nav-entities { display: flex; align-items: center; gap: 2px; padding: 8px 14px 0;
-  border-bottom: 1px solid var(--brd); background: #f8fafc; overflow-x: auto }
-.nav-e { display: inline-flex; align-items: center; gap: 7px; border: none; background: none;
-  font-size: 13.5px; color: var(--text-secondary); padding: 9px 15px; cursor: pointer;
-  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
-  border-radius: 8px 8px 0 0 }
-.nav-e:hover { color: var(--primary); background: #eef2ff55 }
-.nav-e.active { color: var(--primary); font-weight: 700; border-bottom-color: var(--primary);
-  background: var(--card-bg) }
-.nav-icon { font-size: 15px }
-/* 二级：tab */
-.tabs { display: flex; gap: 4px; padding: 8px 16px 0; border-bottom: 1px solid var(--brd) }
-.tab { border: none; background: none; font-size: 12.5px; color: var(--text-secondary);
-  padding: 6px 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px }
-.tab.active { color: var(--primary); font-weight: 600; border-bottom-color: var(--primary) }
+/* ── 一级：药丸标签导航（智能体组 ｜ 全局能力组）── */
+.nav-entities { display: flex; align-items: center; gap: 6px; padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--brd); background: #f8fafc; overflow-x: auto;
+  scrollbar-width: none }
+.nav-entities::-webkit-scrollbar { display: none }
+.nav-e { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent;
+  background: transparent; font-size: 13px; color: var(--text-secondary);
+  padding: 6px 14px; cursor: pointer; white-space: nowrap; border-radius: 999px;
+  transition: all .15s ease; line-height: 1.4 }
+.nav-e:hover { color: var(--primary); background: #fff; border-color: var(--brd) }
+.nav-e.active { color: #fff; font-weight: 600; background: var(--primary);
+  border-color: var(--primary); box-shadow: 0 2px 6px rgba(59, 130, 246, .28) }
+.nav-icon { font-size: 14px }
+/* 实体组与全局组之间的竖分隔 */
+.nav-sep { width: 1px; height: 20px; background: var(--brd); margin: 0 4px; flex-shrink: 0 }
+/* ── 二级：浅底小标签 tab ── */
+.tabs { display: flex; align-items: center; gap: 2px; padding: 10px 16px 8px;
+  border-bottom: 1px solid var(--brd) }
+.tab { border: none; background: transparent; font-size: 12.5px;
+  color: var(--text-secondary); padding: 5px 12px; cursor: pointer;
+  border-radius: 7px; transition: all .13s ease }
+.tab:hover { color: var(--primary); background: var(--primary-soft, #eef2ff) }
+.tab.active { color: var(--primary); font-weight: 600;
+  background: var(--primary-soft, #eef2ff) }
 .cfg-body { flex: 1; overflow: auto; padding: 18px }
-.cfg-body.no-tab { border-top: 1px solid var(--brd) }
+.cfg-body.no-tab { border-top: none }
 .files-wrap { height: 100% }
 .loading { color: var(--text-muted); padding: 40px; text-align: center }
 </style>
