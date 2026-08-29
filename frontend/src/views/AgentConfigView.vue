@@ -140,7 +140,7 @@ watch(activeEntity, (v) => {
 .nav-entities::-webkit-scrollbar { display: none }
 .nav-e { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent;
   background: transparent; font-size: 13px; color: var(--text-secondary);
-  padding: 6px 14px; cursor: pointer; white-space: nowrap; border-radius: 999px;
+  padding: 6px 14px; cursor: pointer; white-space: nowrap; border-radius: 8px;
   transition: all .15s ease; line-height: 1.4 }
 .nav-e:hover { color: var(--primary); background: #fff; border-color: var(--brd) }
 .nav-e.active { color: #fff; font-weight: 600; background: var(--primary);
