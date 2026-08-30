@@ -28,15 +28,15 @@
   <Transition name="pop">
     <div v-if="app.assistantOpen" class="panel">
       <div class="panel-head">
-        <span class="pt">🤖 AIOps 智能助手</span>
+        <span class="pt">⚡ 大屏动作助手</span>
         <button class="close" @click="app.assistantOpen = false" title="收起">✕</button>
       </div>
       <div class="body">
         <ChatMessage v-for="m in chat.messages" :key="m.id" :msg="m" />
-        <div v-if="chat.loading" class="thinking">主智能体思考中…</div>
-        <div v-if="!chat.messages.length" class="empty">向主智能体提问，例如：<br />最近出水 COD 是否超标？</div>
+        <div v-if="chat.loading" class="thinking">执行动作中…</div>
+        <div v-if="!chat.messages.length" class="empty">对监测大屏下指令，例如：<br />检测 pH 平稳异常 / 只看 COD / 看最近一周<br /><br />研判分析请到「AI 助手」问答页</div>
       </div>
-      <ChatComposer />
+      <ChatComposer channel="action" />
     </div>
   </Transition>
 </template>

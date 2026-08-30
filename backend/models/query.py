@@ -34,12 +34,18 @@ class QueryRequest(BaseModel):
     """查询请求"""
     query: str = Field(..., description="用户查询内容", min_length=1)
     session_id: Optional[str] = Field(None, description="会话ID")
+    # 大屏当前观看窗口(JSON 字符串):AI 检测动作按"正在看的时段"取数
+    view_context: Optional[str] = Field(None, description="大屏观看窗口上下文(anchor/segment)")
+    # 'action' = AI 助手(右下角)·动作通道:agent 服务只走动作短路,非动作回引导语
+    mode: Optional[str] = Field(None, description="请求通道:action=动作通道(仅AI助手)")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "query": "最近24小时出水COD异常吗？",
-                "session_id": None
+                "session_id": None,
+                "view_context": None,
+                "mode": None
             }
         }
 

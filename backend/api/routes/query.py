@@ -268,7 +268,9 @@ async def query_stream(request: QueryRequest):
             async with client.stream(
                 "POST",
                 f"{AGENT_SERVICE_URL}/query/stream",
-                json={"query": request.query, "session_id": session_id},
+                json={"query": request.query, "session_id": session_id,
+                      "view_context": request.view_context or "",
+                      "mode": request.mode or ""},
             ) as resp:
                 if resp.status_code != 200:
                     yield 'data: {"type":"error","message":"Agent服务返回 %d"}\n\n' % resp.status_code

@@ -134,6 +134,14 @@ app.include_router(v1_conversations.conversations.router, prefix="/api/v1")
 from backend.api.v1.plants import routes as v1_plants_routes
 app.include_router(v1_plants_routes.router, prefix="/api/v1")
 
+# 系统态势(服务运维状态+按天历史态势)
+from backend.api.v1.system import routes as v1_system_routes
+app.include_router(v1_system_routes.router, prefix="/api/v1")
+
+# 轻量检测(前端直调,保证标注窗口与大屏观看窗口一致)
+from backend.api.v1.detection import routes as v1_detection_routes
+app.include_router(v1_detection_routes.router, prefix="/api/v1")
+
 # 智能体配置中心(身份文件/厂区配置/运行参数/服务管理)
 from backend.api.v1.agents.config import routes as v1_agentcfg_routes
 app.include_router(v1_agentcfg_routes.router, prefix="/api/v1")

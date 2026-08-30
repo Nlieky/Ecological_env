@@ -289,6 +289,10 @@ export interface PlantIndicator {
 export interface PlantDashboard {
   plant_id: string
   window_hours: number
+  latest_time?: string
+  anchor?: string
+  segment_start?: string
+  segment_end?: string
   indicators: Record<string, PlantIndicator>
   influent_points: number
   effluent_points: number

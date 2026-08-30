@@ -8,7 +8,7 @@ export const queryService = {
   /** 流式查询（SSE-over-POST）：实时回调 progress/delta/done/error。返回 AbortController。
    * 用 fetch + ReadableStream（EventSource 只支持 GET，查询带 body 故用 fetch）。 */
   executeStream(
-    { query, session_id }: { query: string; session_id?: string },
+    { query, session_id, view_context, mode }: { query: string; session_id?: string; view_context?: string; mode?: string },
     cbs: {
       onProgress?: (e: { subagent: string; stage: string; summary?: string; chartData?: any }) => void
       onAction?: (actionData: { cmd: string; [k: string]: unknown } | null) => void
@@ -21,7 +21,7 @@ export const queryService = {
     fetch('/api/query/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, session_id }),
+      body: JSON.stringify({ query, session_id, view_context: view_context || undefined, mode }),
       signal: ctrl.signal,
     })
       .then(async (res) => {

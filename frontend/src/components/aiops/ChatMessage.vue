@@ -1,12 +1,12 @@
 <template>
   <div class="msg" :class="msg.role">
-    <div class="role">{{ msg.role === 'user' ? '👤 运维员' : '🤖 主智能体' }}</div>
+    <div class="role">{{ roleLabel }}</div>
     <div v-if="msg.role === 'user'" class="bubble user">{{ msg.content }}</div>
     <div v-else class="bubble assistant">
       <div v-if="msg.streaming && msg.progress" class="prog">⏳ {{ msg.progress }}</div>
       <MarkdownRenderer v-if="!msg.streaming && msg.content" :content="msg.content" />
       <div v-else-if="msg.content" class="stream-text">{{ msg.content }}<span class="cur">▋</span></div>
-      <div v-else-if="msg.streaming" class="stream-text muted">主智能体思考中…</div>
+      <div v-else-if="msg.streaming" class="stream-text muted">{{ msg.progress ? '' : '思考中…' }}</div>
       <!-- 数据曲线(chartData) -->
       <div v-if="charts.length" class="charts">
         <div v-for="(c, i) in charts" :key="i" :ref="el => setChartRef(el, i)" class="chart-item"></div>
@@ -30,16 +30,37 @@ import EvidenceChain from './EvidenceChain.vue'
 import type { ChatMessage } from '@/stores/chat'
 const props = defineProps<{ msg: ChatMessage }>()
 
+// 角色标签:动作通道(AI 助手,短路器秒回)与研判通道(主智能体)区分显示
+const roleLabel = computed(() => {
+  if (props.msg.role === 'user') return '👤 运维员'
+  // 首行是 actionData JSON(短路器输出)或会话在动作助手上下文 → 动作助手
+  return props.msg.channel === 'action' ? '⚡ 动作助手' : '🤖 主智能体'
+})
+
 // chartData 渲染
 const charts = computed(() => props.msg?.chartData?.charts || [])
 const chartRefs: HTMLElement[] = []
-const setChartRef = (el: any, i: number) => { if (el) chartRefs[i] = el }
+/** 幂等渲染:echarts.getInstanceByDom 取已有实例,没有才 init。
+ *  只在微任务(nextTick 后)调用——ref 回调发生在 Vue patch 主过程中,
+ *  里面直接 setOption 会触发 ECharts "main process" 告警并引发 vnode 崩溃。 */
+function renderChartAt(i: number) {
+  const el = chartRefs[i]
+  const opt = charts.value[i]?.option
+  if (!el || !opt) return
+  const inst = echarts.getInstanceByDom(el as any) || echarts.init(el)
+  inst.setOption(opt)
+}
+const setChartRef = (el: any, i: number) => {
+  // ref 回调仅登记 DOM(卸载时 el=null 清位),渲染交给 watch 的 nextTick
+  if (el) {
+    chartRefs[i] = el
+    queueMicrotask(() => renderChartAt(i))  // 微任务:patch 主流程外执行
+  }
+}
 watch(charts, async () => {
   await nextTick()
-  charts.value.forEach((c, i) => {
-    const el = chartRefs[i]
-    if (el && c.option) echarts.init(el).setOption(c.option)
-  })
+  await nextTick()  // 双 nextTick:v-for 的 ref 回调在 patch 后异步执行
+  charts.value.forEach((_, i) => renderChartAt(i))
 }, { immediate: true })
 </script>
 

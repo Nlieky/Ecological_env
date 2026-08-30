@@ -1,20 +1,24 @@
 <template>
   <div class="comp">
-    <input v-model="text" :disabled="chat.loading" placeholder="问主智能体:例如 最近出水COD是否超标?" @keyup.enter="send" />
-    <button :disabled="chat.loading || !text.trim()" @click="send">{{ chat.loading ? '思考中…' : '发送' }}</button>
+    <input v-model="text" :disabled="chat.loading"
+      :placeholder="channel === 'action' ? '下指令:例如 检测pH平稳异常 / 只看COD' : '问主智能体:例如 最近出水COD是否超标?'"
+      @keyup.enter="send" />
+    <button :disabled="chat.loading || !text.trim()" @click="send">{{ chat.loading ? '执行中…' : '发送' }}</button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
+const props = withDefaults(defineProps<{ channel?: 'chat' | 'action' }>(), { channel: 'chat' })
 const chat = useChatStore()
 const text = ref('')
 function send() {
   const q = text.value.trim()
   if (!q || chat.loading) return
   text.value = ''
-  void chat.sendQuery(q)
+  // channel=action → AI 助手(右下角)动作通道:后端只走动作短路
+  void chat.sendQuery(q, props.channel === 'action' ? 'floating' : 'chat')
 }
 </script>
 
