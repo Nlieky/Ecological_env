@@ -113,3 +113,9 @@ audio_cache/
 
 # 真实监测报表(内部数据,不入库,各机自己上传到 shared/data/real-time/)
 shared/data/real-time/*.xls
+config.yaml
+models_dev_cache.json
+*/models_dev_cache.json
+.workbuddy/
+skills/.hub/
+*.tar.gz
