@@ -22,8 +22,8 @@ const router = createRouter({
         // ── 监控大屏 ──
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue'),
           meta: { title: '监测大屏', group: '监控大屏' } },
-        { path: 'plants/:plantId', component: () => import('@/views/PlantDashboardView.vue'),
-          meta: { title: '厂区看板', group: '监控大屏' } },
+        // 旧单厂路由：已并入 /dashboard 仪表盘 tab（看板列表选厂），重定向兼容
+        { path: 'plants/:plantId', redirect: '/dashboard' },
         { path: 'metrics', component: () => import('@/views/MetricsView.vue'),
           meta: { title: '指标查询', group: '监控大屏' } },
         { path: 'logs', component: () => import('@/views/LogsView.vue'),

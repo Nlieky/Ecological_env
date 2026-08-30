@@ -36,17 +36,44 @@ INDICATOR_MAP = {
 
 
 def _plant_and_type_from_filename(path) -> Tuple[str, str]:
-    """从文件名解析 厂名 + 数据类型(进水/出水)。"""
+    """从文件名解析 厂名 + 数据类型(进水/出水)。
+
+    多厂通用规则(按优先级):
+    1. plant-hierarchy.yaml 的 report_name_map 显式映射(文件名主体→plant_id)——
+       命名不规范的厂在这里登记,最可靠;
+    2. 默认启发式:剥掉进出水关键词取前缀(金桥式 "<厂名>废水总排口-沮河")。
+       监测点名本身含"排放口"的厂(洗舱站污水排放口)会被剥残,必须走映射表。
+    """
     name = Path(path).stem
     name = re.sub(r"\s*数据报表\s*$", "", name).strip()
+    # 显式映射表
+    mapping = _load_report_name_map()
+    if name in mapping:
+        pid = mapping[name]
+        m_inf = re.search(r"进水口", name)
+        m_eff = re.search(r"废水总排口|总排口|排污口|排放口|排水口|出水口", name)
+        return pid, ("influent" if m_inf else "effluent" if m_eff else "unknown")
+    # 默认启发式
     m_inf = re.search(r"进水口", name)
-    m_eff = re.search(r"废水总排口|总排口|排污口|排水口|出水口", name)
+    m_eff = re.search(r"废水总排口|总排口|排污口|排放口|排水口|出水口", name)
     if m_inf:
-        return name[:m_inf.start()].strip(), "influent"
+        return name[:m_inf.start()].strip().rstrip("-—－· "), "influent"
     if m_eff:
-        plant = name[:m_eff.start()].strip().rstrip("-—－· ")
-        return plant, "effluent"
+        return name[:m_eff.start()].strip().rstrip("-—－· "), "effluent"
     return name, "unknown"
+
+
+def _load_report_name_map() -> dict:
+    """plant-hierarchy.yaml 的 report_name_map: {报表文件名主体: plant_id}。"""
+    p = Path(__file__).resolve().parent / "plant-hierarchy.yaml"
+    if not p.exists():
+        return {}
+    try:
+        import yaml
+        with open(p, encoding="utf-8") as f:
+            return (yaml.safe_load(f) or {}).get("report_name_map", {}) or {}
+    except Exception:
+        return {}
 
 
 def _build_columns(header_top, header_sub) -> List[str]:

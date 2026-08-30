@@ -1,108 +1,104 @@
 <template>
-  <div class="dash-layout">
-    <!-- 左：厂区目录树(真实数据,点击进单厂看板) -->
-    <div class="dash-side">
-      <div class="dash-side-ttl">厂区目录</div>
-      <PlantTree @select="goPlant" />
+  <div class="dash-page">
+    <!-- 顶部：三个可切换选项卡（参考 aiops.hgdz.cn：仪表盘/系统态势/态势历史） -->
+    <div class="top-tabs">
+      <button v-for="t in TOP_TABS" :key="t.v" :class="{ on: tab === t.v }" @click="tab = t.v">{{ t.t }}</button>
     </div>
-    <!-- 右：原有内容 -->
-    <div class="dash-main">
-      <div class="seg">
-        <button :class="{ on: mode === 'plant' }" @click="mode = 'plant'">单厂 · 全指标</button>
-        <button :class="{ on: mode === 'overview' }" @click="mode = 'overview'">全厂总览</button>
+
+    <!-- 仪表盘 tab：看板列表(市→厂区→厂) + 选中厂流式看板 -->
+    <div v-if="tab === 'dash'" class="dash-layout">
+      <div class="dash-side">
+        <div class="dash-side-ttl">看板列表</div>
+        <PlantTree @select="onPickPlant" />
       </div>
-      <template v-if="mode === 'plant'">
-        <CockpitFilterBar :last-update="realtime.lastUpdate" />
-        <div v-if="groups" class="matrix-wrap">
-          <IndicatorMatrix :groups="groups" />
-          <AnomalyList :groups="groups" />
+      <div class="dash-main">
+        <PlantBoardPanel v-if="store.activePlant" :key="store.activePlant" :plant-id="store.activePlant" />
+        <div v-else class="placeholder">
+          <div class="ph-ico">🏭</div>
+          <div class="ph-t">从左侧看板列表选择厂站</div>
+          <div class="ph-d">市 → 厂区 → 厂，点击具体厂查看该厂各指标流式曲线</div>
         </div>
-        <div v-else-if="realtime.loading || isLoadingHistory" class="loading">加载中…</div>
-        <div v-else class="error">
-          ⚠ 数据加载失败（后端 / InfluxDB 可能未连接）
-          <button class="retry-btn" @click="retry">重试</button>
-        </div>
-      </template>
-      <PlantOverviewGrid v-else :plants="plants" />
+      </div>
     </div>
+
+    <!-- 系统态势 / 态势历史 tabs -->
+    <SystemStatusView v-else-if="tab === 'sys'" />
+    <SituationHistoryView v-else />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
-import { useRealtimeStore } from '@/stores/realtime'
-import { useAppStore } from '@/stores/app'
-import { monitoringService } from '@/api/modules/monitoring'
-import { plantsService } from '@/api/modules/plants'
-import { buildIndicatorCells, type IndicatorGroups } from '@/composables/useIndicatorMatrix'
-import { usePolling } from '@/composables/usePolling'
-import CockpitFilterBar from '@/components/cockpit/CockpitFilterBar.vue'
-import IndicatorMatrix from '@/components/cockpit/IndicatorMatrix.vue'
-import AnomalyList from '@/components/cockpit/AnomalyList.vue'
-import PlantOverviewGrid from '@/components/cockpit/PlantOverviewGrid.vue'
+import { ref, watch } from 'vue'
+import { usePlantsStore } from '@/stores/plants'
+import { useActionStore } from '@/stores/action'
 import PlantTree from '@/components/cockpit/PlantTree.vue'
-import type { HistoryData, PlantData } from '@/api/types/api.types'
+import PlantBoardPanel from '@/views/PlantBoardPanel.vue'
+import SystemStatusView from '@/views/SystemStatusView.vue'
+import SituationHistoryView from '@/views/SituationHistoryView.vue'
 
-const router = useRouter()
-function goPlant(id: string) {
-  router.push(`/plants/${encodeURIComponent(id)}`)
+// 顶部三个选项卡（同参考站：仪表盘 / 系统态势 / 态势历史）
+const TOP_TABS = [
+  { t: '仪表盘', v: 'dash' }, { t: '系统态势', v: 'sys' }, { t: '态势历史', v: 'hist' },
+] as const
+const tab = ref<'dash' | 'sys' | 'hist'>('dash')
+
+const store = usePlantsStore()
+
+function onPickPlant(pid: string) {
+  store.selectPlant(pid)  // 记选中（父级链展开由 PlantTree 内部处理）
 }
 
-const realtime = useRealtimeStore()
-const app = useAppStore()
-const mode = ref<'plant' | 'overview'>('plant')
-const history = ref<HistoryData | null>(null)
-const plants = ref<PlantData[]>([])
-// 统一单壳后，CockpitShell 不再挂载；大屏自行轮询实时数据（默认 30s）
-const { start: startPolling, stop: stopPolling } = usePolling(() => realtime.fetchRealtime(), 30000)
-
-const groups = computed<IndicatorGroups | null>(() =>
-  realtime.realtime && history.value ? buildIndicatorCells(realtime.realtime, history.value) : null,
-)
-
-const isLoadingHistory = ref(false)
-async function loadHistory() {
-  isLoadingHistory.value = true
-  try {
-    history.value = await monitoringService.history({ time_range: app.dashboardFilters.timeWindow, page_size: 100 })
-  } catch {
-    history.value = null
-  } finally {
-    isLoadingHistory.value = false
+// 首次进入：自动选中第一棵树第一个厂（树加载完后）
+store.fetchTree().then((t) => {
+  if (!store.activePlant && t) {
+    const first = t.cities?.[0]?.districts?.[0]?.plants?.[0]
+      || t.ungrouped?.[0]
+    if (first) {
+      store.selectPlant(first.plant_id)
+      store.expandTo(first.plant_id)
+    }
   }
-}
-function retry() {
-  void realtime.fetchRealtime()
-  void loadHistory()
-}
-async function loadPlants() {
-  try { plants.value = await plantsService.list() } catch { plants.value = [] }
-}
-
-onMounted(() => {
-  void realtime.fetchRealtime()
-  void loadHistory()
-  void loadPlants()
-  startPolling()
 })
-onBeforeUnmount(() => stopPolling())
-watch(() => app.dashboardFilters.timeWindow, () => void loadHistory())
+
+// AI 动作指令带厂名时:大屏自动切到该厂(如"检测金桥厂COD异常")
+const actionStore = useActionStore()
+watch(() => actionStore.plant, (p) => {
+  if (!p) return
+  // 树里模糊匹配厂名(允许简称,如"金桥"匹配"当阳市金桥污水处理厂一期")
+  const cands: string[] = []
+  for (const c of store.tree?.cities ?? []) {
+    for (const d of c.districts ?? []) for (const pl of d.plants ?? []) cands.push(pl.plant_id)
+  }
+  for (const pl of store.tree?.ungrouped ?? []) cands.push(pl.plant_id)
+  const hit = cands.find((id) => id === p) || cands.find((id) => id.includes(p) || p.includes(id))
+  if (hit && hit !== store.activePlant) {
+    store.selectPlant(hit)
+    store.expandTo(hit)
+  }
+})
+// 动作到达时确保在仪表盘 tab(用户可能正看系统态势)
+watch(() => actionStore.lastAction, () => { tab.value = 'dash' })
 </script>
 
 <style scoped>
+.dash-page { display: flex; flex-direction: column; gap: 14px }
+.top-tabs { display: flex; gap: 4px; background: var(--card-bg, #fff); border: 1px solid var(--brd, #e2e8f0);
+  border-radius: 11px; padding: 4px; width: fit-content }
+.top-tabs button { all: unset; cursor: pointer; font-size: 13px; padding: 7px 18px; border-radius: 8px;
+  color: var(--text-secondary, #475569); transition: background .15s }
+.top-tabs button:hover { background: var(--primary-light, #eef2ff) }
+.top-tabs button.on { background: linear-gradient(135deg, var(--cyan, #22d3ee), #5fb9ff);
+  color: #04121a; font-weight: 700 }
 .dash-layout { display: flex; gap: 16px; align-items: flex-start }
-.dash-side { width: 230px; flex-shrink: 0; background: var(--card-bg, #fff);
+.dash-side { width: 200px; flex-shrink: 0; background: var(--card-bg, #fff);
   border: 1px solid var(--brd, #e2e8f0); border-radius: 13px; padding: 10px 8px }
 .dash-side-ttl { font-size: 11px; color: var(--text-muted, #94a3b8); letter-spacing: .5px;
   padding: 2px 6px 8px }
-.dash-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px }
-.seg { display: inline-flex; background: var(--card-bg); border: 1px solid var(--brd); border-radius: 11px; padding: 4px; margin-bottom: 14px; }
-.seg button { background: transparent; border: 0; color: var(--text-secondary); font-size: 13px; padding: 7px 16px; border-radius: 8px; cursor: pointer; font-family: inherit; }
-.seg button.on { color: #04121a; background: linear-gradient(135deg, var(--cyan), #5fb9ff); font-weight: 600; }
-.matrix-wrap { margin-top: 14px; }
-.loading { color: var(--text-muted); font-size: 13px; padding: 20px; }
-.error { color: var(--el-color-danger, #f56c6c); font-size: 13px; padding: 20px; display: flex; align-items: center; gap: 12px; }
-.retry-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--brd); background: var(--card-bg); color: var(--primary); font-size: 12px; cursor: pointer; font-family: inherit; }
-.retry-btn:hover { border-color: var(--primary); }
+.dash-main { flex: 1; min-width: 0 }
+
+.placeholder { padding: 90px 20px; text-align: center; color: var(--text-muted);
+  background: var(--card-bg, #fff); border: 1px dashed var(--brd, #e2e8f0); border-radius: 13px }
+.ph-ico { font-size: 40px; margin-bottom: 10px }
+.ph-t { font-size: 15px; font-weight: 600; color: var(--text-secondary) }
+.ph-d { font-size: 12.5px; margin-top: 6px }
 </style>

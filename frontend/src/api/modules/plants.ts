@@ -8,9 +8,9 @@ export const plantsService = {
   /** 多厂区目录树(真实数据): 市→厂区→厂 */
   tree: () => api.get<unknown, { success: boolean; data: PlantTree }>('/v1/plants/tree'),
 
-  /** 单厂看板数据(真实数据): 指标当前值+趋势+状态 */
-  dashboard: (plantId: string, hours = 24) =>
+  /** 单厂看板数据(真实数据): 指标当前值+趋势+状态;anchor=YYYY-MM-DD 任意时间点开播取段 */
+  dashboard: (plantId: string, hours = 24, anchor?: string) =>
     api.get<unknown, { success: boolean; data: PlantDashboard }>(
-      `/v1/plants/${encodeURIComponent(plantId)}/dashboard`, { params: { hours } },
+      `/v1/plants/${encodeURIComponent(plantId)}/dashboard`, { params: { hours, ...(anchor ? { anchor } : {}) } },
     ),
 }

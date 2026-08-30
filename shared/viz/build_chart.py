@@ -35,9 +35,11 @@ _INDICATOR_CN_FULL = {
 
 
 def build_chart_data(records: dict, indicators: Optional[List[str]] = None,
-                     anomalies: Optional[List[dict]] = None) -> List[Dict[str, Any]]:
+                     anomalies: Optional[List[dict]] = None,
+                     plant: str = "") -> List[Dict[str, Any]]:
     """records = {influent: [{timestamp, pH, COD,...}], effluent: [...]}
-    返回 [{"title": "进水水质趋势", "option": <ECharts option>}, {"title": "出水水质趋势", ...}]
+    返回 [{"title": "进水水质趋势", "option": <ECharts option>}, ...]
+    plant 传了就进 title（多厂对话里图必须标明是哪个厂的数据）。
 
     布局：按进出水分图（对比性强），每张图含多个指标线。
     indicators 不传时默认画水质 6 项；传了就只画指定的。
@@ -55,13 +57,15 @@ def build_chart_data(records: dict, indicators: Optional[List[str]] = None,
     xs = [_xlab(r.get("timestamp", "")) for r in infl] or [_xlab(r.get("timestamp", "")) for r in effl]
 
     # 按进出水分图，每张图含多个指标
+    plant_prefix = f"{plant} · " if plant else ""
     charts = []
     for side_key, side_label, rows in [("influent", "进水", infl), ("effluent", "出水", effl)]:
         if not rows:
             continue
 
-        title = f"{side_label}水质趋势"
+        title = f"{plant_prefix}{side_label}水质趋势"
         has_ph = "pH" in indicators
+        dual_axis = has_ph and len(indicators) > 1   # 真·双轴(pH+浓度)才建两根 yAxis
         series = []
         for ind in indicators:
             cn = _INDICATOR_TITLE.get(ind, ind)
@@ -76,10 +80,10 @@ def build_chart_data(records: dict, indicators: Optional[List[str]] = None,
                 "lineStyle": {"width": 2, "color": color},
                 "itemStyle": {"color": color},
             }
-            if has_ph and ind == "pH":
-                s["yAxisIndex"] = 0   # pH 用左轴
-            else:
-                s["yAxisIndex"] = 1   # 浓度用右轴
+            if dual_axis:
+                # 双轴:pH 左(0),浓度右(1)。单轴时不设 yAxisIndex——
+                # 之前无条件设 1,单指标(如只画COD)时 yAxis 只有 0 号,前端 "yAxis 1 not found" 全图崩白
+                s["yAxisIndex"] = 0 if ind == "pH" else 1
 
             series.append(s)
 
@@ -106,14 +110,14 @@ def build_chart_data(records: dict, indicators: Optional[List[str]] = None,
             "title": {"text": title, "left": "center", "textStyle": {"fontSize": 14, "fontWeight": "bold"}},
             "tooltip": {"trigger": "axis", "axisPointer": {"type": "cross"}},
             "legend": {"data": [_INDICATOR_TITLE.get(i, i) for i in indicators], "top": 26, "textStyle": {"fontSize": 11}},
-            "grid": {"top": 55, "left": 55, "right": has_ph and len(indicators) > 1 and 55 or 20, "bottom": 35},
+            "grid": {"top": 55, "left": 55, "right": dual_axis and 55 or 20, "bottom": 35},
             "xAxis": {"type": "category", "data": xs, "axisLabel": {"fontSize": 10}},
             "yAxis": [],
             "series": series,
         }
 
-        # 双 Y 轴：左 pH(0-14)，右浓度(mg/L)
-        if has_ph and len(indicators) > 1:
+        # 双 Y 轴：左 pH(0-14)，右浓度(mg/L)。只在 dual_axis 时两根,否则单轴
+        if dual_axis:
             option["yAxis"] = [
                 {"type": "value", "name": "pH", "position": "left", "min": 0, "max": 14,
                  "axisLabel": {"fontSize": 10}, "nameTextStyle": {"fontSize": 11}},

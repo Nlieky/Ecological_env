@@ -10,7 +10,15 @@
       </div>
       <div class="grp">
         <span class="lbl">时间窗口</span>
-        <button v-for="w in WINDOWS" :key="w.v" class="chip sm" :class="{ on: timeWindow === w.v }" @click="timeWindow = w.v">{{ w.t }}</button>
+        <button v-for="w in WINDOWS" :key="w.v" class="chip sm" :class="{ on: timeWindow === w.v && !customRange.start }" @click="pickWindow(w.v)">{{ w.t }}</button>
+        <!-- 自定义日期范围(长时段堆叠查询,大屏流式看板不管这个) -->
+        <span class="range-box">
+          <span class="lbl">自定义</span>
+          <input type="date" v-model="customRange.start" @change="loadCustom" />
+          <span class="dash">~</span>
+          <input type="date" v-model="customRange.end" @change="loadCustom" />
+          <button v-if="customRange.start" class="chip sm clear" @click="clearRange">✕ 清除</button>
+        </span>
       </div>
     </div>
 
@@ -26,7 +34,7 @@
     <div class="chart-card">
       <div class="chart-head">
         <span class="ct">{{ curMeta.label }}（{{ curMeta.desc }}）趋势 · 进水 vs 出水</span>
-        <span class="cs">{{ records.length }} 个采样点</span>
+        <span class="cs">{{ customRange.start ? `自定义 ${customRange.start} ~ ${customRange.end || '今'}` : `${records.length} 个采样点` }}</span>
       </div>
       <div class="chart-wrap">
         <div ref="chartEl" class="chart"></div>
@@ -41,6 +49,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import echarts from '@/lib/echarts'
 import { monitoringService } from '@/api/modules/monitoring'
+import { plantsService } from '@/api/modules/plants'
 import { useActionStore } from '@/stores/action'
 import type { HistoryRecord } from '@/api/types/api.types'
 
@@ -60,6 +69,47 @@ const indicator = ref<IndKey>('COD')
 const timeWindow = ref<'1h' | '6h' | '24h'>('24h')
 const records = ref<HistoryRecord[]>([])
 const loading = ref(false)
+
+// 自定义日期范围(长时段查询;归本页,大屏流式看板保持固定滑窗)
+const customRange = ref<{ start: string; end: string }>({ start: '', end: '' })
+function pickWindow(v: '1h' | '6h' | '24h') {
+  customRange.value = { start: '', end: '' }
+  timeWindow.value = v
+}
+function clearRange() {
+  customRange.value = { start: '', end: '' }
+  void load()
+}
+async function loadCustom() {
+  const { start, end } = customRange.value
+  if (!start) return
+  // 复用 dashboard 段查询:起止日期(堆叠全量展示,自适应点距)
+  try {
+    const r = await plantsService.dashboard(PLANT, 24, start)
+    const d = r.data
+    // dashboard anchor 模式=该日起7天;不足/超出由 end 截断
+    const inRange = (t: string) => (!end || t.slice(0, 10) <= end)
+    const rs: HistoryRecord[] = (d.indicators?.pH?.series?.effluent ?? [])
+      .filter((p) => inRange(p.time))
+      .map((p) => ({ timestamp: p.time.replace(' ', 'T'),
+        influent: {}, effluent: {} } as unknown as HistoryRecord))
+    // 把全部指标塞进对应时间戳
+    for (const [field, ind] of Object.entries(d.indicators ?? {})) {
+      const key = field === 'suspended_solids' ? 'SS' : field
+      for (const side of ['influent', 'effluent'] as const) {
+        for (const p of ind.series[side]) {
+          if (!inRange(p.time)) continue
+          const rec = rs.find((x) => x.timestamp === p.time.replace(' ', 'T'))
+          if (rec) (rec[side] as any)[key] = p.value
+        }
+      }
+    }
+    records.value = rs
+  } catch { records.value = [] }
+  await nextTick()
+  renderChart()
+}
+const PLANT = '当阳市金桥污水处理厂一期'
 
 const curMeta = computed(() => INDICATORS.find((i) => i.key === indicator.value)!)
 const curUnit = computed(() => curMeta.value.unit)
@@ -172,6 +222,12 @@ onBeforeUnmount(() => { chart?.dispose(); chart = null })
   border: 1px solid var(--brd); border-radius: 13px; padding: 11px 14px }
 .grp { display: flex; align-items: center; gap: 7px; flex-wrap: wrap }
 .lbl { font-size: 11px; color: var(--text-muted); letter-spacing: .5px }
+.range-box { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px;
+  border: 1px solid var(--brd); border-radius: 8px; background: #fff }
+.range-box input { border: 0; outline: none; font-size: 12px; color: var(--text-primary);
+  font-family: inherit; cursor: pointer }
+.range-box .dash { color: var(--text-muted) }
+.chip.clear { border-style: dashed; color: #ef4444 }
 .chip { background: #fff; border: 1px solid var(--brd); color: var(--text-secondary); font-size: 12.5px;
   padding: 6px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px }
 .chip.sm { padding: 6px 11px; font-size: 12px }

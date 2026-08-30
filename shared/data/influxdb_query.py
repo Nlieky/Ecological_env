@@ -53,7 +53,8 @@ def get_client_and_bucket() -> Tuple[InfluxDBClient, str]:
 
 
 def fetch_wastewater_df(client: InfluxDBClient, bucket: str, data_type: str,
-                        fields: Optional[List[str]] = None) -> pd.DataFrame:
+                        fields: Optional[List[str]] = None,
+                        plant_id: Optional[str] = None) -> pd.DataFrame:
     """查一侧(进水/出水)数据,pivot 成宽表。
 
     返回:timestamp(naive,原 naive 视作 UTC)为索引 + 各英文契约字段列,按时间升序。
@@ -64,14 +65,16 @@ def fetch_wastewater_df(client: InfluxDBClient, bucket: str, data_type: str,
         bucket: 桶名
         data_type: "influent" 或 "effluent"
         fields: 要保留的字段(默认 CANONICAL_FIELDS)
+        plant_id: 厂(监测点)过滤——多厂库必传,不传=全库混合(单厂时代旧默认,勿再用)
     """
     fields = fields or CANONICAL_FIELDS
     keep = ", ".join([f'"{f}"' for f in fields])
+    plant_filter = f'  and r.plant_id == "{plant_id.replace(chr(34), "")}" ' if plant_id else ""
     flux = (
         f'from(bucket: "{bucket}") '
         f'|> range(start: 0) '
         f'|> filter(fn: (r) => r._measurement == "{_MEASUREMENT}" '
-        f'  and r.data_type == "{data_type}") '
+        f'  and r.data_type == "{data_type}"{plant_filter}) '
         f'|> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value") '
         f'|> keep(columns: ["_time", {keep}])'
     )
