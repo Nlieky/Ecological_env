@@ -64,10 +64,13 @@ def _load_influx_env() -> None:
         os.environ.setdefault(k.strip(), v.strip())
 
 
-def _fetch_influx_cn(client, bucket: str, data_type: str):
-    """从 InfluxDB 查一侧(委托共享模块)+ 重命名为中文列名(对齐原 CSV,detect_anomalies 零改动)。"""
+def _fetch_influx_cn(client, bucket: str, data_type: str, plant: str | None = None):
+    """从 InfluxDB 查一侧(委托共享模块)+ 重命名为中文列名(对齐原 CSV,detect_anomalies 零改动)。
+
+    plant: 厂过滤(多厂库必传;None=全库混合,单厂遗留)。
+    """
     from shared.data.influxdb_query import fetch_wastewater_df, CANONICAL_FIELDS
-    df = fetch_wastewater_df(client, bucket, data_type, CANONICAL_FIELDS)
+    df = fetch_wastewater_df(client, bucket, data_type, CANONICAL_FIELDS, plant_id=plant)
     if df.empty:
         return df
     df = df.rename(columns=_INFLUX_CN_FIELDS).reset_index().rename(columns={"timestamp": "监测时间"})
@@ -157,10 +160,23 @@ def load_recent_data(hours: int = 24) -> dict:
     try:
         from influxdb_client import InfluxDBClient
         client = InfluxDBClient(url=url, token=token, org=org, timeout=30_000)
-        df_in = _fetch_influx_cn(client, bucket, "influent")
-        df_out = _fetch_influx_cn(client, bucket, "effluent")
+        # 厂过滤:优先 SESSION_DIR/data_result.json 的 metadata.plant(与感知链一致);
+        # 无链式结果时用环境变量 DETECTOR_PLANT(主智能体可设);都无=全库(单厂遗留)
+        plant = None
+        try:
+            sd = os.environ.get('SESSION_DIR')
+            if sd and (Path(sd) / 'data_result.json').exists():
+                meta = (json.loads((Path(sd) / 'data_result.json').read_text(encoding='utf-8'))
+                        .get('result', {}).get('metadata', {}))
+                plant = meta.get('plant') or None
+        except Exception:
+            pass
+        if not plant:
+            plant = os.environ.get('DETECTOR_PLANT') or None
+        df_in = _fetch_influx_cn(client, bucket, "influent", plant)
+        df_out = _fetch_influx_cn(client, bucket, "effluent", plant)
         client.close()
-        logger.info(f"读取数据成功：进水{len(df_in)}条，出水{len(df_out)}条")
+        logger.info(f"读取数据成功(plant={plant or '全库'})：进水{len(df_in)}条，出水{len(df_out)}条")
     except Exception as e:
         logger.error(f"InfluxDB 读取失败：{e}")
         return {"influent_df": pd.DataFrame(), "effluent_df": pd.DataFrame(),

@@ -19,18 +19,23 @@ description: 获取监测数据——从 InfluxDB 取进出水数据，忠实保
 
 脚本路径：`$HERMES_HOME/skills/data-perception-core/scripts/get_data.py`
 
+**⚠️ Python 必须用项目 venv 的绝对路径**（PATH 里的 python 是 miniconda 3.8，缺 influxdb_client 等依赖，直接用必报 ImportError）：
+```
+E:/project/Ecological_env/ecological_env/Scripts/python.exe
+```
+
 ### 时间范围 → 参数
 
 脚本支持两种方式（二选一）：
 
 **方式 1：起止日期**（任务给了明确日期时优先用）
 ```bash
-python "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --start "2026-07-14" --end "2026-07-15"
+"E:/project/Ecological_env/ecological_env/Scripts/python.exe" "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --start "2026-07-14" --end "2026-07-15"
 ```
 
 **方式 2：最近 N 小时**（任务说"最近X天/小时"时用）
 ```bash
-python "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --hours 168
+"E:/project/Ecological_env/ecological_env/Scripts/python.exe" "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --hours 168
 ```
 
 | 任务里说的 | 用哪个参数 |
@@ -43,12 +48,24 @@ python "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --hours 16
 | "本月" / "一个月" | `--hours 720` |
 | 没提时间 | `--hours 24`（唯一允许默认的情况） |
 
-### 指定指标（用户只问了某些指标时加这个参数）
+### 指定指标（用户只问了某些指标时**必须**加这个参数）
 
-如果用户只问特定指标（如"pH和COD"），加 `--chart-indicators` 只画这些指标的曲线：
+用户只问特定指标（如"COD是多少"）→ **必须**加 `--chart-indicators "COD"`，否则曲线会画全部 6 个指标，跟用户的问题对不上：
 ```bash
-python "...get_data.py" --start "2026-07-14" --end "2026-07-15" --chart-indicators "pH,COD"
+"E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py" --start "2026-07-14" --end "2026-07-15" --chart-indicators "pH,COD"
 ```
+不传时默认画所有水质指标（pH/COD/TN/氨氮/TP/SS）——只在用户要"全部指标/整体情况"时才允许默认。
+
+### 指定厂/监测点（**多厂库必传**，加这个参数）
+
+库里有多个厂(监测点)。任务里提到厂/排放口名(如"金桥厂""洗舱站")→ 必须加 `--plant`，否则取到的是全库混合数据、结果错误：
+```bash
+"E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py" --hours 24 --plant "当阳市金桥污水处理厂一期"
+"E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py" --hours 24 --plant "洗舱站污水排放口"
+```
+厂名要写全称(InfluxDB 里的 plant_id)。任务里没提厂 → 用主任务上下文里给的厂；都没有才允许不传(单厂遗留行为)。
+
+**多个厂 = 跑多次脚本，每次一个 --plant**。任务要两个厂的数据(如"金桥和洗舱站的COD")→ 依次跑两次。**最终答复必须逐厂列出关键统计**（每个厂的进/出水各指标 min/max/mean，脚本输出里有）——主智能体只能看到你的文字答复，你不写它就不知道；尤其**不要**说"只有XX厂有数据"除非某厂脚本明确返回 0 条。**禁止**为了"一次取多厂"用 terminal 自己写 Python 查库——get_data.py 是唯一数据入口,自己写的代码 import 环境不对必然失败。
 不加这个参数时默认画所有水质指标（pH/COD/TN/氨氮/TP/SS）。
 
 **关键**：从任务描述里识别时间，选对参数，把数值/日期写进命令。任务说"一周"就写 `--hours 168`，不能写成 24。
@@ -56,23 +73,23 @@ python "...get_data.py" --start "2026-07-14" --end "2026-07-15" --chart-indicato
 ### 好的调用 vs 差的调用
 
 ```
-✅ 好：python "...get_data.py" --start "2026-07-14" --end "2026-07-15"
+✅ 好："E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py" --start "2026-07-14" --end "2026-07-15"
    → "7月14日到15日"（跨2天），时间精确，脚本取对应范围
 
-✅ 好：python "...get_data.py" --start "2026-07-14" --end "2026-07-14"
+✅ 好："E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py" --start "2026-07-14" --end "2026-07-14"
    → "7月14日全天"（单日）：start 和 end 同一天，脚本自动补到 23:59:59 取整天（24条）
 
-✅ 好：python "...get_data.py" --hours 168
+✅ 好："E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py" --hours 168
    → "一周"换算成 168 小时，正确
 
-❌ 差：python "...get_data.py" --start "2026-07-14" --end "2026-07-15"
+❌ 差："E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py" --start "2026-07-14" --end "2026-07-15"
    → 任务只要"7月14日"（单日），却写成 14→15，**多取了一整天变成 48 条**！
      单日任务的 end 绝不能写次日，必须 --start=--end=同一天
 
-❌ 差：python "...get_data.py"
+❌ 差："E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py"
    → 没传时间，默认 24 小时——任务要一周却只取了一天
 
-❌ 差：python "...get_data.py" --hours 24
+❌ 差："E:/project/Ecological_env/ecological_env/Scripts/python.exe" "...get_data.py" --hours 24
    → 任务说"一周"却写了 24——没换算
 ```
 

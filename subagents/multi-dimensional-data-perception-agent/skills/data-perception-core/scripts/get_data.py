@@ -59,10 +59,13 @@ def _load_env() -> None:
         os.environ.setdefault(k.strip(), v.strip())
 
 
-def _fetch_df(client, bucket: str, data_type: str) -> pd.DataFrame:
-    """查一侧数据(委托共享模块)+ 重命名为旧 CSV 键名,下游零改动。"""
+def _fetch_df(client, bucket: str, data_type: str, plant: str | None = None) -> pd.DataFrame:
+    """查一侧数据(委托共享模块)+ 重命名为旧 CSV 键名,下游零改动。
+
+    plant: 厂(监测点)过滤——多厂库必传,不传=全库混合(单厂遗留)。
+    """
     from shared.data.influxdb_query import fetch_wastewater_df, CANONICAL_FIELDS
-    df = fetch_wastewater_df(client, bucket, data_type, CANONICAL_FIELDS)
+    df = fetch_wastewater_df(client, bucket, data_type, CANONICAL_FIELDS, plant_id=plant)
     return df.rename(columns=_FIELD_RENAME)
 
 
@@ -86,15 +89,15 @@ def _df_to_records(df: pd.DataFrame) -> list:
     return records
 
 
-def get_data_by_hours(client, bucket, data_type, hours_back=24):
+def get_data_by_hours(client, bucket, data_type, hours_back=24, plant=None):
     """最近 N 小时(按数据集最新时间往回取 N 条,1 条/小时)。"""
-    df = _fetch_df(client, bucket, data_type)
+    df = _fetch_df(client, bucket, data_type, plant)
     return _df_to_records(df.tail(hours_back))
 
 
-def get_data_by_range(client, bucket, data_type, start_time, end_time):
+def get_data_by_range(client, bucket, data_type, start_time, end_time, plant=None):
     """指定时间范围 [start, end]。"""
-    df = _fetch_df(client, bucket, data_type)
+    df = _fetch_df(client, bucket, data_type, plant)
     if df.empty:
         return []
     start_dt = pd.to_datetime(start_time)
@@ -147,11 +150,13 @@ def main():
     parser.add_argument("--start", type=str, help="开始时间 (YYYY-MM-DD)")
     parser.add_argument("--end", type=str, help="结束时间 (YYYY-MM-DD)")
     parser.add_argument("--chart-indicators", type=str, default="", help="只画指定指标的曲线(逗号分隔,如 pH,COD)")
+    parser.add_argument("--plant", type=str, default="", help="厂/监测点过滤(多厂库必传,如'洗舱站污水排放口')")
     args = parser.parse_args()
 
     # 用户指定的曲线指标(None=画全部水质指标)。提前解析，metadata 和 chartData 都要用。
     chart_inds = ([x.strip() for x in args.chart_indicators.split(",") if x.strip()]
                   if args.chart_indicators else None)
+    plant = args.plant.strip() or None
 
     task_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     hours_back = args.hours or (args.days * 24 if args.days else 24)
@@ -161,10 +166,12 @@ def main():
 
     def _get(data_type):
         if use_range:
-            return get_data_by_range(client, bucket, data_type, args.start, args.end)
-        return get_data_by_hours(client, bucket, data_type, hours_back)
+            return get_data_by_range(client, bucket, data_type, args.start, args.end, plant)
+        return get_data_by_hours(client, bucket, data_type, hours_back, plant)
 
     label = f"{args.start} 至 {args.end}" if use_range else f"最近{hours_back}小时"
+    if plant:
+        label = f"{plant} {label}"
     print(f"获取 {label} 的数据 (InfluxDB bucket={bucket}) ...")
     influent_data = _get("influent")
     effluent_data = _get("effluent")
@@ -179,6 +186,7 @@ def main():
             "effluent": effluent_data,
             "metadata": {
                 "time_range": time_range_str,
+                "plant": plant or "",
                 "indicators": ["pH", "COD", "TN", "NH3-N", "TP", "SS", "flow_rate", "discharge_volume"],
                 # 用户 --chart-indicators 指定的指标(None=没指定，画全部水质指标)。
                 # 异常检测子智能体读它，让异常图画同样的指标(用户问"pH和COD"就只画pH/COD)。
@@ -199,21 +207,57 @@ def main():
     }
 
     # 保存到会话目录(优先)或子智能体目录(与旧版默认路径一致)
+    # 多厂:主文件 data_result.json 仍是"最后一次"结果(下游链式消费契约不变),
+    # 另按厂写 data_result_<plant>.json 汇总文件(全厂累积),主智能体/主智能体
+    # 可读它拿全部厂——单文件被多厂互相覆盖丢数据的问题由此解决。
     session_dir = os.environ.get("SESSION_DIR")
     if session_dir:
         output_file = Path(session_dir) / "data_result.json"
+        plants_file = Path(session_dir) / "data_result_plants.json"
     else:
         # parents[3] = subagents/multi-dimensional-data-perception-agent
         output_file = Path(__file__).resolve().parents[3] / "data_result.json"
+        plants_file = output_file.parent / "data_result_plants.json"
 
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
+
+    # 多厂累积: {plant: 精简摘要+统计} — 每跑一厂累积一厂,全部厂都留痕
+    try:
+        plants = {}
+        if plants_file.exists():
+            plants = json.loads(plants_file.read_text(encoding="utf-8"))
+        pid = plant or "(默认)"
+        def _stats(rows):
+            if not rows:
+                return {}
+            out = {}
+            keys = [k for k in rows[0] if k not in ("timestamp",)]
+            for k in keys:
+                vs = [r[k] for r in rows if r.get(k) is not None]
+                if vs:
+                    out[k] = {"min": round(min(vs), 2), "max": round(max(vs), 2), "mean": round(sum(vs)/len(vs), 2), "n": len(vs)}
+            return out
+        plants[pid] = {
+            "plant": pid,
+            "time_range": label,
+            "influent": _stats(influent_data),
+            "effluent": _stats(effluent_data),
+        }
+        result["result"]["metadata"]["all_plants"] = list(plants.keys())
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)  # all_plants 也进主文件
+        plants_file.write_text(json.dumps(plants, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[多厂累积] {len(plants)} 厂结果 → {plants_file.name}: {', '.join(plants.keys())}")
+    except Exception as e:
+        print(f"[多厂累积] 失败(不影响主流程): {e}")
 
     # 报告可视化: 构造 chartData(无异常标注, 纯数据曲线)
     try:
         from shared.viz.build_chart import build_chart_data
         result["result"]["chartData"] = build_chart_data(
-            {"influent": influent_data, "effluent": effluent_data}, indicators=chart_inds)
+            {"influent": influent_data, "effluent": effluent_data}, indicators=chart_inds,
+            plant=plant or "")
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
     except Exception as e:
