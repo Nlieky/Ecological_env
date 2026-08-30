@@ -6,6 +6,7 @@
 使主智能体能够通过LLM决策调用子智能体。
 """
 
+import os
 import sys
 import json
 from pathlib import Path
@@ -167,18 +168,25 @@ def _compact_result_for_master(result):
     }
 
     # 数据感知：计算各指标统计值（Python 算，不是 LLM 编），让主智能体能回答数据查询
+    # ★ 多厂通用(2026-08-26)：进水为空(如洗舱站只有排放口)不再跳过整块——出水统计照给,
+    #   否则无进水厂永远"没有 data_stats",主智能体会误判为"该厂无数据"。
     infl = r.get("influent")
     effl = r.get("effluent")
-    if isinstance(infl, list) and infl:
+    if isinstance(infl, list) or isinstance(effl, list):
+        infl = infl if isinstance(infl, list) else []
+        effl = effl if isinstance(effl, list) else []
+        if not infl and not effl:
+            infl = None  # 双侧都空才走"无数据"路径
+    if isinstance(infl, list) or isinstance(effl, list):
         n_in = len(infl)
-        n_out = len(effl) if isinstance(effl, list) else 0
+        n_out = len(effl)
         compact["influent_count"] = n_in
         compact["effluent_count"] = n_out
         compact["chart_generated"] = "曲线已由数据感知自动生成（chartData），前端会自动渲染，你不需要自己画"
         stats = {}
         for ind in ("pH", "COD", "TN", "NH3-N", "TP", "SS"):
             infl_vals = [x.get(ind) for x in infl if x.get(ind) is not None]
-            effl_vals = [x.get(ind) for x in (effl or []) if x.get(ind) is not None]
+            effl_vals = [x.get(ind) for x in effl if x.get(ind) is not None]
             if infl_vals or effl_vals:
                 s = {}
                 if infl_vals:
@@ -191,18 +199,40 @@ def _compact_result_for_master(result):
         if stats:
             compact["data_stats"] = stats
         md = r.get("metadata", {})
-        if isinstance(md, dict) and md.get("time_range"):
-            compact["time_range"] = md["time_range"]
-        # ★ 把"数据+曲线已就绪"塞进 summary 头条——LLM 最先读 summary 字段。
-        #   之前只把"曲线已生成"放在独立的 chart_generated 字段里，主智能体没读它，
-        #   仍为"画曲线"重复调用①。现在让 summary 本身明确告知曲线已随数据返回，杜绝重调。
+        if isinstance(md, dict):
+            if md.get("time_range"):
+                compact["time_range"] = md["time_range"]
+            if md.get("plant"):
+                compact["plant"] = md["plant"]  # 多厂:标明本结果是哪个厂
+        # ★ summary 头条区分"有进水"和"仅出水"(无进水厂),主智能体不再误判"无数据"
         ind_list = ", ".join(stats.keys()) if stats else "各指标"
+        if n_in > 0:
+            side_txt = f"进出水 {n_in}/{n_out} 条"
+        else:
+            side_txt = f"出水 {n_out} 条（该监测点无进水监测,属正常）"
         compact["summary"] = (
-            f"✅ 数据+曲线已就绪：进出水各 {n_in}/{n_out} 条"
+            f"✅ 数据+曲线已就绪：{side_txt}"
             f"（{ind_list} 的 min/max/mean 见 data_stats）；"
             f"时序曲线 chartData 已生成，前端自动渲染。"
             f"用户要的'曲线/图'已包含——不要为画曲线再调本子智能体。"
         )
+        # ★ 多厂归档透传(2026-08-27):子智能体一次调用可能跑了多个厂(data_result.json
+        # 只留最后一个厂,主智能体会漏看其他厂)。data_result_plants.json 是逐厂累积统计,
+        # 附进 compact.all_plants_stats——主智能体不用再调①就能拿到本会话全部厂的数字。
+        try:
+            import os as _os
+            _sd = _os.environ.get("SESSION_DIR")
+            if _sd:
+                _pf = Path(_sd) / "data_result_plants.json"
+                if _pf.exists():
+                    _plants = json.loads(_pf.read_text(encoding="utf-8"))
+                    if isinstance(_plants, dict) and len(_plants) > 1:
+                        compact["all_plants_stats"] = _plants
+                        compact["summary"] += (
+                            f" 本次会话已查 {len(_plants)} 个厂,逐厂统计见 all_plants_stats"
+                            f"(主文件 data_result 只是其中一厂)——回答多厂问题时逐厂引用它,不要重调①。")
+        except Exception:
+            pass
 
     # 异常检测：异常数
     anoms = r.get("anomalies")
@@ -222,6 +252,25 @@ def _compact_result_for_master(result):
         compact["action"] = r["action"]
 
     return compact
+
+
+def _remount_mcp_tools(agent):
+    """把全局 registry 里已注册的 mcp_* 工具 schema 补挂进 agent.tools。
+
+    可重入：registry 里没有(未装 MCP/discover 未跑)时 no-op；有则去重后 extend。
+    解决 hermes agent_init 首次 query 重算 agent.tools 冲掉 MCP 的问题(见注册函数内注释)。
+    """
+    try:
+        from tools.registry import registry as _reg
+        mcp_names = {n for n in _reg.get_all_tool_names() if str(n).startswith("mcp_")}
+        if not mcp_names:
+            return
+        existing = {t.get('function', {}).get('name') for t in agent.tools if isinstance(t, dict)}
+        defs = _reg.get_definitions(mcp_names - existing)
+        if defs:
+            agent.tools.extend(defs)
+    except Exception as e:
+        print(f"MCP 工具补挂跳过: {e}")
 
 
 def register_orchestrator_tools(agent):
@@ -273,14 +322,14 @@ def register_orchestrator_tools(agent):
         }},
         {"type": "function", "function": {
             "name": "run_detector",
-            "description": "对监测数据跑异常检测算法并在大屏标注。当用户指令是检测类动作(如'检测pH平稳异常''检测COD突变''用孤立森林检测')时调用。纯问答(如'pH是多少')不要调。",
+            "description": "对监测数据跑异常检测算法并在大屏标注。当用户指令是检测类动作(如'检测pH平稳异常''检测COD突变''用孤立森林检测')时调用。纯问答(如'pH是多少')不要调。时间范围:用户消息带[大屏当前观看窗口]注记且未明确指定时间→必须用注记的段起/段止;否则用户说了日期用日期;都没提传 now(脚本自动取数据最新点24h)。",
             "parameters": {"type": "object", "properties": {
                 "algorithm": {"type": "string", "enum": ["constant", "changepoint", "iforest"],
                               "description": "算法: constant=平稳/恒定检测, changepoint=突变检测, iforest=孤立森林离群检测"},
                 "indicator": {"type": "string", "enum": ["pH", "COD", "TN", "NH3-N", "TP", "SS"],
                               "description": "监测指标"},
-                "start": {"type": "string", "description": "开始日期 YYYY-MM-DD"},
-                "end": {"type": "string", "description": "结束日期 YYYY-MM-DD"}
+                "start": {"type": "string", "description": "开始时间 YYYY-MM-DD 或 'YYYY-MM-DD HH:MM' 或 'now'。用户消息带[大屏当前观看窗口]注记时=注记的段起"},
+                "end": {"type": "string", "description": "结束时间,同 start 格式;注记时=注记的段止;无注记无日期传 now"}
             }, "required": ["algorithm", "indicator", "start", "end"]}
         }},
     ]
@@ -294,11 +343,28 @@ def register_orchestrator_tools(agent):
     # orchestrator-core/SKILL.md（AGENTS.md 要求"先 skill_view('orchestrator-core')
     # 再 call_subagent"）。之前把 skill_view 一起砍了，导致主智能体根本读不到编排规则，
     # 只能瞎猜、时对时错（有时只调①、有时跑全链①②③④）。
+    # 【保留 mcp_* 工具】——MCP 是配置中心装的外部能力(Filesystem 查知识库/Fetch 抓网页/
+    # InfluxDB 即席查/Memory 记忆)。实测(2026-08-29): hermes agent_init 在首次 query 时会
+    # 用内置工具表重算 agent.tools,把启动时挂载的 MCP 工具冲掉——所以这里精简后重新从
+    # registry 拉 mcp 工具挂回来(可重入:无论工具表何时被重算,MCP 都会回来)。
     _KEEP_NAMES = {s['function']['name'] for s in _ORCH_SCHEMAS} | {"skill_view", "skills_list"}
     before_n = len(agent.tools)
     agent.tools = [t for t in agent.tools if isinstance(t, dict)
-                   and t.get('function', {}).get('name') in _KEEP_NAMES]
-    print(f"主智能体工具精简：{before_n} → {len(agent.tools)}（保留编排工具 + skill_view/skills_list，移除 terminal/browser 等分心工具）")
+                   and (t.get('function', {}).get('name') in _KEEP_NAMES
+                        or str(t.get('function', {}).get('name', '')).startswith('mcp_'))]
+    # 精简后补挂 MCP 工具(从全局 registry 取,discover 阶段已注册进来;没配 MCP 时空列表 no-op)
+    _remount_mcp_tools(agent)
+    # ★ 同步刷新 valid_tool_names(2026-08-30 根因修复):conversation_loop 用这个集合做
+    # 调用合法性闸门——初始化时算的旧集合(17 个,无 mcp_*)会让 LLM 的 mcp 工具调用
+    # 全部被判 "Unknown tool" 回错误,模型试几次后就学会宣称"工具不存在"。
+    # agent.tools 扩了集合必须跟着扩,否则工具表有 79 个但只有旧集合里的能调。
+    try:
+        if hasattr(agent, "valid_tool_names"):
+            agent.valid_tool_names = {t.get('function', {}).get('name')
+                                      for t in agent.tools if isinstance(t, dict)}
+    except Exception as _e:
+        print(f"valid_tool_names 刷新跳过: {_e}")
+    print(f"主智能体工具精简：{before_n} → {len(agent.tools)}（保留编排工具 + skill_view/skills_list + MCP，移除 terminal/browser 等分心工具）")
 
     # 第 2 层：覆盖注册到 hermes 全局 registry。vendored hermes 自带的
     # tools/orchestrator_tool.py 是多处损坏的桥接（handler 签名错、schema 双层包裹
@@ -324,6 +390,89 @@ def register_orchestrator_tools(agent):
 
 
 # Hermes-agent兼容的工具处理器（灵活签名以兼容多种调用方式）
+def _guard_perception_result(result, task_text, session_dir):
+    """感知①结果守卫(2026-08-27):LLM 构造 get_data 命令丢参(厂/时间)不稳定——
+    校验产出,不符则用任务文本解析的参数确定性重跑脚本,覆盖错误结果。
+
+    校验项:plant 为空(全库混合)、metadata.time_range 不含任务要求的日期。
+    返回修正后的 result(或原 result)。"""
+    try:
+        if not isinstance(result, dict) or result.get("status") != "completed":
+            return result
+        r = result.get("result") or {}
+        md = r.get("metadata") or {}
+        plant = md.get("plant") or ""
+        tr = str(md.get("time_range") or "")
+        import re as _re
+        # 任务要求的日期(显式 YYYY-MM-DD 或 YYYY年M月D日)
+        m = _re.search(r'(20\d{2})[-年](\d{1,2})[-月](\d{1,2})', task_text or "")
+        want_date = f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}" if m else ""
+        # 任务要求的厂
+        want_plant = None
+        for alias, pid in {"金桥": "当阳市金桥污水处理厂一期",
+                           "洗舱站": "洗舱站污水排放口"}.items():
+            if alias in (task_text or ""):
+                want_plant = pid
+                break
+        bad_plant = (not plant) and bool(want_plant)          # 混库
+        bad_date = bool(want_date) and want_date not in tr    # 时间窗回退
+        # 指标校验:任务点名了指标(如"只要COD"),图的 series 却画了全指标 → 也重跑
+        want_inds = []
+        for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
+                       ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS")]:
+            if cn in (task_text or "") and en not in want_inds:
+                want_inds.append(en)
+        got_series = []
+        for c in (r.get("chartData") or []):
+            got_series += [s.get("name") for s in (c.get("option") or {}).get("series") or []]
+        # 图里的中文名→英文键粗映射,比对集合
+        _cn2en = {"COD": "COD", "pH": "pH", "总氮": "TN", "氨氮": "NH3-N", "总磷": "TP", "悬浮物": "SS"}
+        got_en = {_cn2en.get(n, n) for n in got_series}
+        bad_inds = bool(want_inds) and bool(got_en) and not set(want_inds) >= got_en
+        if not (bad_plant or bad_date or bad_inds):
+            return result
+        # 确定性重跑:从任务文本解析参数(entry 已有同款解析,这里内联精简版)
+        import subprocess as _sp
+        import sys as _sys
+        # 项目根:tool_registration.py 在 skills/orchestrator-core/scripts/ 下,parents[2]=skills/,parents[3]=项目根
+        script = Path(__file__).resolve().parents[3] / "subagents" / "multi-dimensional-data-perception-agent" / "skills" / "data-perception-core" / "scripts" / "get_data.py"
+        if not script.exists():
+            return result
+        args = []
+        m2 = _re.search(r'(20\d{2}-\d{2}-\d{2})\s*(?:00:00)?\s*(?:至|~|-|到)\s*(20\d{2}-\d{2}-\d{2})', task_text or "")
+        if want_date:
+            args += ["--start", want_date, "--end", want_date]
+        elif m2:
+            args += ["--start", m2.group(1), "--end", m2.group(2)]
+        else:
+            args += ["--hours", "24"]
+        if want_plant:
+            args += ["--plant", want_plant]
+        inds = []
+        for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
+                       ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS")]:
+            if cn in (task_text or "") and en not in inds:
+                inds.append(en)
+        if inds:
+            args += ["--chart-indicators", ",".join(inds)]
+        env = dict(os.environ)
+        if session_dir:
+            env["SESSION_DIR"] = str(session_dir)
+        rp = _sp.run([_sys.executable, str(script)] + args, capture_output=True,
+                     text=True, encoding="utf-8", errors="replace", timeout=120, env=env)
+        print(f"[感知守卫] 参数不符(plant='{plant}' tr='{tr[:20]}' want={want_plant or '-'}{want_date}) → 确定性重跑 rc={rp.returncode}")
+        if rp.returncode == 0 and session_dir:
+            p = Path(session_dir) / "data_result.json"
+            if p.exists():
+                fixed = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(fixed, dict) and fixed.get("status") == "completed":
+                    return fixed
+        return result
+    except Exception as e:
+        print(f"[感知守卫] 异常(返回原结果): {e}")
+        return result
+
+
 def _call_subagent_handler(*args, **kwargs) -> str:
     """call_subagent工具的hermes-agent兼容处理器
 
@@ -354,9 +503,18 @@ def _call_subagent_handler(*args, **kwargs) -> str:
         subagent_name = params.get('subagent_name') or params.get('name') or 'unknown'
         _emit_progress(subagent_name, 'start')
         result = call_subagent(**params)
+        # 感知①结果守卫:LLM 丢参(混库/时间回退)→确定性重跑修正。
+        # 策略开关(配置中心·策略tab):perception_guard_enabled=False 跳过守卫(每调用读,立即生效)
+        if subagent_name == "multi-dimensional-data-perception" and _strategy("perception_guard_enabled", True):
+            _task_txt = str(params.get('task') or '')
+            _sd = os.environ.get("SESSION_DIR") or ""
+            result = _guard_perception_result(result, _task_txt, _sd)
         _sc = result.get("skill_calls") if isinstance(result, dict) else None
         _ev = _extract_evidence(result)
-        _cd = result.get("result", {}).get("chartData") if isinstance(result, dict) else None
+        # None 保护:子智能体失败时 result 里键存在但值为 null(如 result:None),
+        # .get("result",{}) 默认值不生效,.get("chartData") 直接崩——真实错误被吞
+        _r = result.get("result") if isinstance(result, dict) else None
+        _cd = _r.get("chartData") if isinstance(_r, dict) else None
         _emit_progress(subagent_name, 'done', _summarize_result(result), skill_calls=_sc, evidence=_ev, chartData=_cd)
         # 给主智能体回传精简版：去掉大数据数组（进/出水原始行），只留摘要+关键字段。
         # 完整结果已在 session 文件，下游子智能体从文件读；主智能体不该背原始数据
@@ -419,7 +577,11 @@ def _read_result_handler(*args, **kwargs) -> str:
 
 
 def _run_detector_handler(*args, **kwargs) -> str:
-    """run_detector 工具处理器：直接 subprocess 跑轻量算子脚本(1-3秒,不经LLM)。"""
+    """run_detector 工具处理器：直接 subprocess 跑轻量算子脚本(1-3秒,不经LLM)。
+
+    窗口兜底：LLM 没传有效 start/end 时，用 agent 服务注入的 _current_view_context
+    （大屏观看窗口）——检测的永远是用户眼前正在看的时段,标注才能落在窗口内。
+    """
     import subprocess
     if args and isinstance(args[0], dict):
         params = args[0]
@@ -430,15 +592,28 @@ def _run_detector_handler(*args, **kwargs) -> str:
     else:
         params = kwargs
 
+    start = str(params.get("start", "") or "")
+    end = str(params.get("end", "") or "")
+    vc = getattr(_run_detector_handler, "_view_context", None) or {}
+    # start/end 是 now/空 且有观看窗口 → 用窗口段起止兜底
+    if (not start or start == "now") and vc.get("segmentStart"):
+        start = str(vc["segmentStart"])
+    if (not end or end == "now") and vc.get("segmentEnd"):
+        end = str(vc["segmentEnd"])
+
     script = Path(__file__).resolve().parents[2] / "action-command-core" / "scripts" / "run_detector.py"
     cmd = [sys.executable, str(script),
            "--algorithm", str(params.get("algorithm", "constant")),
            "--indicator", str(params.get("indicator", "pH")),
-           "--start", str(params.get("start", "")),
-           "--end", str(params.get("end", ""))]
+           "--start", start or "now",
+           "--end", end or "now"]
+    # 环境变量兜底:LLM 若用 terminal 直接跑脚本(绕过本 handler),脚本自己也认这组变量
+    env = {**os.environ}
+    if vc.get("segmentStart"): env["DETECTOR_START"] = str(vc["segmentStart"])
+    if vc.get("segmentEnd"): env["DETECTOR_END"] = str(vc["segmentEnd"])
     try:
         r = subprocess.run(cmd, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=60)
+                           encoding="utf-8", errors="replace", timeout=60, env=env)
         out_str = r.stdout.strip()
         # 透传 action 事件给前端（run_detector 的 actionData → 大屏标注）
         try:

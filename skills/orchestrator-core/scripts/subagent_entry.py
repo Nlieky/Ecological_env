@@ -108,7 +108,7 @@ def _read_script_result(session_dir, result_filename):
     return None
 
 
-# 厂名别名→plant_id 全称(与库内一致;兜底默认=内置两厂)
+# 感知①自愈:厂名别名→plant_id 全称(与库内一致;兜底默认=内置两厂)
 _PLANT_ALIASES = {
     "金桥": "当阳市金桥污水处理厂一期",
     "当阳市金桥污水处理厂一期": "当阳市金桥污水处理厂一期",
@@ -126,6 +126,73 @@ try:
             _PLANT_ALIASES = {**_PLANT_ALIASES, **_raw_aliases}
 except Exception:
     pass
+
+
+def _heal_perception_by_script(task_text, session_dir):
+    """感知①自愈(2026-08-27):LLM"读了 skill 不执行"时,entry 从任务文本解析参数
+    直接 subprocess 跑 get_data.py——确定性兜底,不再依赖 LLM 重试。
+
+    解析不出厂/时间(返回 None)则退回 failed。"""
+    import re as _re
+    import subprocess as _sp
+    text = task_text or ""
+    plant = None
+    for alias, pid in _PLANT_ALIASES.items():
+        if alias in text:
+            plant = pid
+            break
+    if plant is None:
+        # 任务没提厂 → 绝不全库混查(多厂库混合=数据错误)。默认金桥(主监测点)。
+        # 用户真要看别的厂,主智能体的 task 会带厂名。
+        plant = "当阳市金桥污水处理厂一期"
+    m = _re.search(r'(20\d{2}-\d{2}-\d{2})\s*(?:00:00)?\s*(?:至|~|-|到)\s*(20\d{2}-\d{2}-\d{2})', text)
+    m2 = _re.search(r'(20\d{2})年(\d{1,2})月(\d{1,2})日', text)
+    hours_m = _re.search(r'最近\s*(\d+)\s*小时', text)
+    days_m = _re.search(r'最近\s*(\d+)\s*天', text)
+    args = []
+    if m:
+        args += ["--start", m.group(1), "--end", m.group(2)]
+    elif m2:
+        d = f"{m2.group(1)}-{int(m2.group(2)):02d}-{int(m2.group(3)):02d}"
+        args += ["--start", d, "--end", d]
+    elif hours_m:
+        args += ["--hours", hours_m.group(1)]
+    elif days_m:
+        args += ["--hours", str(int(days_m.group(1)) * 24)]
+    else:
+        args += ["--hours", "24"]
+    if plant:
+        args += ["--plant", plant]
+    inds = []
+    for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
+                   ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS")]:
+        if cn in text and en not in inds:
+            inds.append(en)
+    if inds:
+        args += ["--chart-indicators", ",".join(inds)]
+
+    script = AGENT_DIR / "skills" / "data-perception-core" / "scripts" / "get_data.py"
+    if not script.exists():
+        return None
+    # 项目根(标记法:向上找含 shared/+workspace/ 的目录;get_data 内部也有同款,双保险)
+    root = script
+    for p in root.parents:
+        if (p / "shared").is_dir() and (p / "workspace").is_dir():
+            root = p
+            break
+    try:
+        env = dict(os.environ)
+        if session_dir:
+            env["SESSION_DIR"] = str(session_dir)
+        r = _sp.run([sys.executable, str(script)] + args, capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=120,
+                    cwd=str(root), env=env)
+        logger.info(f"[自愈] get_data.py {' '.join(args)} → rc={r.returncode}")
+        if r.returncode == 0:
+            return _read_script_result(session_dir, "data_result.json")
+    except Exception as e:
+        logger.warning(f"[自愈] 执行失败: {e}")
+    return None
 
 
 def _extract_skill_calls(response) -> list:
@@ -210,15 +277,24 @@ def run_subagent() -> Dict[str, Any]:
         result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
         result = _read_script_result(session_dir, result_filename)
 
-        # 自愈：ctgu-vlm 偶尔读完 skill_view 后直接回"我已就绪"就结束（finish_reason=stop），
-        # 压根没调 terminal 跑脚本 → 没产出结果文件。检测到此情况时，复用同一会话追加一条
-        # 硬指令再跑一轮，逼 LLM 真正用 terminal 执行脚本。比让主智能体重试更省（不必重建
-        # agent、不必重新 skill_view；技能说明已在 history 里）。2026-07-28 trace 实证：
-        # 首轮只 skill_view 后"就绪"finish，主智能体简化重试才成功——把那次重试下沉到这里。
+        # 自愈(2026-08-27 强化):ctgu-vlm 偶发"读完 skill 不执行脚本"(onboarding 就 finish)。
+        # 旧方案只标 failed 等主智能体重试——主智能体(同为 ctgu-vlm)常不重试,用户拿到"无数据"。
+        # 新方案:entry 自己从任务文本解析参数、直接 subprocess 跑 canonical 脚本——确定性兜底,
+        # 不再依赖 LLM 第二轮。感知①的参数(--hours/--start/--end/--plant/--chart-indicators)
+        # 都能从任务文本正则抽出;解析不出再退回 failed。
+        # 自愈(策略开关:perception_heal_enabled=False 跳过——配置中心·策略tab)
+        _heal_on = True
+        try:
+            from backend.services.agent_strategy import get_strategy as _gs
+            _heal_on = _gs("perception_heal_enabled", True)
+        except Exception:
+            pass
+        if result is None and subagent_name == "multi-dimensional-data-perception" and _heal_on:
+            healed = _heal_perception_by_script(task.get('task', ''), session_dir)
+            if healed is not None:
+                result = healed
+                logger.info(f"[自愈] 已直接执行 get_data.py 兜底成功")
         if result is None:
-            # LLM 没产出结果文件（通常"读了 skill 没执行脚本"）。不自愈（自愈给命令是 hack：
-            # hermes 第二轮 run_conversation history=0 不继承，且时间窗不准）。直接 failed，
-            # 让主智能体决定重试或如实告知用户。
             final_text = response.get('final_response', '') if isinstance(response, dict) else str(response)
             logger.warning(f"[WARN] 未产出 {result_filename}（LLM 可能读了 skill 没执行脚本），标记 failed")
             result = {"task_id": task_id, "status": "failed",

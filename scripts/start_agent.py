@@ -8,12 +8,13 @@
 
 import os
 import sys
+import json
 import logging
 import time
 import uuid
 import threading
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -66,9 +67,13 @@ logger = logging.getLogger(__name__)
 
 
 class QueryRequest(BaseModel):
-    """查询请求模型"""
+    """查询请求模型(Optional 接受显式 null——pydantic v2 下 str=None 收到 null 会 422)"""
     query: str
-    session_id: str = None
+    session_id: Optional[str] = None
+    # 大屏观看窗口上下文(JSON 字符串):注入用户消息,让动作指令按正在看的时段执行
+    view_context: Optional[str] = None
+    # 'action' = AI 助手(右下角)·动作通道:只走短路,非动作直接回引导语,绝不进子智能体管线
+    mode: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -77,8 +82,11 @@ class QueryResponse(BaseModel):
     session_id: str
     timestamp: str
     success: bool
-    error: str = None
-    trace: dict = None  # 子智能体调用明细(decision_path + subagent_calls),供后端审计
+    error: Optional[str] = None
+    # 子智能体调用明细(decision_path + subagent_calls),供后端审计。
+    # Optional[dict](pydantic v2 下裸 dict=None 声明仍要求 dict——quick_response
+    # 无 trace 键时 .get() 得 None 直接 ValidationError 500,2026-08-30 实测)
+    trace: Optional[dict] = None
 
 
 class AgentService:
@@ -122,12 +130,16 @@ class AgentService:
 
             # 创建主智能体AIAgent实例
             # 关键：使用identity_path="workspace"加载主智能体身份文件
+            # disabled_toolsets: 排除 terminal/browser/filesystem 等——registry 层砍掉
+            # LLM 绕过 run_detector 直跑脚本的歪路(executor 从 registry 解析,白名单拦不住)
             self.master_agent = AIAgent(
                 model=model,
                 base_url=base_url,
                 api_key=api_key,
                 identity_path="workspace",  # 关键参数：加载主智能体身份文件
-                load_soul_identity=True
+                load_soul_identity=True,
+                disabled_toolsets=["terminal", "browser", "filesystem", "process",
+                                   "cronjob", "memory", "todo", "code", "web"],
             )
 
             # 设置最大迭代次数（4子智能体pipeline需要更多轮次；参数中心可调）
@@ -352,9 +364,10 @@ class AgentService:
 
             # 提取响应内容
             if isinstance(result, dict):
-                content = result.get("final_response", str(result))
+                # final_response 键存在但可能为 None(研判失败/被截断)——get 默认值不生效,显式兜底
+                content = result.get("final_response") or (str(result)[:2000] if result else "（智能体未产出文本回复，请重试或换种问法）")
             else:
-                content = str(result) if result else ""
+                content = str(result) if result else "（智能体未产出文本回复，请重试或换种问法）"
 
             # 从进度队列收集子智能体调用（与流式 query_stream 的 progress 解析一致）
             _decision_order = []
@@ -499,6 +512,43 @@ async def status():
     }
 
 
+def _try_shortcircuit(request: "QueryRequest", exclusive: bool = False) -> str | None:
+    """动作指令短路:轻量分类器命中 → 直接执行,返回给前端的文本;未命中返回 None。
+
+    exclusive=True(AI 助手·动作通道):非动作也返回引导语而非 None——绝不进子智能体
+    管线,保持"动作通道"与"研判通道"(/chat)分离。
+    exclusive=False(研判通道默认行为):未命中返回 None 落回主智能体管线。
+    """
+    try:
+        import importlib.util as _ilu
+        _p = Path(__file__).resolve().parents[1] / "skills" / "action-command-core" / "scripts" / "action_classifier.py"
+        _spec = _ilu.spec_from_file_location("_action_classifier", _p)
+        _mod = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+        vc = {}
+        if getattr(request, "view_context", None) and _gst("action_inject_view_context", True):
+            try:
+                vc = json.loads(request.view_context)
+            except Exception:
+                vc = {}
+        verdict = _mod.classify_action(request.query)
+        if verdict.is_action:
+            logger.info(f"⚡ 动作短路命中: {verdict.action}")
+            return verdict.execute(view_context=vc)
+        logger.info("动作分类: 非动作" + ("(动作通道,回引导语)" if exclusive else ",走主智能体管线"))
+        if exclusive:
+            _guide = _gst("action_guide_text", "") or (
+                "我是大屏动作助手,只执行让监测大屏变化的指令,例如:\n"
+                "- 检测pH平稳异常 / 检测COD离群 / 标出TN突变点\n"
+                "- 只看pH和COD / 切到进水 / 看最近一周\n"
+                "数据研判、异常原因分析请到左侧「智能体问答」页面,那里有完整的子智能体分析管线。")
+            return _guide
+        return None
+    except Exception as e:
+        logger.warning(f"动作短路失败(落回主智能体): {e}")
+        return None
+
+
 @app.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest):
     """执行查询
@@ -506,7 +556,17 @@ def query(request: QueryRequest):
     说明：用 sync def（而非 async def）。process_query 内部 run_conversation 是阻塞的
     （完整 pipeline ~30-60s）。若用 async def 直接调，会冻住整个事件循环，导致 /health、
     /status 及其它查询全部卡住。sync def 由 FastAPI 自动丢进线程池执行，事件循环保持畅通。
+
+    动作指令短路：先过轻量分类器(单轮 LLM,~5s)——命中动作(检测/切视图)直接执行秒回,
+    不进主智能体 agentic 循环(实测 3 分钟);未命中/失败落回原管线(它擅长问答与研判)。
+    mode=action(AI 助手动作通道)时短路独占:非动作回引导语,不落回管线。
     """
+    short = _try_shortcircuit(request, exclusive=(getattr(request, "mode", None) == "action"))
+    if short is not None:
+        return QueryResponse(
+            content=short, session_id=request.session_id or "action_shortcut",
+            timestamp=datetime.now().isoformat(), success=True,
+        )
     result = agent_service.process_query(
         query=request.query,
         session_id=request.session_id
@@ -546,9 +606,31 @@ def query_stream(request: QueryRequest):
     tool_reg = getattr(agent_service, "_tool_reg", None)
 
     def worker():
+        # ── 动作指令短路(在抢主智能体锁之前):分类命中→直接执行,秒级 done ──
+        # mode=action(AI 助手动作通道):非动作也短路回引导语,不进子智能体管线
+        short = _try_shortcircuit(request, exclusive=(getattr(request, "mode", None) == "action"))
+        if short is not None:
+            # 第一行是 actionData JSON → 同时发 action 事件(前端大屏标注)+ delta + done
+            first = short.split("\n", 1)[0].strip()
+            try:
+                ad = _json.loads(first)
+                if isinstance(ad, dict) and ad.get("cmd"):
+                    q.put({"type": "progress", "subagent": "action-command", "stage": "done",
+                           "summary": "动作指令", "action": ad})
+            except Exception:
+                pass
+            q.put({"type": "delta", "text": short})
+            q.put({"type": "done", "content": short, "session_id": session_id})
+            return
         # 挂队列到 tool_registration 模块全局，让 call_subagent handler（在 executor 线程）吐进度
         if tool_reg is not None:
             tool_reg._current_progress_queue = q
+            # 大屏观看窗口挂给 run_detector handler:LLM 不传时间时兜底检测"正在看的时段"
+            try:
+                tool_reg._run_detector_handler._view_context = (
+                    _json.loads(request.view_context) if request.view_context else {})
+            except Exception:
+                tool_reg._run_detector_handler._view_context = {}
         if not agent_service._agent_lock.acquire(timeout=agent_service._agent_lock_timeout):
             q.put({"type": "error", "message": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"})
             return
@@ -556,15 +638,32 @@ def query_stream(request: QueryRequest):
             agent_service._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
             _apply_style_strategy(agent_service.master_agent)   # /query/stream 路径:风格策略即时生效
             history = agent_service.session_histories.get(session_id)
+            # 大屏观看窗口注入用户消息:动作指令(如"检测pH平稳异常")按正在看的时段执行
+            # (只注入事实性上下文;语言/技能等行为要求放身份文件与技能里,不硬塞用户消息)
+            user_msg = request.query
+            if request.view_context:
+                try:
+                    import json as _j
+                    vc = _j.loads(request.view_context)
+                    parts = []
+                    if vc.get("anchor"): parts.append(f"锚点日期={vc['anchor']}")
+                    if vc.get("segmentStart"): parts.append(f"段起={vc['segmentStart']}")
+                    if vc.get("segmentEnd"): parts.append(f"段止={vc['segmentEnd']}")
+                    if parts:
+                        user_msg = (f"{request.query}\n\n[大屏当前观看窗口] {'; '.join(parts)}"
+                                    f"（动作指令如检测/标注,未明确指定时间时优先对这段窗口执行,"
+                                    f"run_detector 传 start/end 用这段的起止时间）")
+                except Exception:
+                    pass
             result = agent_service.master_agent.run_conversation(
-                user_message=request.query,
+                user_message=user_msg,
                 conversation_history=history,
                 task_id=session_id,
                 stream_callback=lambda text: q.put({"type": "delta", "text": text}),
             )
             if isinstance(result, dict) and "messages" in result:
                 agent_service.session_histories[session_id] = result["messages"]
-            content = result.get("final_response", str(result)) if isinstance(result, dict) else (str(result) if result else "")
+            content = (result.get("final_response") or "（智能体未产出文本回复，请重试或换种问法）") if isinstance(result, dict) else (str(result) if result else "（智能体未产出文本回复）")
             q.put({"type": "done", "content": content, "session_id": session_id})
         except Exception as e:
             logger.error(f"流式查询失败: {e}")
