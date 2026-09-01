@@ -4,15 +4,15 @@
     <div v-else-if="store.treeError" class="hint err">⚠ {{ store.treeError }}</div>
     <template v-else>
       <div v-for="city in store.tree?.cities" :key="city.name" class="city">
-        <button class="lvl1" @click="toggleCity(city.name)">
-          <span class="tri" :class="{ open: store.openCity === city.name }">▶</span>{{ city.name }}
+        <button class="lvl1" @click="store.toggleCity(city.name)">
+          <span class="tri" :class="{ open: store.openCities.includes(city.name) }">▶</span>{{ city.name }}
         </button>
-        <div v-show="store.openCity === city.name">
+        <div v-show="store.openCities.includes(city.name)">
           <div v-for="dist in city.districts" :key="dist.name" class="dist">
-            <button class="lvl2" @click="toggleDist(dist.name)">
-              <span class="tri" :class="{ open: store.openDist === dist.name }">▶</span>{{ dist.name }}
+            <button class="lvl2" @click="store.toggleDist(dist.name)">
+              <span class="tri" :class="{ open: store.openDists.includes(dist.name) }">▶</span>{{ dist.name }}
             </button>
-            <div v-show="store.openDist === dist.name">
+            <div v-show="store.openDists.includes(dist.name)">
               <button v-for="p in dist.plants" :key="p.plant_id" class="plant"
                 :class="{ active: store.activePlant === p.plant_id }"
                 @click="pick(p.plant_id, city.name, dist.name)">
@@ -24,10 +24,10 @@
         </div>
       </div>
       <div v-if="store.tree?.ungrouped?.length" class="city">
-        <button class="lvl1" @click="toggleCity('__ungrouped__')">
-          <span class="tri" :class="{ open: store.openCity === '__ungrouped__' }">▶</span>未分组
+        <button class="lvl1" @click="store.toggleCity('__ungrouped__')">
+          <span class="tri" :class="{ open: store.openCities.includes('__ungrouped__') }">▶</span>未分组
         </button>
-        <div v-show="store.openCity === '__ungrouped__'">
+        <div v-show="store.openCities.includes('__ungrouped__')">
           <button v-for="p in store.tree.ungrouped" :key="p.plant_id" class="plant"
             :class="{ active: store.activePlant === p.plant_id }"
             @click="pick(p.plant_id, '__ungrouped__')">
@@ -51,12 +51,6 @@ const emit = defineEmits<{ (e: 'select', plantId: string): void }>()
 
 const store = usePlantsStore()
 
-function toggleCity(name: string) {
-  store.openCity = store.openCity === name ? '' : name
-}
-function toggleDist(name: string) {
-  store.openDist = store.openDist === name ? '' : name
-}
 function pick(pid: string, city: string, dist?: string) {
   store.selectPlant(pid, city, dist)
   emit('select', pid)

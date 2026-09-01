@@ -3,7 +3,7 @@
     <ConversationList @new="chat.clearMessages()" />
     <section class="chat">
       <div class="chdr"><span class="ttl">AI 智能助手</span><span class="mdl">ctgu-vlm · 主智能体</span></div>
-      <div class="body">
+      <div class="body" ref="bodyRef">
         <ChatMessage v-for="m in chat.messages" :key="m.id" :msg="m" />
         <div v-if="!chat.messages.length" class="empty">向主智能体提问,例如:最近出水COD是否超标?</div>
       </div>
@@ -13,13 +13,33 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import ConversationList from '@/components/aiops/ConversationList.vue'
 import ChatMessage from '@/components/aiops/ChatMessage.vue'
 import ChatComposer from '@/components/aiops/ChatComposer.vue'
 
 const chat = useChatStore()
+const bodyRef = ref<HTMLElement>()
+
+/** 自动滚到底部：新消息/流式输出时，让智能体回复始终贴底展示。
+ *  只在用户本来就贴底(或接近底)时跟随——用户主动上翻阅读时不打扰。 */
+function autoScroll() {
+  const el = bodyRef.value
+  if (!el) return
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  if (nearBottom || chat.messages[chat.messages.length - 1]?.role === 'user') {
+    el.scrollTop = el.scrollHeight
+  }
+}
+
+// 消息数量变化(新消息) 或 流式内容更新(delta 追加) → 贴底
+watch(() => chat.messages.length, () => nextTick(autoScroll))
+watch(() => {
+  const last = chat.messages[chat.messages.length - 1]
+  return last?.content?.length ?? 0
+}, () => nextTick(autoScroll))
+
 onMounted(() => chat.fetchConversations())
 </script>
 

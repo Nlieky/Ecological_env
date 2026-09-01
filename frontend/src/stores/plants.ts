@@ -8,16 +8,30 @@ export const usePlantsStore = defineStore('plants', () => {
   const treeLoading = ref(false)
   const treeError = ref<string | null>(null)
 
-  // 树展开状态提升到 store：路由跳转(PlantTree 重挂载)不丢展开/选中
-  const openCity = ref('')
-  const openDist = ref('')
+  // 树展开状态提升到 store：路由跳转(PlantTree 重挂载)不丢展开/选中。
+  // 多值数组而非单值手风琴——用户点开谁谁展开、关闭由用户自己关，互不影响
+  // (之前单值模式点一个市其他市自动收起,违背直觉)。
+  const openCities = ref<string[]>([])
+  const openDists = ref<string[]>([])
   const activePlant = ref('')
+
+  /** 市/区折叠切换（多值：加入或移出，不动其他节点） */
+  function toggleCity(name: string) {
+    openCities.value = openCities.value.includes(name)
+      ? openCities.value.filter(n => n !== name)
+      : [...openCities.value, name]
+  }
+  function toggleDist(name: string) {
+    openDists.value = openDists.value.includes(name)
+      ? openDists.value.filter(n => n !== name)
+      : [...openDists.value, name]
+  }
 
   /** 选中某厂：记录选中并确保父级链展开（点三级目录不再收回一级） */
   function selectPlant(pid: string, city?: string, dist?: string) {
     activePlant.value = pid
-    if (city) openCity.value = city
-    if (dist) openDist.value = dist
+    if (city && !openCities.value.includes(city)) openCities.value = [...openCities.value, city]
+    if (dist && !openDists.value.includes(dist)) openDists.value = [...openDists.value, dist]
   }
   /** 按厂名反查父级并展开（从 URL 直进单厂页时用） */
   function expandTo(pid: string) {
@@ -25,14 +39,16 @@ export const usePlantsStore = defineStore('plants', () => {
     for (const c of tree.value.cities ?? []) {
       for (const d of c.districts ?? []) {
         if ((d.plants ?? []).some((p) => p.plant_id === pid)) {
-          openCity.value = c.name
-          openDist.value = d.name
+          selectPlant(pid, c.name, d.name)
           return
         }
       }
     }
     // 未分组
-    if ((tree.value.ungrouped ?? []).some((p) => p.plant_id === pid)) openCity.value = '__ungrouped__'
+    if ((tree.value.ungrouped ?? []).some((p) => p.plant_id === pid)
+        && !openCities.value.includes('__ungrouped__')) {
+      openCities.value = [...openCities.value, '__ungrouped__']
+    }
   }
 
   const dashboard = ref<PlantDashboard | null>(null)
@@ -62,5 +78,6 @@ export const usePlantsStore = defineStore('plants', () => {
   }
 
   return { tree, treeLoading, treeError, dashboard, dashboardLoading,
-    openCity, openDist, activePlant, selectPlant, expandTo, fetchTree, fetchDashboard }
+    openCities, openDists, activePlant, toggleCity, toggleDist,
+    selectPlant, expandTo, fetchTree, fetchDashboard }
 })
