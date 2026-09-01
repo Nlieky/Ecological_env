@@ -28,7 +28,6 @@
       <StrategyPanel v-else-if="isEntity && tab === 'strategy'" @restart="goRestart" />
       <McpPanel v-else-if="activeEntity === '__mcp__'" @restart="goRestart" />
       <ProvidersPanel v-else-if="activeEntity === '__providers__'" @restart="goRestart" />
-      <PlantsConfigPanel v-else-if="activeEntity === '__plants__'" />
       <ServiceControl v-else-if="activeEntity === '__service__'" />
       <div v-else class="loading">加载中…</div>
     </div>
@@ -45,7 +44,6 @@ import SkillsPanel from '@/components/agents/config/SkillsPanel.vue'
 import StrategyPanel from '@/components/agents/config/StrategyPanel.vue'
 import McpPanel from '@/components/agents/config/McpPanel.vue'
 import ProvidersPanel from '@/components/agents/config/ProvidersPanel.vue'
-import PlantsConfigPanel from '@/components/agents/config/PlantsConfigPanel.vue'
 import ServiceControl from '@/components/agents/config/ServiceControl.vue'
 
 const TAB_LABELS: Record<string, string> = {
@@ -67,18 +65,18 @@ const tabsFor = computed(() =>
     ? ['overview', 'files', 'skills', 'strategy']
     : ['overview', 'files', 'skills', 'strategy'])
 
-// 顶部一级导航项 = 5 个智能体实体 ｜ MCP/供应商/厂区/服务（全局能力，竖线分组）
+// 顶部一级导航项 = 5 个智能体实体 ｜ MCP/供应商/服务（全局能力，竖线分组）。
+// 厂区配置已拆到独立页 /plants/config（数据域配置，归监控大屏组）。
 const navItems = computed(() => [
   ...(entities.value as AgentEntity[]),
   { name: '__mcp__', label: 'MCP', icon: '🔌' },
   { name: '__providers__', label: '供应商', icon: '🌐' },
-  { name: '__plants__', label: '厂区配置', icon: '⚙️' },
   { name: '__service__', label: '服务管理', icon: '🔄' },
 ])
 const entityCount = computed(() => entities.value.length)   // 分隔线位置
 
 // 一级直达入口（无二级 tab）
-const DIRECT_ENTITIES = ['__mcp__', '__providers__', '__plants__', '__service__']
+const DIRECT_ENTITIES = ['__mcp__', '__providers__', '__service__']
 
 function switchEntity(name: string) {
   if (activeEntity.value === name) return

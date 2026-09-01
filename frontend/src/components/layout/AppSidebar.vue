@@ -29,7 +29,7 @@ import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   ChatDotRound, Setting, Document, Monitor, DataAnalysis, Notebook,
-  Connection, Coin, Bell, DataLine, Tickets, Tools,
+  Connection, Coin, Bell, DataLine, Tickets, Tools, OfficeBuilding,
 } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 
@@ -50,6 +50,7 @@ const GROUPS: NavGroup[] = [
     { path: '/datasources', title: '数据源', icon: Coin },
     { path: '/alerts', title: '告警中心', icon: Bell },
     { path: '/grafana', title: 'Grafana 大屏', icon: DataLine },
+    { path: '/plants/config', title: '厂区配置', icon: OfficeBuilding },
   ]},
   { title: '事件中心', icon: Tickets, items: [
     { path: '/events', title: '事件中心', icon: Tickets },

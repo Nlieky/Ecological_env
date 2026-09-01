@@ -24,6 +24,9 @@ const router = createRouter({
           meta: { title: '监测大屏', group: '监控大屏' } },
         // 旧单厂路由：已并入 /dashboard 仪表盘 tab（看板列表选厂），重定向兼容
         { path: 'plants/:plantId', redirect: '/dashboard' },
+        // 厂区配置独立页（数据域配置，从智能体配置页拆出，归监控大屏组末位）
+        { path: 'plants/config', component: () => import('@/views/PlantsConfigView.vue'),
+          meta: { title: '厂区配置', group: '监控大屏' } },
         { path: 'metrics', component: () => import('@/views/MetricsView.vue'),
           meta: { title: '指标查询', group: '监控大屏' } },
         { path: 'logs', component: () => import('@/views/LogsView.vue'),
