@@ -125,6 +125,8 @@ export const useChatStore = defineStore('chat', () => {
               // 非流式兼容：回复第一行是 actionData JSON 时也 dispatch（UI 动作没走 SSE action 事件）
               const m = (content || '').match(/^\s*(\{[\s\S]*?\})\s*\n/)
               if (m) { try { const a = JSON.parse(m[1]); if (a.cmd) useActionStore().dispatch(a) } catch { /* 非 JSON 忽略 */ } }
+              // 问答已落库：刷新左侧历史列表（标题/消息数即时更新，无需手动刷新）
+              fetchConversations()
               resolve()
             },
             onError: (msg) => {

@@ -291,6 +291,10 @@ class ConversationService:
                 )
                 db.add(conversation)
                 db.flush()  # 拿到主键，后续消息可引用同一事务内的 conversation
+            elif conversation.title == "新对话":
+                # 前端"+新对话"先建的占位标题——首条真实提问进来时改成问题摘要,
+                # 列表语义从"新对话"变成这条对话聊了什么
+                conversation.title = title
 
             now = datetime.now()
             user_message = ConversationMessage(
