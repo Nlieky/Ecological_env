@@ -6,6 +6,9 @@ export const conversationsService = {
     api.get<unknown, { success: boolean; data: ConversationListResponse }>('/v1/conversations', {
       params: { page, page_size: pageSize },
     }),
+  create: (title?: string) =>
+    api.post<unknown, { success: boolean; data: { id: string; title: string; started_at: string } }>(
+      '/v1/conversations', { title }),
   detail: (id: string) =>
     api.get<unknown, { success: boolean; data: ConversationDetail }>(`/v1/conversations/${id}`),
   delete: (id: string) =>

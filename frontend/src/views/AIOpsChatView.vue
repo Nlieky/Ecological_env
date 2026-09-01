@@ -1,6 +1,6 @@
 <template>
   <div class="chat-wrap">
-    <ConversationList @new="chat.clearMessages()" />
+    <ConversationList />
     <section class="chat">
       <div class="chdr"><span class="ttl">AI 智能助手</span><span class="mdl">ctgu-vlm · 主智能体</span></div>
       <div class="body" ref="bodyRef">

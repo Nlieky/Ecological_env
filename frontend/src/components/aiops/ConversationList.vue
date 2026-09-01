@@ -1,6 +1,8 @@
 <template>
   <aside class="sess">
-    <button class="newbtn" @click="$emit('new')">+ 新对话</button>
+    <button class="newbtn" :disabled="creating" @click="newConversation">
+      {{ creating ? '创建中…' : '+ 新对话' }}
+    </button>
     <div class="head-row">
       <h4>历史会话 ({{ chat.conversations.length }})</h4>
       <button v-if="chat.conversations.length" class="clear-btn" @click="clearAll" title="清除全部历史">清除</button>
@@ -17,10 +19,20 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { conversationsService } from '@/api/modules/conversations'
 const chat = useChatStore()
-defineEmits<{ (e: 'new'): void }>()
+const creating = ref(false)
+
+/** 新对话：先在后端落一条对话记录（列表立刻可见 + sessionId 绑定它，
+ *  首次提问的问答会归到这条对话），再清空消息区。 */
+async function newConversation() {
+  if (creating.value) return
+  creating.value = true
+  try { await chat.startNewConversation() }
+  finally { creating.value = false }
+}
 
 async function removeOne(id: string) {
   if (!confirm('确定删除这条对话？')) return

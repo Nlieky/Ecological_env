@@ -156,5 +156,21 @@ export const useChatStore = defineStore('chat', () => {
 
   function clearMessages() { messages.value = []; sessionId.value = undefined }
 
-  return { conversations, current, messages, sessionId, loading, error, fetchConversations, openConversation, sendQuery, clearMessages }
+  /** 新建对话：在后端先落一条记录（列表立即可见），并把返回的 id 设为当前
+   *  sessionId——这样首次提问时后端 record_exchange 按 session_id 能命中
+   *  这条对话（追加而非另建），问答与"新对话"归到同一条。 */
+  async function startNewConversation() {
+    messages.value = []
+    current.value = null
+    try {
+      const r: any = await conversationsService.create('新对话')
+      const d = r.data ?? r
+      if (d?.id) sessionId.value = d.id
+      await fetchConversations()
+    } catch {
+      sessionId.value = undefined   // 创建失败退回旧行为：空白对话,首问时由后端建
+    }
+  }
+
+  return { conversations, current, messages, sessionId, loading, error, fetchConversations, openConversation, sendQuery, clearMessages, startNewConversation }
 })
