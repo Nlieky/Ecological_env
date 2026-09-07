@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from collections import deque
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -71,47 +72,54 @@ class GraphStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
+        # 共享单连接：backend(线程池) 与子智能体并发访问时串行化所有操作
+        self._lock = threading.Lock()
 
     # ---------- 写入 ----------
     def upsert_node(self, node_id: str, ntype: str, label: str,
                     props: Optional[Dict] = None) -> None:
         if ntype not in NODE_TYPES:
             raise ValueError(f"未知节点类型: {ntype}")
-        self._conn.execute(
-            """INSERT INTO nodes(id, type, label, props_json) VALUES(?, ?, ?, ?)
-               ON CONFLICT(id) DO UPDATE SET
-                 type=excluded.type, label=excluded.label,
-                 props_json=excluded.props_json""",
-            (node_id, ntype, label, json.dumps(props or {}, ensure_ascii=False)))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO nodes(id, type, label, props_json) VALUES(?, ?, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET
+                     type=excluded.type, label=excluded.label,
+                     props_json=excluded.props_json""",
+                (node_id, ntype, label, json.dumps(props or {}, ensure_ascii=False)))
+            self._conn.commit()
 
     def upsert_edge(self, src: str, dst: str, etype: str,
                     props: Optional[Dict] = None) -> None:
         if etype not in EDGE_TYPES:
             raise ValueError(f"未知边类型: {etype}")
-        self._conn.execute(
-            """INSERT INTO edges(src, dst, type, props_json) VALUES(?, ?, ?, ?)
-               ON CONFLICT(src, dst, type) DO UPDATE SET
-                 props_json=excluded.props_json""",
-            (src, dst, etype, json.dumps(props or {}, ensure_ascii=False)))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO edges(src, dst, type, props_json) VALUES(?, ?, ?, ?)
+                   ON CONFLICT(src, dst, type) DO UPDATE SET
+                     props_json=excluded.props_json""",
+                (src, dst, etype, json.dumps(props or {}, ensure_ascii=False)))
+            self._conn.commit()
 
     def set_meta(self, key: str, value: str) -> None:
-        self._conn.execute(
-            "INSERT INTO meta(key, value) VALUES(?, ?) "
-            "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO meta(key, value) VALUES(?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+            self._conn.commit()
 
     def get_meta(self, key: str) -> Optional[str]:
-        row = self._conn.execute(
-            "SELECT value FROM meta WHERE key=?", (key,)).fetchone()
-        return row["value"] if row else None
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+            return row["value"] if row else None
 
     # ---------- 查询 ----------
     def get_node(self, node_id: str) -> Optional[Dict]:
-        row = self._conn.execute(
-            "SELECT * FROM nodes WHERE id=?", (node_id,)).fetchone()
-        return _row_to_node(row) if row else None
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM nodes WHERE id=?", (node_id,)).fetchone()
+            return _row_to_node(row) if row else None
 
     def seeded(self) -> bool:
         """是否跑过种子（meta 记录 last_seeded_at）。"""
@@ -136,7 +144,7 @@ class GraphStore:
             if et not in EDGE_TYPES:
                 raise ValueError(f"未知边类型: {et}")
         # edge_types 白名单校验后内插（注入安全）；depth 为校验过的 int 字面量
-        et_sql = (f" AND e.type IN ({','.join(chr(39)+e+chr(39) for e in ets)})"
+        et_sql = (f" AND e.type IN ({','.join(f"'{e}'" for e in ets)})"
                   if ets else "")
         d_sql = str(depth)
 
@@ -167,25 +175,32 @@ class GraphStore:
                f"SELECT n.id, n.type, n.label, n.props_json, reach.d AS d "
                f"FROM reach JOIN nodes n ON n.id = reach.nxt "
                f"WHERE n.id != :nid ORDER BY d, n.id")
-        rows = self._conn.execute(sql, {"nid": node_id}).fetchall()
+        with self._lock:
+            rows = self._conn.execute(sql, {"nid": node_id}).fetchall()
 
-        best: Dict[str, Dict] = {}  # id -> 最小深度节点
-        for r in rows:
-            nid = r["id"]
-            if nid not in best or r["d"] < best[nid]["depth"]:
-                best[nid] = {"id": nid, "type": r["type"], "label": r["label"],
-                             "props": json.loads(r["props_json"] or "{}"),
-                             "depth": r["d"]}
-        edges = self._edges_between({node_id, *best.keys()})
-        return {"nodes": list(best.values()), "edges": edges, "depth": depth}
+            best: Dict[str, Dict] = {}  # id -> 最小深度节点
+            for r in rows:
+                nid = r["id"]
+                if nid not in best or r["d"] < best[nid]["depth"]:
+                    best[nid] = {"id": nid, "type": r["type"], "label": r["label"],
+                                 "props": json.loads(r["props_json"] or "{}"),
+                                 "depth": r["d"]}
+            # 边过滤与节点遍历同语义：只留白名单边类型 + 两端在集合内
+            edges = self._edges_between({node_id, *best.keys()}, ets)
+            return {"nodes": list(best.values()), "edges": edges, "depth": depth}
 
-    def _edges_between(self, node_ids: set) -> List[Dict]:
+    def _edges_between(self, node_ids: set,
+                       edge_types: Optional[List[str]] = None) -> List[Dict]:
+        """调用方必须已持 self._lock（私有方法，不自行加锁防死锁）。"""
         if not node_ids:
             return []
         ph = ",".join("?" * len(node_ids))
-        rows = self._conn.execute(
-            f"SELECT * FROM edges WHERE src IN ({ph}) AND dst IN ({ph})",
-            list(node_ids) * 2).fetchall()
+        params = list(node_ids) * 2
+        sql = f"SELECT * FROM edges WHERE src IN ({ph}) AND dst IN ({ph})"
+        if edge_types:
+            sql += f" AND type IN ({','.join('?' * len(edge_types))})"
+            params += edge_types
+        rows = self._conn.execute(sql, params).fetchall()
         return [_row_to_edge(r) for r in rows]
 
     def subgraph(self, node_types: Optional[List[str]] = None,
@@ -195,51 +210,55 @@ class GraphStore:
         if node_types:
             nq += " WHERE type IN (%s)" % ",".join("?" * len(node_types))
             nparams += node_types
-        nodes = [_row_to_node(r) for r in
-                 self._conn.execute(nq, nparams).fetchall()]
-        ids = {n["id"] for n in nodes}
-        eq, eparams = "SELECT * FROM edges", []
-        if edge_types:
-            eq += " WHERE type IN (%s)" % ",".join("?" * len(edge_types))
-            eparams += edge_types
-        all_edges = [_row_to_edge(r) for r in
-                     self._conn.execute(eq, eparams).fetchall()]
-        edges = [e for e in all_edges if e["src"] in ids and e["dst"] in ids]
-        return {"nodes": nodes, "edges": edges}
+        with self._lock:
+            nodes = [_row_to_node(r) for r in
+                     self._conn.execute(nq, nparams).fetchall()]
+            ids = {n["id"] for n in nodes}
+            eq, eparams = "SELECT * FROM edges", []
+            if edge_types:
+                eq += " WHERE type IN (%s)" % ",".join("?" * len(edge_types))
+                eparams += edge_types
+            all_edges = [_row_to_edge(r) for r in
+                         self._conn.execute(eq, eparams).fetchall()]
+            edges = [e for e in all_edges if e["src"] in ids and e["dst"] in ids]
+            return {"nodes": nodes, "edges": edges}
 
     def shortest_path(self, a: str, b: str,
                       max_hops: int = 6) -> Optional[List[str]]:
         """BFS 寻路（无向语义），返回节点 id 序列；不可达返回 None。"""
-        if a == b:
-            return [a]
-        visited = {a}
-        queue = deque([(a, [a])])
-        while queue:
-            cur, path = queue.popleft()
-            if len(path) > max_hops:
-                continue
-            rows = self._conn.execute(
-                "SELECT dst FROM edges WHERE src=? "
-                "UNION SELECT src FROM edges WHERE dst=?",
-                (cur, cur)).fetchall()
-            for r in rows:
-                nxt = r[0]
-                if nxt in visited:
+        with self._lock:
+            if a == b:
+                return [a]
+            visited = {a}
+            queue = deque([(a, [a])])
+            while queue:
+                cur, path = queue.popleft()
+                if len(path) > max_hops:
                     continue
-                if nxt == b:
-                    return path + [nxt]
-                visited.add(nxt)
-                queue.append((nxt, path + [nxt]))
-        return None
+                rows = self._conn.execute(
+                    "SELECT dst FROM edges WHERE src=? "
+                    "UNION SELECT src FROM edges WHERE dst=?",
+                    (cur, cur)).fetchall()
+                for r in rows:
+                    nxt = r[0]
+                    if nxt in visited:
+                        continue
+                    if nxt == b:
+                        return path + [nxt]
+                    visited.add(nxt)
+                    queue.append((nxt, path + [nxt]))
+            return None
 
     def stats(self) -> Dict:
-        nodes_by_type = {r["type"]: r["c"] for r in self._conn.execute(
-            "SELECT type, COUNT(*) AS c FROM nodes GROUP BY type").fetchall()}
-        edges_by_type = {r["type"]: r["c"] for r in self._conn.execute(
-            "SELECT type, COUNT(*) AS c FROM edges GROUP BY type").fetchall()}
-        return {"nodes": sum(nodes_by_type.values()),
-                "edges": sum(edges_by_type.values()),
-                "node_types": nodes_by_type, "edge_types": edges_by_type}
+        with self._lock:
+            nodes_by_type = {r["type"]: r["c"] for r in self._conn.execute(
+                "SELECT type, COUNT(*) AS c FROM nodes GROUP BY type").fetchall()}
+            edges_by_type = {r["type"]: r["c"] for r in self._conn.execute(
+                "SELECT type, COUNT(*) AS c FROM edges GROUP BY type").fetchall()}
+            return {"nodes": sum(nodes_by_type.values()),
+                    "edges": sum(edges_by_type.values()),
+                    "node_types": nodes_by_type, "edge_types": edges_by_type}
 
     def close(self) -> None:
-        self._conn.close()
+        with self._lock:
+            self._conn.close()

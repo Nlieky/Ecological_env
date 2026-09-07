@@ -1,6 +1,7 @@
 # tests/knowledge_graph/test_graph_store.py
 """GraphStore 单测：建表、upsert 幂等、邻居、子图、路径、统计。"""
 from pathlib import Path
+from threading import Barrier, Thread
 
 import pytest
 
@@ -157,3 +158,74 @@ def test_meta_roundtrip(tmp_path):
     g.set_meta("schema_version", "2")  # 覆盖
     assert g.get_meta("schema_version") == "2"
     assert g.get_meta("nope") is None
+
+
+def test_concurrent_writes_serialized(tmp_path):
+    """共享单连接多线程写入：锁串行化，8 线程各写 20 个节点全部落库。"""
+    g = make_store(tmp_path)
+    n_threads, per_thread = 8, 20
+    barrier = Barrier(n_threads)
+    errors = []
+
+    def worker(t: int) -> None:
+        try:
+            barrier.wait()  # 尽量同刻起跑，放大竞态窗口
+            for i in range(per_thread):
+                g.upsert_node(f"plant:t{t}n{i}", "plant", f"厂{t}-{i}", {"i": i})
+        except Exception as ex:  # pragma: no cover - 仅收集失败
+            errors.append(ex)
+
+    threads = [Thread(target=worker, args=(t,)) for t in range(n_threads)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert errors == []
+    assert g.stats()["nodes"] == n_threads * per_thread  # 160
+
+
+def test_neighbors_empty_graph(tmp_path):
+    g = make_store(tmp_path)
+    nb = g.neighbors("agent:master", depth=2)
+    assert nb["nodes"] == []
+    assert nb["edges"] == []
+    assert nb["depth"] == 2
+
+
+def test_neighbors_missing_start(tmp_path):
+    g = make_store(tmp_path)
+    seed_small(g)
+    nb = g.neighbors("nope:nope", depth=1)
+    assert nb["nodes"] == []
+    assert nb["edges"] == []
+
+
+def test_neighbors_direction_out(tmp_path):
+    g = make_store(tmp_path)
+    seed_small(g)
+    nb = g.neighbors("pattern:bottle", direction="out", depth=1)
+    assert {n["id"] for n in nb["nodes"]} == {"regulation:law83"}
+    nb2 = g.neighbors("agent:master", direction="out", depth=3)
+    assert {n["id"] for n in nb2["nodes"]} == {
+        "operator:constant", "pattern:bottle", "regulation:law83"}
+
+
+def test_neighbors_cycle(tmp_path):
+    """A→B→A 环：递归 CTE depth 上限兜住，节点不重复、深度取最小。"""
+    g = make_store(tmp_path)
+    g.upsert_node("agent:a", "agent", "A", {})
+    g.upsert_node("operator:b", "operator", "B", {})
+    g.upsert_edge("agent:a", "operator:b", "calls")
+    g.upsert_edge("operator:b", "agent:a", "reads")
+    nb = g.neighbors("agent:a", depth=4)
+    assert {n["id"] for n in nb["nodes"]} == {"operator:b"}
+    depths = {n["id"]: n["depth"] for n in nb["nodes"]}
+    assert depths["operator:b"] == 1  # 1 跳可达，不因环虚增
+
+
+def test_neighbors_edge_filter_also_filters_edges(tmp_path):
+    """#4 边过滤一致化：返回的 edges 也只含白名单边类型。"""
+    g = make_store(tmp_path)
+    seed_small(g)
+    nb = g.neighbors("operator:constant", edge_types=["detects"], depth=4)
+    assert {e["type"] for e in nb["edges"]} == {"detects"}
