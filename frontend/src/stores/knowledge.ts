@@ -16,6 +16,12 @@ export const NODE_META: Record<string, { label: string; color: string; tab: 'dom
   service: { label: '服务', color: '#06b6d4', tab: 'topology' },
 }
 
+/** 当前可见类型 = tab 预设 - hidden（hidden 为反向集合：空=全显，取消勾选即加入） */
+export function computeVisibleTypes(tab: 'domain' | 'topology', hidden: string[]): string[] {
+  return Object.keys(NODE_META)
+    .filter(k => NODE_META[k].tab === tab && !hidden.includes(k))
+}
+
 export const useKnowledgeStore = defineStore('knowledge', () => {
   const allNodes = ref<KGNode[]>([])
   const allEdges = ref<KGEdge[]>([])
@@ -25,9 +31,10 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const error = ref<string | null>(null)
 
   const activeTab = ref<'domain' | 'topology'>('domain')
-  const enabledTypes = ref<string[]>([]) // 空=该 tab 全选
+  const hiddenTypes = ref<string[]>([]) // 空=该 tab 全显
 
   async function loadGraph() {
+    if (loading.value) return // 防重入
     loading.value = true
     error.value = null
     try {
@@ -36,31 +43,25 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       allEdges.value = resp.edges
       stats.value = resp.stats
       seeded.value = resp.seeded
-    } catch (e) {
-      error.value = String(e)
+    } catch (e: any) {
+      error.value = e?.message || '知识图谱加载失败'
     } finally {
       loading.value = false
     }
   }
 
   function toggleType(t: string) {
-    enabledTypes.value = enabledTypes.value.includes(t)
-      ? enabledTypes.value.filter(x => x !== t)
-      : [...enabledTypes.value, t]
+    hiddenTypes.value = hiddenTypes.value.includes(t)
+      ? hiddenTypes.value.filter(x => x !== t)
+      : [...hiddenTypes.value, t]
   }
 
-  /** 当前可见类型 = tab 预设 ∩ 图例勾选（勾选为空=全选 tab 预设） */
-  const visibleTypes = computed(() => {
-    const tabTypes = Object.keys(NODE_META).filter(
-      k => NODE_META[k].tab === activeTab.value)
-    if (!enabledTypes.value.length) return tabTypes
-    return tabTypes.filter(t => enabledTypes.value.includes(t))
-  })
+  const visibleTypes = computed(() => computeVisibleTypes(activeTab.value, hiddenTypes.value))
 
   /** 切 tab 时重置图例勾选 */
   function setTab(tab: 'domain' | 'topology') {
     activeTab.value = tab
-    enabledTypes.value = []
+    hiddenTypes.value = []
   }
 
   const selectedNode = ref<KGNode | null>(null)
@@ -70,8 +71,10 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       const resp = await knowledgeService.node(id)
       selectedNode.value = resp.node
       selectedNeighbors.value = resp.neighbors
-    } catch {
+    } catch (e: any) {
       selectedNode.value = null
+      selectedNeighbors.value = {} // 失败对称清空——不留上一节的过期邻居
+      error.value = e?.message || '节点详情加载失败'
     }
   }
   function clearSelection() {
@@ -80,28 +83,50 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   return { allNodes, allEdges, stats, seeded, loading, error,
-           activeTab, enabledTypes, visibleTypes, toggleType, setTab,
+           activeTab, hiddenTypes, visibleTypes, toggleType, setTab,
            selectedNode, selectedNeighbors, selectNode, clearSelection, loadGraph }
 })
+
+/** ECharts graph series 节点/边数据形状 */
+export interface GraphNodeDatum {
+  id: string
+  name: string
+  category: number
+  symbolSize: number
+  itemStyle: { color: string | undefined }
+}
+export interface GraphLinkDatum {
+  source: string
+  target: string
+  value: string
+}
 
 /** nodes/edges + 可见类型集合 → ECharts graph series（data/links/categories） */
 export function toEChartsSeries(
   nodes: KGNode[], edges: KGEdge[], visibleTypes: string[],
-): { data: unknown[]; links: unknown[]; categories: { name: string }[] } {
+): {
+  data: GraphNodeDatum[]
+  links: GraphLinkDatum[]
+  categories: { name: string; itemStyle: { color: string | undefined } }[]
+} {
   const vis = visibleTypes.slice() // 保持顺序=categories 顺序
-  const categories = vis.map(t => ({ name: NODE_META[t]?.label ?? t }))
+  const categories = vis.map(t => ({
+    name: NODE_META[t]?.label ?? t,
+    // ECharts 图例(legend)从 category.itemStyle 取色——必须与节点颜色一致
+    itemStyle: { color: NODE_META[t]?.color },
+  }))
   const catIdx = new Map(vis.map((t, i) => [t, i]))
-  const data = nodes
+  const data: GraphNodeDatum[] = nodes
     .filter(n => vis.includes(n.type))
     .map(n => ({
       id: n.id,
       name: n.label,
       category: catIdx.get(n.type) ?? 0,
-      symbolSize: n.type === 'agent' || n.type === 'service' ? 40 : 28,
+      symbolSize: NODE_META[n.type]?.tab === 'topology' ? 40 : 28,
       itemStyle: { color: NODE_META[n.type]?.color },
     }))
-  const nodeIds = new Set(data.map(d => (d as { id: string }).id))
-  const links = edges
+  const nodeIds = new Set(data.map(d => d.id))
+  const links: GraphLinkDatum[] = edges
     .filter(e => nodeIds.has(e.src) && nodeIds.has(e.dst))
     .map(e => ({ source: e.src, target: e.dst, value: e.type }))
   return { data, links, categories }
