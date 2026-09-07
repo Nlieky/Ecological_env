@@ -48,7 +48,7 @@
 
 节点 ID 用英文 slug（如 `pattern:bottle_interference`、`plant:jinqiao_phase1`），中文进 label。
 
-### 边类型（9 类）
+### 边类型（10 种）
 
 | 边 | 方向 | 含义 | 示例 |
 |---|---|---|---|
@@ -59,8 +59,11 @@
 | `employs` | 智能体→算子 | 该智能体使用此算子 | ②异常检测 → 孤立森林 |
 | `calls` | 智能体→服务 | 调用此服务 | 主智能体 → LLM |
 | `orchestrates` | 主→子 | 编排关系 | 主智能体 → ①感知 |
-| `reads`/`writes` | 智能体→服务 | 读写存储 | ③规则推理 → 知识库 |
+| `reads` | 智能体→服务 | 读取存储 | ③规则推理 → 知识库 |
+| `writes` | 智能体→服务 | 写入存储 | ①感知 → InfluxDB |
 | `involves` | 案例→厂/指标 | 案例涉及对象 | 案例 → 金桥一期、氨氮 |
+
+**边渲染规则**：一条边仅当其两端节点类型都在当前显示集合（tab 预设或图例过滤）内时才渲染。算子（operator）同时属于两个 tab 的预设——领域知识 tab 里它是"检测器"，服务拓扑 tab 里它是 shared 算子库成员（使 employs 边可见）。
 
 案例节点是生长点：种子导历史案例，子项目 3 写研判结论继续追加 case 节点与 involves/detects 边。
 
@@ -107,10 +110,11 @@ src/dst/type 建索引。库开 WAL 模式。
 
 | 导入源 | 产出 |
 |---|---|
-| plant-hierarchy.yaml | 2 厂节点 + 动态发现指标 + monitors 边 |
+| plant-hierarchy.yaml | 2 厂节点 + 层级属性（市/厂区） |
+| InfluxDB 字段发现（`shared/data/influxdb_query.py` 或 operator 侧字段契约；InfluxDB 不可达时回退固定 7 指标清单：pH/COD/TN/AN/TP/flow/SS） | 指标节点 + monitors 边 |
 | violation_patterns.md/.py | 6 模式节点（含实现状态标注） |
 | operator_config.json | 算子节点 |
-| 硬编码映射表（~40 行，seed_importer.py 内） | detects / indicates / employs / orchestrates / reads / calls 边 |
+| 硬编码映射表（~40 行，seed_importer.py 内） | detects / indicates / employs / orchestrates / reads / writes / calls 边 |
 | historical_cases.json | 案例节点 + cites / involves 边 |
 | 智能体与服务目录 | 5 智能体 + 6 服务节点 |
 
@@ -160,7 +164,7 @@ src/dst/type 建索引。库开 WAL 模式。
 pytest，`tests/knowledge_graph/`：
 
 1. 存储层单测：upsert 幂等、neighbors 多跳、subgraph 过滤、shortest_path
-2. 种子导入集成测：临时目录跑种子 → 断言节点数 >120、9 类边齐全、`pattern:bottle_interference` 有 detects 入边、重跑第二遍边数不变
+2. 种子导入集成测：临时目录跑种子 → 断言节点数 >120、10 种边齐全、`pattern:bottle_interference` 有 detects 入边、重跑第二遍边数不变
 3. API 路由测：TestClient 三端点——空库、种子后、类型过滤三场景
 4. 前端：Vitest 测 store 数据转换（nodes/edges → ECharts series）；页面人工验收
 
