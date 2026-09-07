@@ -146,6 +146,10 @@ app.include_router(v1_detection_routes.router, prefix="/api/v1")
 from backend.api.v1.agents.config import routes as v1_agentcfg_routes
 app.include_router(v1_agentcfg_routes.router, prefix="/api/v1")
 
+# 知识图谱(shared/knowledge_graph 第四库只读端点)
+from backend.api.v1.knowledge import routes as v1_knowledge_routes
+app.include_router(v1_knowledge_routes.router, prefix="/api/v1")
+
 
 # 全局异常处理器
 @app.exception_handler(BackendException)
