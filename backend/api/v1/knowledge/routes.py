@@ -2,8 +2,11 @@
 """知识图谱 API——只读 3 端点（/agents/knowledge 页面数据源）。
 
 库不存在时返回空图 + seeded:false（前端显示引导卡片），不自动建库。
-live=true 时把 /v1/system/status 的实时状态叠加到节点 props（查时合并，不落库）。
+live=true 时把各厂数据新鲜度叠加到节点 props（查时合并，不落库）——直接经
+asyncio.to_thread 调 discover_plants()（InfluxDB 网络 IO 挪出事件循环，防
+InfluxDB 慢时全端点冻结；也不借道 /v1/system/status，免附 agent 服务探测）。
 """
+import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -30,22 +33,24 @@ def _get_store():
 async def _overlay_live_status(nodes: list) -> None:
     """查时合并：各厂数据新鲜度叠加到 plant 节点 props。失败不影响主图。
 
-    get_system_status 返回 {"success", "data": {"plants": [
-        {"plant_id", "latest_time", "status", "data_types"}, ...]}}；
-    plant 节点 id 保留真实中文 plant_id（graph_store 约定，同 InfluxDB tag），
-    故 id 去掉 "plant:" 前缀后直接与 plant_id 匹配。
+    discover_plants() 返回 [{"plant_id", "data_types", "latest_time"(原始
+    datetime 字符串), "point_count"}]，无 status 字段——能被发现即有数据，
+    同 get_system_status 的映射记 online；时间同样截到分钟（[:16]）并把
+    ISO 的 T 换成空格。plant 节点 id 保留真实中文 plant_id（graph_store
+    约定，同 InfluxDB tag），去掉 "plant:" 前缀后直接与 plant_id 匹配。
     """
     try:
-        from backend.api.v1.system.routes import get_system_status
-        status = await get_system_status()
-        plants = (status.get("data") or {}).get("plants", [])
+        from shared.data.discover_plants import discover_plants
+        plants = await asyncio.to_thread(discover_plants)
         plant_fresh = {p.get("plant_id"): p for p in plants}
         for n in nodes:
-            if n["type"] == "plant":
-                info = plant_fresh.get(n["id"].split(":", 1)[1])
-                if info:
-                    n["props"]["last_data_ts"] = info.get("latest_time", "")
-                    n["props"]["live_status"] = info.get("status", "")
+            if n["type"] != "plant" or not n["id"].startswith("plant:"):
+                continue  # startswith 守卫：畸形 id 跳过，不影响其余节点
+            info = plant_fresh.get(n["id"].partition(":")[2])
+            if info:
+                n["props"]["last_data_ts"] = (
+                    str(info.get("latest_time", ""))[:16].replace("T", " "))
+                n["props"]["live_status"] = "online"
     except Exception:
         pass
 

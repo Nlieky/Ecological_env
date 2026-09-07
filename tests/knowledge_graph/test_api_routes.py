@@ -1,5 +1,5 @@
 # tests/knowledge_graph/test_api_routes.py
-"""knowledge 路由测试：种子后全图、类型过滤、节点详情、404、stats。"""
+"""knowledge 路由测试：种子后全图、类型过滤、节点详情、404、stats、空库引导。"""
 from pathlib import Path
 
 import pytest
@@ -8,18 +8,22 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.fixture(scope="module")
-def client(tmp_path_factory):
-    db = tmp_path_factory.mktemp("kg") / "kg.test.db"
+@pytest.fixture
+def client(tmp_path):
+    """临时种子库 + 覆盖模块级 db 路径，测完还原（防污染同进程后续测试）。"""
+    db = tmp_path / "kg.test.db"
     from shared.knowledge_graph import seed_importer
     seed_importer.run_seed(db_path=db)
 
     import backend.api.v1.knowledge.routes as kr
+    saved_path, saved_cache = kr._DB_PATH, kr._store_cache
     kr._DB_PATH = db          # 模块级 db 路径（测试专用临时库）
     kr._store_cache = None    # 清缓存
-
-    from backend.main import app
-    return TestClient(app)
+    try:
+        from backend.main import app
+        yield TestClient(app)
+    finally:
+        kr._DB_PATH, kr._store_cache = saved_path, saved_cache
 
 
 def test_graph_endpoint_returns_full(client):
@@ -64,3 +68,31 @@ def test_stats_endpoint(client):
     body = r.json()
     assert body["node_types"]["plant"] >= 1
     assert "case_count" in body
+
+
+def test_empty_db_guidance(tmp_path):
+    """库不存在：三端点都走引导态（不建库、不 5xx）。"""
+    import backend.api.v1.knowledge.routes as kr
+    saved_path, saved_cache = kr._DB_PATH, kr._store_cache
+    kr._DB_PATH = tmp_path / "nonexistent" / "kg.db"  # 不存在的路径
+    kr._store_cache = None
+    try:
+        from fastapi.testclient import TestClient
+        from backend.main import app
+        c = TestClient(app)
+
+        r = c.get("/api/v1/knowledge/graph")
+        assert r.status_code == 200
+        assert r.json() == {"success": True, "seeded": False,
+                            "nodes": [], "edges": [], "stats": {}}
+
+        r = c.get("/api/v1/knowledge/node/plant:any")
+        assert r.status_code == 404
+
+        r = c.get("/api/v1/knowledge/stats")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["seeded"] is False and body["nodes"] == 0
+        assert body["node_types"] == {} and body["case_count"] == 0
+    finally:
+        kr._DB_PATH, kr._store_cache = saved_path, saved_cache
