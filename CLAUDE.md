@@ -305,6 +305,13 @@ Natural language report + alerts
 - `shared/knowledge/`: 知识库
 - `shared/operators/`: 异常检测算子
 
+### 知识图谱（2026-09-07 子项目 1/4）
+- `shared/knowledge_graph/`：第四库（graph_store.py 线程安全存储+查询 / seed_importer.py 种子导入，幂等可重跑）
+- `shared/data/knowledge_graph.db`：图数据文件（gitignore；~68 节点/40 边 = 2厂+7指标+6违规模式+38算子+2法规+2案例+5智能体+6服务；不存在时 API 返回 seeded:false 引导）
+- `backend/api/v1/knowledge/routes.py`：3 只读端点（graph/node/stats）+ 活图状态叠加（asyncio.to_thread 查时合并不落库，防事件循环冻结）
+- `frontend/src/views/KnowledgeGraphView.vue`：/agents/knowledge 双 tab（领域知识/服务拓扑）力导向图 + hiddenTypes 反选图例 + 详情侧栏
+- 后续子项目：2 事件中心真实化 → 3 智能体集成（图查询+研判写回）→ 4 根因分析；spec 在 docs/superpowers/specs/2026-09-07-knowledge-graph-core-design.md
+
 ### 配置
 - `.env`: 环境变量配置
 - `.hermes/config.yaml`: Hermes 框架配置
