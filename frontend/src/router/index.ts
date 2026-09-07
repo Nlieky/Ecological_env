@@ -19,6 +19,8 @@ const router = createRouter({
           meta: { title: '智能体配置', group: '智能助手' } },
         { path: 'agents/audit', component: () => import('@/views/AgentAuditView.vue'),
           meta: { title: '智能体审计', group: '智能助手' } },
+        { path: 'agents/knowledge', component: () => import('@/views/KnowledgeGraphView.vue'),
+          meta: { title: '知识图谱', group: '智能助手' } },
         // ── 监控大屏 ──
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue'),
           meta: { title: '监测大屏', group: '监控大屏' } },

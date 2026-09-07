@@ -41,6 +41,7 @@ const GROUPS: NavGroup[] = [
     { path: '/chat', title: 'AI 助手', icon: ChatDotRound },
     { path: '/agents/config', title: '智能体配置', icon: Setting },
     { path: '/agents/audit', title: '智能体审计', icon: Document },
+    { path: '/agents/knowledge', title: '知识图谱', icon: Connection },
   ]},
   { title: '监控大屏', icon: Monitor, items: [
     { path: '/dashboard', title: '监测大屏', icon: Monitor },
