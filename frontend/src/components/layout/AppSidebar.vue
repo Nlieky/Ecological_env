@@ -29,7 +29,7 @@ import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   ChatDotRound, Setting, Document, Monitor, DataAnalysis, Notebook,
-  Connection, Coin, Bell, DataLine, Tickets, Tools, OfficeBuilding,
+  Connection, Coin, Bell, DataLine, Tickets, Tools, OfficeBuilding, Share,
 } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 
@@ -41,7 +41,7 @@ const GROUPS: NavGroup[] = [
     { path: '/chat', title: 'AI 助手', icon: ChatDotRound },
     { path: '/agents/config', title: '智能体配置', icon: Setting },
     { path: '/agents/audit', title: '智能体审计', icon: Document },
-    { path: '/agents/knowledge', title: '知识图谱', icon: Connection },
+    { path: '/agents/knowledge', title: '知识图谱', icon: Share },
   ]},
   { title: '监控大屏', icon: Monitor, items: [
     { path: '/dashboard', title: '监测大屏', icon: Monitor },

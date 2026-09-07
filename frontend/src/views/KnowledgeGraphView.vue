@@ -1,21 +1,21 @@
 <template>
   <div class="kg-page">
     <div class="kg-header">
-      <div class="kg-title">
-        <h2>知识图谱</h2>
-        <span v-if="store.stats" class="kg-badges">
-          <el-tag size="small">{{ store.stats.nodes }} 节点</el-tag>
-          <el-tag size="small" type="warning">{{ store.stats.edges }} 关系</el-tag>
-          <el-tag size="small" type="danger">{{ caseCount }} 案例</el-tag>
-        </span>
-      </div>
+      <span v-if="store.stats" class="kg-badges">
+        <el-tag size="small">{{ store.stats.nodes }} 节点</el-tag>
+        <el-tag size="small" type="warning">{{ store.stats.edges }} 关系</el-tag>
+        <el-tag size="small" type="danger">{{ caseCount }} 案例</el-tag>
+      </span>
       <el-radio-group :model-value="store.activeTab" size="small" @update:model-value="store.setTab">
         <el-radio-button value="domain">领域知识</el-radio-button>
         <el-radio-button value="topology">服务拓扑</el-radio-button>
       </el-radio-group>
     </div>
 
-    <el-empty v-if="!store.loading && !store.seeded" description="知识图谱未初始化">
+    <!-- 加载失败（后端不可达等）——与"未初始化"分开，不给跑 seed 的错误指引 -->
+    <el-alert v-if="store.error && !store.seeded" type="error" :closable="false"
+              :title="`知识图谱加载失败：${store.error}`" />
+    <el-empty v-else-if="!store.loading && !store.seeded" description="知识图谱未初始化">
       <template #image><el-icon :size="48"><Connection /></el-icon></template>
       <p class="kg-hint">运行初始化：ecological_env\Scripts\python.exe shared\knowledge_graph\seed_importer.py</p>
     </el-empty>
@@ -35,20 +35,21 @@
         <el-alert v-if="renderError" type="warning" :closable="false"
                   title="图形渲染失败，已降级为列表视图" />
         <div v-show="!renderError" ref="chartEl" class="kg-chart" />
-        <el-table v-if="renderError" :data="visibleNodes" size="small" height="100%">
+        <el-table v-if="renderError" class="kg-table" :data="visibleNodes" size="small" height="100%"
+                  @row-click="(row: any) => openNode(row.id)">
           <el-table-column prop="id" label="ID" width="280" />
           <el-table-column prop="label" label="名称" />
           <el-table-column prop="type" label="类型" width="120" />
         </el-table>
       </div>
 
-      <div v-if="store.selectedNode" class="kg-detail">
+      <div v-if="store.selectedNode || detailLoading" v-loading="detailLoading" class="kg-detail">
         <div class="kg-detail-head">
-          <h3>{{ store.selectedNode.label }}</h3>
-          <el-tag size="small">{{ typeLabel(store.selectedNode.type) }}</el-tag>
+          <h3>{{ store.selectedNode?.label }}</h3>
+          <el-tag size="small">{{ typeLabel(store.selectedNode?.type ?? '') }}</el-tag>
           <el-button text size="small" @click="store.clearSelection">关闭</el-button>
         </div>
-        <el-descriptions :column="1" size="small" border>
+        <el-descriptions v-if="store.selectedNode" :column="1" size="small" border>
           <el-descriptions-item v-for="(v, k) in store.selectedNode.props" :key="k"
                                 :label="String(k)">{{ String(v) }}</el-descriptions-item>
         </el-descriptions>
@@ -56,7 +57,7 @@
         <div v-for="(list, ntype) in store.selectedNeighbors" :key="ntype" class="kg-nb-group">
           <div class="label">{{ typeLabel(String(ntype)) }}（{{ list.length }}）</div>
           <el-tag v-for="n in list" :key="n.id" class="kg-nb-tag"
-                  @click="store.selectNode(n.id)">{{ n.label }}</el-tag>
+                  @click="openNode(n.id)">{{ n.label }}</el-tag>
         </div>
       </div>
     </div>
@@ -73,6 +74,17 @@ const store = useKnowledgeStore()
 const chartEl = ref<HTMLDivElement>()
 const renderError = ref(false)
 let chart: ReturnType<typeof echarts.init> | null = null
+
+// 详情侧栏加载态（store.selectNode 不切换 store.loading，故页面自持）
+const detailLoading = ref(false)
+async function openNode(id: string) {
+  detailLoading.value = true
+  try {
+    await store.selectNode(id)
+  } finally {
+    detailLoading.value = false
+  }
+}
 
 const caseCount = computed(() => store.stats?.node_types?.case ?? 0)
 const tabTypes = computed(() =>
@@ -104,8 +116,9 @@ function renderChart() {
     const series = toEChartsSeries(store.allNodes, store.allEdges, store.visibleTypes)
     chart.setOption({
       tooltip: {
+        // 注意：graph series tooltip 参数无 p.id，节点 id 在 p.data.id（与点击处理一致）
         formatter: (p: any) => p.dataType === 'node'
-          ? `${p.name}（${typeLabel(store.allNodes.find(n => n.id === p.id)?.type ?? '')}）`
+          ? `${p.name}（${typeLabel(store.allNodes.find(n => n.id === p.data?.id)?.type ?? '')}）`
           : String(p.value ?? ''),
       },
       legend: { data: series.categories.map(c => c.name), bottom: 0 },
@@ -123,13 +136,14 @@ function renderChart() {
       }],
     }, { notMerge: true })
     renderError.value = false
-  } catch {
+  } catch (e) {
+    console.error('知识图谱渲染失败', e)
     renderError.value = true // 降级表格
   }
 }
 
 function onNodeClick(params: any) {
-  if (params.dataType === 'node' && params.data?.id) store.selectNode(params.data.id)
+  if (params.dataType === 'node' && params.data?.id) openNode(params.data.id)
 }
 function onResize() { chart?.resize() }
 
@@ -146,9 +160,10 @@ onBeforeUnmount(() => {
   chart = null
 })
 
-// tab/图例/数据变化 → 重渲染（nextTick 兜底，项目历史坑：echarts.init 必须在 DOM 就绪后）
+// tab/图例/数据变化 → 重渲染（visibleTypes 是 computed 新数组、allNodes 整体替换，
+// 引用比较即触发，无需 deep；nextTick 兜底，项目历史坑：echarts.init 必须在 DOM 就绪后）
 watch([() => store.visibleTypes, () => store.allNodes],
-  () => nextTick(renderChart), { deep: true })
+  () => nextTick(renderChart))
 
 // 详情侧栏出现/消失使图区宽度变化 → resize，否则 canvas 按旧宽度溢出、盖住侧栏拦截点击
 watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
@@ -157,8 +172,6 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
 <style scoped>
 .kg-page { padding: 16px; height: 100%; display: flex; flex-direction: column; }
 .kg-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.kg-title { display: flex; align-items: center; gap: 12px; }
-.kg-title h2 { margin: 0; font-size: 18px; }
 .kg-badges { display: flex; gap: 6px; }
 .kg-body { flex: 1; display: flex; gap: 12px; min-height: 0; }
 .kg-legend { width: 180px; flex-shrink: 0; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 12px; overflow-y: auto; }
@@ -166,6 +179,7 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
 .kg-count { color: var(--el-text-color-secondary); font-size: 12px; margin-left: 4px; }
 .kg-chart-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .kg-chart { flex: 1; min-height: 0; }
+.kg-table :deep(.el-table__row) { cursor: pointer; }
 .kg-detail { width: 300px; flex-shrink: 0; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 12px; overflow-y: auto; }
 .kg-detail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .kg-detail-head h3 { margin: 0; font-size: 15px; flex: 1; }
