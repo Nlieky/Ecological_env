@@ -19,7 +19,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT))  # 允许 python path/to/seed_importer.py 直跑
@@ -157,13 +157,24 @@ _WRITES = [
 ]
 
 
+# yaml 顶层保留键（映射不是层级），与 discover_plants.build_tree 的 _RESERVED 一致
+_RESERVED_KEYS = {"report_name_map", "plant_configs", "plant_aliases"}
+
+
 def _import_plants(g: GraphStore) -> List[str]:
-    """读层级 yaml，返回 plant_id 列表。"""
+    """读层级 yaml，返回 plant_id 列表。缺失/损坏跳过（返回 []，不抛）。"""
+    if not _HIERARCHY_FILE.exists():
+        print(f"[seed] 警告: {_HIERARCHY_FILE} 不存在，跳过厂区源")
+        return []
     import yaml
-    data = yaml.safe_load(_HIERARCHY_FILE.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(_HIERARCHY_FILE.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as e:
+        print(f"[seed] 警告: 层级 yaml 解析失败({e})，跳过厂区源")
+        return []
     plant_ids: List[str] = []
     for city, districts in data.items():
-        if not isinstance(districts, dict):
+        if city in _RESERVED_KEYS or not isinstance(districts, dict):
             continue
         for district, plants in districts.items():
             if not isinstance(plants, list):
@@ -282,14 +293,24 @@ def _import_static_topology(g: GraphStore) -> int:
     return len(AGENTS) + len(SERVICES)
 
 
+def _edge_if_ends_exist(g: GraphStore, src: str, dst: str, etype: str,
+                        props: Optional[Dict] = None) -> bool:
+    """两端节点都存在才写边，防悬挂边（源被跳过时其关系边一并丢弃）。"""
+    if g.get_node(src) is None or g.get_node(dst) is None:
+        return False
+    g.upsert_edge(src, dst, etype, props)
+    return True
+
+
 def _import_relation_edges(g: GraphStore) -> int:
+    n = 0
     for src, dst, note in _DETECTS:
-        g.upsert_edge(src, dst, "detects", {"note": note})
+        n += _edge_if_ends_exist(g, src, dst, "detects", {"note": note})
     for src, dst, note in _INDICATES:
-        g.upsert_edge(src, dst, "indicates", {"note": note})
+        n += _edge_if_ends_exist(g, src, dst, "indicates", {"note": note})
     for src, dst, note in _EMPLOYS:
-        g.upsert_edge(src, dst, "employs", {"note": note})
-    return len(_DETECTS) + len(_INDICATES) + len(_EMPLOYS)
+        n += _edge_if_ends_exist(g, src, dst, "employs", {"note": note})
+    return n
 
 
 def run_seed(db_path=None) -> int:

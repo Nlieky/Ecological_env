@@ -58,7 +58,7 @@ def test_seed_idempotent(tmp_path):
 
 
 def test_seed_missing_source_skips(tmp_path, monkeypatch):
-    """单源文件缺失：跳过该源其余继续，退出码 0。"""
+    """单源文件缺失：跳过该源其余继续，退出码 0，且不产生悬挂边。"""
     from shared.knowledge_graph import seed_importer
     monkeypatch.setattr(seed_importer, "_OPERATOR_CONFIG",
                         ROOT / "nonexistent" / "operator_config.json")
@@ -68,6 +68,36 @@ def test_seed_missing_source_skips(tmp_path, monkeypatch):
     st = g.stats()
     assert st["node_types"].get("operator", 0) == 0  # 算子源被跳过
     assert st["node_types"].get("plant", 0) >= 1     # 厂还在
+    # 算子端点的关系边一并丢弃（detects/employs 的端点全是 operator 节点）
+    assert st["edge_types"].get("detects", 0) == 0
+    assert st["edge_types"].get("employs", 0) == 0
+    assert st["edge_types"].get("indicates", 0) == 6  # 模式/法规源不受影响
+    # 数据完整性：任一边两端都必须是存在的节点（直查 sqlite，绕开
+    # subgraph/neighbors 会静默丢悬挂边的 JOIN 过滤）
+    import sqlite3
+    conn = sqlite3.connect(db)
+    dangling = conn.execute(
+        "SELECT e.src, e.dst FROM edges e "
+        "WHERE e.src NOT IN (SELECT id FROM nodes) "
+        "   OR e.dst NOT IN (SELECT id FROM nodes)").fetchall()
+    conn.close()
+    assert not dangling, f"悬挂边: {dangling}"
+    g.close()
+
+
+def test_seed_yaml_missing_skips(tmp_path, monkeypatch):
+    """层级 yaml 缺失：厂区源跳过（不抛 FileNotFoundError），其余源继续。"""
+    from shared.knowledge_graph import seed_importer
+    monkeypatch.setattr(seed_importer, "_HIERARCHY_FILE",
+                        ROOT / "nonexistent" / "plant-hierarchy.yaml")
+    db = tmp_path / "kg.db"
+    assert seed_importer.run_seed(db_path=db) == 0
+    g = GraphStore(db)
+    st = g.stats()
+    assert st["node_types"].get("plant", 0) == 0         # 厂区源被跳过
+    assert st["node_types"].get("operator", 0) >= 30     # 算子源还在
+    assert st["node_types"].get("violation_pattern", 0) == 6
+    assert st["edge_types"].get("monitors", 0) == 0      # 无厂 → 无 monitors 边
     g.close()
 
 
