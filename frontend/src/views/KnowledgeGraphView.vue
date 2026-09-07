@@ -89,7 +89,7 @@ async function openNode(id: string) {
 const caseCount = computed(() => store.stats?.node_types?.case ?? 0)
 const tabTypes = computed(() =>
   Object.fromEntries(Object.entries(NODE_META)
-    .filter(([, m]) => m.tab === store.activeTab)))
+    .filter(([, m]) => m.tab.includes(store.activeTab))))
 const visibleNodes = computed(() =>
   store.allNodes.filter(n => store.visibleTypes.includes(n.type)))
 
@@ -98,7 +98,7 @@ const checkedTypes = computed(() =>
   store.visibleTypes) // 当前可见即勾选
 function onLegendChange(vals: string[]) {
   // 把 tab 内全部类型里不在 vals 的加进 hiddenTypes；在的移出
-  const all = Object.keys(NODE_META).filter(k => NODE_META[k].tab === store.activeTab)
+  const all = Object.keys(NODE_META).filter(k => NODE_META[k].tab.includes(store.activeTab))
   for (const t of all) {
     const shouldHide = !vals.includes(t)
     const isHidden = store.hiddenTypes.includes(t)

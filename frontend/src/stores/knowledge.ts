@@ -4,22 +4,23 @@ import { ref, computed } from 'vue'
 import { knowledgeService } from '@/api/modules/knowledge'
 import type { KGNode, KGEdge, KGStats } from '@/api/modules/knowledge'
 
-// 节点类型元数据：中文标签/颜色/tab 归属（domain=领域知识 / topology=服务拓扑）
-export const NODE_META: Record<string, { label: string; color: string; tab: 'domain' | 'topology' }> = {
-  plant: { label: '厂区', color: '#22c55e', tab: 'domain' },
-  indicator: { label: '指标', color: '#84cc16', tab: 'domain' },
-  violation_pattern: { label: '违规模式', color: '#ef4444', tab: 'domain' },
-  operator: { label: '算子', color: '#f59e0b', tab: 'domain' },
-  regulation: { label: '法规', color: '#8b5cf6', tab: 'domain' },
-  case: { label: '案例', color: '#ec4899', tab: 'domain' },
-  agent: { label: '智能体', color: '#3b82f6', tab: 'topology' },
-  service: { label: '服务', color: '#06b6d4', tab: 'topology' },
+// 节点类型元数据：中文标签/颜色/tab 归属（domain=领域知识 / topology=服务拓扑）。
+// tab 是数组：operator 双归属（spec L66）——domain 里是检测器，topology 里是 shared 算子库成员（使 employs 边可见）
+export const NODE_META: Record<string, { label: string; color: string; tab: ('domain' | 'topology')[] }> = {
+  plant: { label: '厂区', color: '#22c55e', tab: ['domain'] },
+  indicator: { label: '指标', color: '#84cc16', tab: ['domain'] },
+  violation_pattern: { label: '违规模式', color: '#ef4444', tab: ['domain'] },
+  operator: { label: '算子', color: '#f59e0b', tab: ['domain', 'topology'] },
+  regulation: { label: '法规', color: '#8b5cf6', tab: ['domain'] },
+  case: { label: '案例', color: '#ec4899', tab: ['domain'] },
+  agent: { label: '智能体', color: '#3b82f6', tab: ['topology'] },
+  service: { label: '服务', color: '#06b6d4', tab: ['topology'] },
 }
 
 /** 当前可见类型 = tab 预设 - hidden（hidden 为反向集合：空=全显，取消勾选即加入） */
 export function computeVisibleTypes(tab: 'domain' | 'topology', hidden: string[]): string[] {
   return Object.keys(NODE_META)
-    .filter(k => NODE_META[k].tab === tab && !hidden.includes(k))
+    .filter(k => NODE_META[k].tab.includes(tab) && !hidden.includes(k))
 }
 
 export const useKnowledgeStore = defineStore('knowledge', () => {
@@ -122,7 +123,7 @@ export function toEChartsSeries(
       id: n.id,
       name: n.label,
       category: catIdx.get(n.type) ?? 0,
-      symbolSize: NODE_META[n.type]?.tab === 'topology' ? 40 : 28,
+      symbolSize: NODE_META[n.type]?.tab.includes('topology') ? 40 : 28,
       itemStyle: { color: NODE_META[n.type]?.color },
     }))
   const nodeIds = new Set(data.map(d => d.id))

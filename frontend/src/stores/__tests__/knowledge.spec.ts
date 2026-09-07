@@ -36,13 +36,40 @@ describe('toEChartsSeries', () => {
     expect(s.data).toHaveLength(0)
     expect(s.links).toHaveLength(0)
   })
+
+  it('agent+operator 同可见时 employs 边保留（topology tab 边可见性，spec L66）', () => {
+    const s = toEChartsSeries(nodes, edges, ['agent', 'operator'])
+    // employs: agent:master → pattern:bottle 是违规模式端点，不含 pattern 时仍滤掉
+    expect(s.links).toHaveLength(0)
+    // 造一条 agent → operator 的 employs 边：两端都可见才保留
+    const edges2 = [
+      { id: 4, src: 'agent:master', dst: 'operator:iforest', type: 'employs', props: {} },
+    ]
+    const nodes2 = [
+      { id: 'agent:master', type: 'agent', label: '主智能体', props: {} },
+      { id: 'operator:iforest', type: 'operator', label: '孤立森林', props: {} },
+    ]
+    const s2 = toEChartsSeries(nodes2, edges2, ['agent', 'operator'])
+    expect(s2.data).toHaveLength(2)
+    expect(s2.links).toHaveLength(1)
+    expect(s2.links[0]).toMatchObject({ source: 'agent:master', target: 'operator:iforest', value: 'employs' })
+    // operator 在 topology tab 是大节点（内容成员）
+    const op = s2.data.find(d => d.id === 'operator:iforest')
+    expect(op?.symbolSize).toBe(40)
+  })
 })
 
 describe('computeVisibleTypes（hidden 反向集合）', () => {
   it('空 hidden = 全选该 tab 预设', () => {
     expect(computeVisibleTypes('domain', [])).toEqual(
       ['plant', 'indicator', 'violation_pattern', 'operator', 'regulation', 'case'])
-    expect(computeVisibleTypes('topology', [])).toEqual(['agent', 'service'])
+    // 顺序=NODE_META 键序：operator 在 agent/service 前
+    expect(computeVisibleTypes('topology', [])).toEqual(['operator', 'agent', 'service'])
+  })
+
+  it('operator 双 tab 归属（spec L66）——domain 与 topology 的可见集都含 operator', () => {
+    expect(computeVisibleTypes('domain', [])).toContain('operator')
+    expect(computeVisibleTypes('topology', [])).toContain('operator')
   })
 
   it('hidden 排除对应类型（取消勾选即隐藏）', () => {
@@ -51,7 +78,9 @@ describe('computeVisibleTypes（hidden 反向集合）', () => {
   })
 
   it('hidden 覆盖全部类型时返回空数组（不回退全选）', () => {
-    expect(computeVisibleTypes('topology', ['agent', 'service'])).toEqual([])
+    expect(computeVisibleTypes('topology', ['agent', 'service', 'operator'])).toEqual([])
+    // operator 属 topology 预设：只 hidden agent/service 时仍剩 operator
+    expect(computeVisibleTypes('topology', ['agent', 'service'])).toEqual(['operator'])
   })
 })
 
@@ -80,19 +109,21 @@ describe('knowledge store 图例反选（hiddenTypes）', () => {
     store.setTab('topology')
     expect(store.activeTab).toBe('topology')
     expect(store.hiddenTypes).toEqual([])
-    expect(store.visibleTypes).toEqual(['agent', 'service'])
+    expect(store.visibleTypes).toEqual(['operator', 'agent', 'service'])
   })
 })
 
 describe('NODE_META', () => {
-  it('8 类节点齐备且 tab 归属二分', () => {
+  it('8 类节点齐备且 tab 归属为数组（operator 双归属）', () => {
     const types = Object.keys(NODE_META)
     expect(types).toEqual(expect.arrayContaining([
       'plant', 'indicator', 'violation_pattern', 'operator',
       'regulation', 'case', 'agent', 'service',
     ]))
     for (const meta of Object.values(NODE_META)) {
-      expect(['domain', 'topology']).toContain(meta.tab)
+      expect(Array.isArray(meta.tab)).toBe(true)
+      for (const t of meta.tab) expect(['domain', 'topology']).toContain(t)
     }
+    expect(NODE_META.operator.tab).toEqual(['domain', 'topology'])
   })
 })
