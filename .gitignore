@@ -119,3 +119,4 @@ models_dev_cache.json
 .workbuddy/
 skills/.hub/
 *.tar.gz
+shared/data/knowledge_graph.db
