@@ -9,8 +9,10 @@ import type { KGNode, KGEdge, KGStats } from '@/api/modules/knowledge'
 // 颜色经 dataviz 校验器验证（light 面 全 PASS）：降饱和去塑料感；viol红独占暖区语义色；
 // protan 最差对 7.2 在合法带内，靠节点文字标签做辅助编码（图上节点均带 label，天然满足）
 export const NODE_META: Record<string, { label: string; color: string; tab: ('domain' | 'topology')[] }> = {
-  library: { label: '库', color: '#0f172a', tab: ['domain'] },
-  category: { label: '分类', color: '#475569', tab: ['domain'] },
+  library: { label: '库', color: '#0f172a', tab: ['domain', 'topology'] },
+  // category 双归属：拓扑 tab 里算子→分类→库 的归属树让 38 个算子不再是孤环
+  // （只给 library 双 tab 时 belongs_to 边的 category 端不可见，边被两端规则滤掉）
+  category: { label: '分类', color: '#475569', tab: ['domain', 'topology'] },
   knowledge_doc: { label: '知识文档', color: '#64748b', tab: ['domain'] },
   plant: { label: '厂区', color: '#3b82f6', tab: ['domain'] },
   indicator: { label: '指标', color: '#15876b', tab: ['domain'] },
@@ -20,6 +22,9 @@ export const NODE_META: Record<string, { label: string; color: string; tab: ('do
   case: { label: '案例', color: '#a52a8a', tab: ['domain'] },
   agent: { label: '智能体', color: '#3b82f6', tab: ['topology'] },
   service: { label: '服务', color: '#15876b', tab: ['topology'] },
+  skill: { label: '技能', color: '#7c3aed', tab: ['topology'] },
+  tool: { label: '工具', color: '#0369a1', tab: ['topology'] },
+  mcp: { label: 'MCP', color: '#ca8a04', tab: ['topology'] },
 }
 
 /** 当前可见类型 = tab 预设 - hidden（hidden 为反向集合：空=全显，取消勾选即加入） */

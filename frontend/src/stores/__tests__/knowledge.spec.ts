@@ -69,13 +69,15 @@ describe('computeVisibleTypes（hidden 反向集合）', () => {
   it('空 hidden = 全选该 tab 预设', () => {
     expect(computeVisibleTypes('domain', [])).toEqual(
       ['library', 'category', 'knowledge_doc', 'plant', 'indicator', 'violation_pattern', 'operator', 'regulation', 'case'])
-    // 顺序=NODE_META 键序：operator 在 agent/service 前
-    expect(computeVisibleTypes('topology', [])).toEqual(['operator', 'agent', 'service'])
+    // 顺序=NODE_META 键序；topology 含技能/工具/MCP，library 双归属桥接两 tab
+    expect(computeVisibleTypes('topology', [])).toEqual(
+      ['library', 'category', 'operator', 'agent', 'service', 'skill', 'tool', 'mcp'])
   })
 
-  it('operator 双 tab 归属（spec L66）——domain 与 topology 的可见集都含 operator', () => {
+  it('operator/library 双 tab 归属——两 tab 的可见集都含', () => {
     expect(computeVisibleTypes('domain', [])).toContain('operator')
     expect(computeVisibleTypes('topology', [])).toContain('operator')
+    expect(computeVisibleTypes('topology', [])).toContain('library')
   })
 
   it('hidden 排除对应类型（取消勾选即隐藏）', () => {
@@ -84,9 +86,11 @@ describe('computeVisibleTypes（hidden 反向集合）', () => {
   })
 
   it('hidden 覆盖全部类型时返回空数组（不回退全选）', () => {
-    expect(computeVisibleTypes('topology', ['agent', 'service', 'operator'])).toEqual([])
-    // operator 属 topology 预设：只 hidden agent/service 时仍剩 operator
-    expect(computeVisibleTypes('topology', ['agent', 'service'])).toEqual(['operator'])
+    expect(computeVisibleTypes('topology',
+      ['library', 'category', 'operator', 'agent', 'service', 'skill', 'tool', 'mcp'])).toEqual([])
+    // 只 hidden agent/service 时仍剩 library/operator/skill/tool/mcp
+    expect(computeVisibleTypes('topology', ['agent', 'service']))
+      .toEqual(['library', 'category', 'operator', 'skill', 'tool', 'mcp'])
   })
 })
 
@@ -115,17 +119,18 @@ describe('knowledge store 图例反选（hiddenTypes）', () => {
     store.setTab('topology')
     expect(store.activeTab).toBe('topology')
     expect(store.hiddenTypes).toEqual([])
-    expect(store.visibleTypes).toEqual(['operator', 'agent', 'service'])
+    expect(store.visibleTypes).toEqual(['library', 'category', 'operator', 'agent', 'service', 'skill', 'tool', 'mcp'])
   })
 })
 
 describe('NODE_META', () => {
-  it('11 类节点齐备且 tab 归属为数组（operator 双归属；library/category/knowledge_doc 为层级与文档节点）', () => {
+  it('14 类节点齐备且 tab 归属为数组（operator/library 双归属；skill/tool/mcp 属拓扑）', () => {
     const types = Object.keys(NODE_META)
     expect(types).toEqual(expect.arrayContaining([
       'plant', 'indicator', 'violation_pattern', 'operator',
       'regulation', 'case', 'agent', 'service',
       'library', 'category', 'knowledge_doc',
+      'skill', 'tool', 'mcp',
     ]))
     for (const meta of Object.values(NODE_META)) {
       expect(Array.isArray(meta.tab)).toBe(true)

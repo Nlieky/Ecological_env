@@ -146,6 +146,7 @@ _CALLS = [
     ("service:frontend", "service:backend", "HTTP /api/*"),
     ("service:backend", "service:agent_service", "HTTP /query(/stream) 转发"),
     ("service:agent_service", "service:llm", "OpenAI 兼容 API"),
+    ("service:agent_service", "service:frontend", "SSE progress/delta 流式回传"),
 ]
 _READS = [
     ("agent:multi-dimensional-data-perception", "service:influxdb",
@@ -154,6 +155,37 @@ _READS = [
 ]
 _WRITES = [
     ("agent:disposition-execution", "service:sqlite_logs", "处置结果归档"),
+]
+
+# ── 技能（skill）目录：主智能体 + 4 子智能体的真实技能（各 skills/ 目录） ──
+SKILLS: List[Tuple[str, str, str]] = [
+    # (skill 名, 归属 agent, 说明)
+    ("orchestrator-core", "agent:master", "编排技能：停止铁律/task写法/结果整合"),
+    ("action-command-core", "agent:master", "动作指令：分类器+检测短路"),
+    ("data-perception-core", "agent:multi-dimensional-data-perception", "取数主技能 get_data"),
+    ("data-export", "agent:multi-dimensional-data-perception", "导出 CSV"),
+    ("anomaly-detection-core", "agent:anomaly-detection", "检测主技能 5类特征+孤立森林"),
+    ("rule-reasoning-core", "agent:rule-reasoning", "判定主技能 工艺规则+嫌疑矩阵"),
+    ("knowledge-search", "agent:rule-reasoning", "知识四库检索"),
+    ("disposition-execution-core", "agent:disposition-execution", "处置主技能 工单+预警"),
+    ("report-generator", "agent:disposition-execution", "日报/周报生成"),
+]
+# 主智能体运行时工具（tool_registration.py 精简后的 6 个 + MCP）
+MASTER_TOOLS: List[Tuple[str, str]] = [
+    ("call_subagent", "调用子智能体（核心编排工具）"),
+    ("run_detector", "动作指令直调检测算子（不经 LLM）"),
+    ("list_subagents", "列出可用子智能体"),
+    ("create_session", "建会话目录（sessions/ 通信）"),
+    ("read_result", "读子智能体结果（已废弃，防上下文撑爆）"),
+    ("skill_view", "读技能 SKILL.md（hermes 原生，读编排技能用）"),
+    ("skills_list", "列技能清单（hermes 原生）"),
+]
+# MCP 服务器（根 config.yaml mcp_servers 段，npx 启动）
+MCPS: List[Tuple[str, str]] = [
+    ("fetch", "网页抓取 @kazuph/mcp-fetch"),
+    ("memory", "跨会话记忆 @modelcontextprotocol/server-memory"),
+    ("filesystem", "文件系统（shared/knowledge 目录）"),
+    ("influxdb", "InfluxDB 查询（community influxdb-mcp-server）"),
 ]
 
 
@@ -381,13 +413,39 @@ def _import_static_topology(g: GraphStore) -> int:
         g.upsert_node(s["id"], "service", s["label"], s["props"])
     for src, dst in _ORCHESTRATES:
         g.upsert_edge(src, dst, "orchestrates")
+    # 服务簇↔智能体簇的桥：Agent 服务承载主智能体运行（无此边两簇不连通）
+    g.upsert_edge("service:agent_service", "agent:master", "hosts",
+                  {"note": "AIAgent 会话跑在 8642 服务进程内"})
     for src, dst, note in _CALLS:
         g.upsert_edge(src, dst, "calls", {"note": note})
     for src, dst, note in _READS:
         g.upsert_edge(src, dst, "reads", {"note": note})
     for src, dst, note in _WRITES:
         g.upsert_edge(src, dst, "writes", {"note": note})
-    return len(AGENTS) + len(SERVICES)
+
+    # ── 技能/工具/MCP：服务拓扑的丰满层 ──
+    # 技能节点（各 agent 的 skills/ 目录实体）经 uses 边挂 agent
+    for skill, owner, desc in SKILLS:
+        g.upsert_node(f"skill:{skill}", "skill", skill, {"desc": desc})
+        g.upsert_edge(owner, f"skill:{skill}", "uses")
+    # 主智能体运行时工具（6 个精简编排工具）经 invokes 边挂主智能体
+    for tool, desc in MASTER_TOOLS:
+        g.upsert_node(f"tool:{tool}", "tool", tool, {"desc": desc})
+        g.upsert_edge("agent:master", f"tool:{tool}", "invokes")
+    # MCP 服务器（config.yaml mcp_servers，npx 子进程）挂 Agent 服务
+    for name, desc in MCPS:
+        g.upsert_node(f"mcp:{name}", "mcp", f"MCP {name}", {"desc": desc,
+                                                             "runtime": "npx"})
+        g.upsert_edge("service:agent_service", f"mcp:{name}", "mounts")
+    # 库连接（复用 library 节点，领域/拓扑两 tab 的桥）：agents 经 reads/writes 摸三库
+    for agent_id, lib_id, etype, note in [
+        ("agent:anomaly-detection", "library:operators", "reads", "调 shared/operators 算子"),
+        ("agent:rule-reasoning", "library:knowledge", "reads", "查知识四库"),
+        ("agent:multi-dimensional-data-perception", "library:database", "reads", "InfluxDB 取数"),
+        ("agent:disposition-execution", "library:knowledge", "reads", "处置引用知识/法规"),
+    ]:
+        _edge_if_ends_exist(g, agent_id, lib_id, etype, {"note": note})
+    return len(AGENTS) + len(SERVICES) + len(SKILLS) + len(MASTER_TOOLS) + len(MCPS)
 
 
 def _edge_if_ends_exist(g: GraphStore, src: str, dst: str, etype: str,

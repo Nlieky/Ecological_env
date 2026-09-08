@@ -49,12 +49,15 @@ NODE_TYPES = {
     "regulation", "case", "agent", "service",
     "library", "category",  # 库/分类层级节点：算子库→统计类/深度学习类→…；知识库→违规模式库/法规库→…
     "knowledge_doc",  # 知识文档实体：工艺知识/典型违规模式/专家嫌疑规则(R001-R010)
+    "skill", "tool", "mcp",  # 服务拓扑层：子智能体技能/主智能体工具/MCP服务器
 }
 EDGE_TYPES = {
     "monitors", "detects", "indicates", "cites", "employs",
     "calls", "orchestrates", "reads", "writes", "involves",
     "belongs_to",  # 归属层级：算子→分类、分类→库、违规模式→违规模式库、法规→法规库
     "limits",  # 限值：指标→排放标准（GB 18918 一级A标 超标判定基准）
+    "uses", "invokes", "mounts",  # 拓扑：agent→技能、master→工具、agent服务→MCP
+    "hosts",  # 承载：Agent 服务→主智能体（服务簇与智能体簇的桥,防两簇不连通）
 }
 
 
