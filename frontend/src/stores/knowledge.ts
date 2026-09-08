@@ -17,14 +17,18 @@ export const NODE_META: Record<string, { label: string; color: string; tab: ('do
   plant: { label: '厂区', color: '#3b82f6', tab: ['domain'] },
   indicator: { label: '指标', color: '#15876b', tab: ['domain'] },
   violation_pattern: { label: '违规模式', color: '#b91c1c', tab: ['domain'] },
-  operator: { label: '算子', color: '#eb6834', tab: ['domain', 'topology'] },
+  // 算子只在领域 tab：38个算子的归属树归"领域知识"管；拓扑 tab 里"哪个智能体
+  // 用什么算子"已由技能层（uses 边）承载，重复展示反而挤占拓扑画布。
+  // employs 边（agent→算子）随之只在领域 tab 可见（两端规则自动滤）。
+  operator: { label: '算子', color: '#eb6834', tab: ['domain'] },
   regulation: { label: '法规', color: '#5b21b6', tab: ['domain'] },
   case: { label: '案例', color: '#a52a8a', tab: ['domain'] },
   agent: { label: '智能体', color: '#3b82f6', tab: ['topology'] },
   service: { label: '服务', color: '#15876b', tab: ['topology'] },
   skill: { label: '技能', color: '#7c3aed', tab: ['topology'] },
   tool: { label: '工具', color: '#0369a1', tab: ['topology'] },
-  mcp: { label: 'MCP', color: '#ca8a04', tab: ['topology'] },
+  // MCP 用冷灰蓝：与已撤出拓扑tab的算子橙色(#eb6834)拉开,防"MCP 误读成算子残留"
+  mcp: { label: 'MCP', color: '#64748b', tab: ['topology'] },
 }
 
 /** 当前可见类型 = tab 预设 - hidden（hidden 为反向集合：空=全显，取消勾选即加入） */

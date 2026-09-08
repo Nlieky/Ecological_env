@@ -42,7 +42,7 @@ describe('toEChartsSeries', () => {
     expect(s.links).toHaveLength(0)
   })
 
-  it('agent+operator 同可见时 employs 边保留（topology tab 边可见性，spec L66）', () => {
+  it('agent+operator 同可见时 employs 边保留（两端可见规则；2026-09-08 算子撤出拓扑tab后此场景只在领域tab出现）', () => {
     const s = toEChartsSeries(nodes, edges, ['agent', 'operator'])
     // employs: agent:master → pattern:bottle 是违规模式端点，不含 pattern 时仍滤掉
     expect(s.links).toHaveLength(0)
@@ -58,10 +58,9 @@ describe('toEChartsSeries', () => {
     expect(s2.data).toHaveLength(2)
     expect(s2.links).toHaveLength(1)
     expect(s2.links[0]).toMatchObject({ source: 'agent:master', target: 'operator:iforest', value: 'employs' })
-    // operator 在 topology tab 是核心成员（度数同为 1 时比 domain 侧大 6px）
-    const agent = s2.data.find(d => d.id === 'agent:master')
+    // symbolSize 是数值且大于 0（度数编码存在）
     const op = s2.data.find(d => d.id === 'operator:iforest')
-    expect((op?.symbolSize ?? 0)).toBeGreaterThan((agent?.symbolSize ?? 0) - 1)
+    expect((op?.symbolSize ?? 0)).toBeGreaterThan(0)
   })
 })
 
@@ -69,15 +68,16 @@ describe('computeVisibleTypes（hidden 反向集合）', () => {
   it('空 hidden = 全选该 tab 预设', () => {
     expect(computeVisibleTypes('domain', [])).toEqual(
       ['library', 'category', 'knowledge_doc', 'plant', 'indicator', 'violation_pattern', 'operator', 'regulation', 'case'])
-    // 顺序=NODE_META 键序；topology 含技能/工具/MCP，library 双归属桥接两 tab
+    // 算子撤出 topology（技能层已承载该信息）；library/category 保留双归属桥接
     expect(computeVisibleTypes('topology', [])).toEqual(
-      ['library', 'category', 'operator', 'agent', 'service', 'skill', 'tool', 'mcp'])
+      ['library', 'category', 'agent', 'service', 'skill', 'tool', 'mcp'])
   })
 
-  it('operator/library 双 tab 归属——两 tab 的可见集都含', () => {
-    expect(computeVisibleTypes('domain', [])).toContain('operator')
-    expect(computeVisibleTypes('topology', [])).toContain('operator')
+  it('library/category 双 tab 归属桥接；operator 仅 domain', () => {
     expect(computeVisibleTypes('topology', [])).toContain('library')
+    expect(computeVisibleTypes('topology', [])).toContain('category')
+    expect(computeVisibleTypes('domain', [])).toContain('operator')
+    expect(computeVisibleTypes('topology', [])).not.toContain('operator')
   })
 
   it('hidden 排除对应类型（取消勾选即隐藏）', () => {
@@ -87,10 +87,10 @@ describe('computeVisibleTypes（hidden 反向集合）', () => {
 
   it('hidden 覆盖全部类型时返回空数组（不回退全选）', () => {
     expect(computeVisibleTypes('topology',
-      ['library', 'category', 'operator', 'agent', 'service', 'skill', 'tool', 'mcp'])).toEqual([])
-    // 只 hidden agent/service 时仍剩 library/operator/skill/tool/mcp
+      ['library', 'category', 'agent', 'service', 'skill', 'tool', 'mcp'])).toEqual([])
+    // 只 hidden agent/service 时仍剩库/分类/技能/工具/MCP
     expect(computeVisibleTypes('topology', ['agent', 'service']))
-      .toEqual(['library', 'category', 'operator', 'skill', 'tool', 'mcp'])
+      .toEqual(['library', 'category', 'skill', 'tool', 'mcp'])
   })
 })
 
@@ -119,12 +119,12 @@ describe('knowledge store 图例反选（hiddenTypes）', () => {
     store.setTab('topology')
     expect(store.activeTab).toBe('topology')
     expect(store.hiddenTypes).toEqual([])
-    expect(store.visibleTypes).toEqual(['library', 'category', 'operator', 'agent', 'service', 'skill', 'tool', 'mcp'])
+    expect(store.visibleTypes).toEqual(['library', 'category', 'agent', 'service', 'skill', 'tool', 'mcp'])
   })
 })
 
 describe('NODE_META', () => {
-  it('14 类节点齐备且 tab 归属为数组（operator/library 双归属；skill/tool/mcp 属拓扑）', () => {
+  it('14 类节点齐备且 tab 归属为数组（library/category 双归属桥接；operator 仅 domain）', () => {
     const types = Object.keys(NODE_META)
     expect(types).toEqual(expect.arrayContaining([
       'plant', 'indicator', 'violation_pattern', 'operator',
@@ -136,6 +136,7 @@ describe('NODE_META', () => {
       expect(Array.isArray(meta.tab)).toBe(true)
       for (const t of meta.tab) expect(['domain', 'topology']).toContain(t)
     }
-    expect(NODE_META.operator.tab).toEqual(['domain', 'topology'])
+    expect(NODE_META.operator.tab).toEqual(['domain'])
+    expect(NODE_META.library.tab).toEqual(['domain', 'topology'])
   })
 })
