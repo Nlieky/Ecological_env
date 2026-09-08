@@ -68,7 +68,7 @@ describe('toEChartsSeries', () => {
 describe('computeVisibleTypes（hidden 反向集合）', () => {
   it('空 hidden = 全选该 tab 预设', () => {
     expect(computeVisibleTypes('domain', [])).toEqual(
-      ['library', 'category', 'plant', 'indicator', 'violation_pattern', 'operator', 'regulation', 'case'])
+      ['library', 'category', 'knowledge_doc', 'plant', 'indicator', 'violation_pattern', 'operator', 'regulation', 'case'])
     // 顺序=NODE_META 键序：operator 在 agent/service 前
     expect(computeVisibleTypes('topology', [])).toEqual(['operator', 'agent', 'service'])
   })
@@ -80,7 +80,7 @@ describe('computeVisibleTypes（hidden 反向集合）', () => {
 
   it('hidden 排除对应类型（取消勾选即隐藏）', () => {
     expect(computeVisibleTypes('domain', ['plant', 'case'])).toEqual(
-      ['library', 'category', 'indicator', 'violation_pattern', 'operator', 'regulation'])
+      ['library', 'category', 'knowledge_doc', 'indicator', 'violation_pattern', 'operator', 'regulation'])
   })
 
   it('hidden 覆盖全部类型时返回空数组（不回退全选）', () => {
@@ -96,7 +96,7 @@ describe('knowledge store 图例反选（hiddenTypes）', () => {
   it('初始 hidden 空 → visibleTypes 为当前 tab 全集', () => {
     const store = useKnowledgeStore()
     expect(store.hiddenTypes).toEqual([])
-    expect(store.visibleTypes).toHaveLength(8) // domain 8 类（含 library/category 层级节点）
+    expect(store.visibleTypes).toHaveLength(9) // domain 9 类（library/category/knowledge_doc 层级+文档）
   })
 
   it('toggleType 双向：取消勾选=加入 hidden（隐藏），重新勾选=移出（恢复）', () => {
@@ -120,12 +120,12 @@ describe('knowledge store 图例反选（hiddenTypes）', () => {
 })
 
 describe('NODE_META', () => {
-  it('10 类节点齐备且 tab 归属为数组（operator 双归属；library/category 为层级节点）', () => {
+  it('11 类节点齐备且 tab 归属为数组（operator 双归属；library/category/knowledge_doc 为层级与文档节点）', () => {
     const types = Object.keys(NODE_META)
     expect(types).toEqual(expect.arrayContaining([
       'plant', 'indicator', 'violation_pattern', 'operator',
       'regulation', 'case', 'agent', 'service',
-      'library', 'category',
+      'library', 'category', 'knowledge_doc',
     ]))
     for (const meta of Object.values(NODE_META)) {
       expect(Array.isArray(meta.tab)).toBe(true)

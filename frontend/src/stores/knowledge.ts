@@ -11,6 +11,7 @@ import type { KGNode, KGEdge, KGStats } from '@/api/modules/knowledge'
 export const NODE_META: Record<string, { label: string; color: string; tab: ('domain' | 'topology')[] }> = {
   library: { label: '库', color: '#0f172a', tab: ['domain'] },
   category: { label: '分类', color: '#475569', tab: ['domain'] },
+  knowledge_doc: { label: '知识文档', color: '#64748b', tab: ['domain'] },
   plant: { label: '厂区', color: '#3b82f6', tab: ['domain'] },
   indicator: { label: '指标', color: '#15876b', tab: ['domain'] },
   violation_pattern: { label: '违规模式', color: '#b91c1c', tab: ['domain'] },

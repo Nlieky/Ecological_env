@@ -176,12 +176,20 @@ def _import_plants(g: GraphStore) -> List[str]:
     for city, districts in data.items():
         if city in _RESERVED_KEYS or not isinstance(districts, dict):
             continue
+        # 市→厂区→厂 三级层级（category 复用：与算子库的分类同级语义）
+        city_id = f"category:city:{city}"
+        g.upsert_node(city_id, "category", city, {"parent": "厂区层级", "level": "市"})
         for district, plants in districts.items():
             if not isinstance(plants, list):
                 continue
+            district_id = f"category:district:{city}:{district}"
+            g.upsert_node(district_id, "category", district,
+                          {"parent": city, "level": "厂区"})
+            g.upsert_edge(district_id, city_id, "belongs_to")
             for pid in plants:
                 g.upsert_node(f"plant:{pid}", "plant", pid,
                               {"city": city, "district": district})
+                g.upsert_edge(f"plant:{pid}", district_id, "belongs_to")
                 plant_ids.append(pid)
     return plant_ids
 
@@ -208,10 +216,17 @@ def _discover_indicators() -> List[Dict]:
 
 def _import_indicators(g: GraphStore, indicators: List[Dict],
                        plant_ids: List[str]) -> int:
+    # 数据库（三库一体的第三库）：时序监测数据库 → 指标归属
+    # （InfluxDB monitoring-data bucket；指标是库里的 fields）
+    g.upsert_node("library:database", "library", "时序监测数据库",
+                  {"path": "shared/data", "engine": "InfluxDB 2.7",
+                   "bucket": "monitoring-data", "measurement": "wastewater",
+                   "desc": "三库一体之一——真实报表导入的时序监测数据"})
     for ind in indicators:
         g.upsert_node(f"indicator:{ind['field']}", "indicator",
                       ind["label"],
                       {"field": ind["field"], "unit": ind["unit"]})
+        g.upsert_edge(f"indicator:{ind['field']}", "library:database", "belongs_to")
         for pid in plant_ids:
             g.upsert_edge(f"plant:{pid}", f"indicator:{ind['field']}", "monitors")
     return len(indicators)
@@ -291,7 +306,46 @@ def _import_knowledge_tree(g: GraphStore) -> int:
         g.upsert_edge(p["id"], "category:violation_patterns", "belongs_to")
     for r in REGULATIONS:
         g.upsert_edge(r["id"], "category:regulations", "belongs_to")
-    return 5  # 库2 + 分类3（边在幂等 upsert 里）
+
+    # 知识库四库补全：工艺知识库 + 专家经验库（此前只有两库）
+    g.upsert_node("category:process_knowledge", "category", "工艺知识库",
+                  {"parent": "知识库", "path": "shared/knowledge/process_knowledge"})
+    g.upsert_node("category:expert_experience", "category", "专家经验库",
+                  {"parent": "知识库", "path": "shared/knowledge/expert_experience"})
+    g.upsert_edge("category:process_knowledge", "library:knowledge", "belongs_to")
+    g.upsert_edge("category:expert_experience", "library:knowledge", "belongs_to")
+    # 工艺知识库实体：生化处理工艺（真实文档）
+    g.upsert_node("knowledge_doc:bio_process", "knowledge_doc", "生化处理工艺",
+                  {"file": "生化处理工艺.md",
+                   "sections": ["工艺原理", "正常工况指标关系", "异常工况识别", "工艺异常模式"]})
+    g.upsert_edge("knowledge_doc:bio_process", "category:process_knowledge", "belongs_to")
+    # 专家经验库实体：典型违规模式 + 嫌疑规则 R001-R010（suspicion_rules.py 真实导出）
+    g.upsert_node("knowledge_doc:typical_violations", "knowledge_doc", "典型违规模式",
+                  {"file": "典型违规模式.md",
+                   "sections": ["插瓶干扰", "暗管偷排", "清水稀释", "数据篡改", "虚假停产", "工况造假"]})
+    g.upsert_edge("knowledge_doc:typical_violations", "category:expert_experience", "belongs_to")
+    try:
+        from shared.knowledge.expert_experience.suspicion_rules import RULES
+        for r in RULES:
+            g.upsert_node(f"expert_rule:{r.rule_id}", "knowledge_doc", f"{r.rule_id} {r.name}",
+                          {"name": r.name, "desc": r.description,
+                           "score": getattr(r, "suspicion_score", None)})
+            g.upsert_edge(f"expert_rule:{r.rule_id}", "category:expert_experience", "belongs_to")
+    except Exception as e:
+        print(f"[seed] 警告: 嫌疑规则导入失败({e})，仅导典型违规模式文档")
+
+    # 排放标准（GB 18918-2002 一级A标，排放标准.md 真实表格）：
+    # 标准节点挂法规库，限值经 limits 边关联指标（超标判定基准）
+    g.upsert_node("regulation:gb18918", "regulation", "GB 18918-2002 排放标准",
+                  {"law": "城镇污水处理厂污染物排放标准", "grade": "一级A标",
+                   "note": "基本控制项目最高允许排放浓度（日均值）"})
+    g.upsert_edge("regulation:gb18918", "category:regulations", "belongs_to")
+    for field, limit in [("pH", "6-9"), ("COD", "50 mg/L"), ("TN", "15 mg/L"),
+                         ("AN", "5(8) mg/L"), ("TP", "0.5 mg/L"),
+                         ("suspended_solids", "10 mg/L")]:
+        g.upsert_edge(f"indicator:{field}", "regulation:gb18918", "limits",
+                      {"value": limit})
+    return 5  # 顶层骨架节点数（其余实体在幂等 upsert 里）
 
 
 def _import_cases(g: GraphStore) -> int:

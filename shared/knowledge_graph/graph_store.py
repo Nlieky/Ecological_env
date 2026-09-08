@@ -48,11 +48,13 @@ NODE_TYPES = {
     "plant", "indicator", "violation_pattern", "operator",
     "regulation", "case", "agent", "service",
     "library", "category",  # 库/分类层级节点：算子库→统计类/深度学习类→…；知识库→违规模式库/法规库→…
+    "knowledge_doc",  # 知识文档实体：工艺知识/典型违规模式/专家嫌疑规则(R001-R010)
 }
 EDGE_TYPES = {
     "monitors", "detects", "indicates", "cites", "employs",
     "calls", "orchestrates", "reads", "writes", "involves",
     "belongs_to",  # 归属层级：算子→分类、分类→库、违规模式→违规模式库、法规→法规库
+    "limits",  # 限值：指标→排放标准（GB 18918 一级A标 超标判定基准）
 }
 
 
