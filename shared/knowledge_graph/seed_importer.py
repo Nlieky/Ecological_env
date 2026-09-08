@@ -221,9 +221,22 @@ def _import_operators(g: GraphStore) -> int:
     if not _OPERATOR_CONFIG.exists():
         print(f"[seed] 警告: {_OPERATOR_CONFIG} 不存在，跳过算子源")
         return 0
+    # 层级骨架：算子库 → 各分类（统计/机器学习/深度学习/专用）→ 具体算子（belongs_to）
+    # 没有归属的算子就是孤点——库结构本身是图的一部分（用户语义：梯度检测属于
+    # 统计学算子属于算子库；transformer 属于深度学习算子属于算子库）
+    g.upsert_node("library:operators", "library", "算子库",
+                  {"path": "shared/operators", "desc": "异常检测模型算子库（三库一体之一）"})
+    cat_names = {"statistical": "统计类算子", "machine_learning": "机器学习类算子",
+                 "deep_learning": "深度学习类算子", "specialized": "专用类算子"}
     cfg = json.loads(_OPERATOR_CONFIG.read_text(encoding="utf-8"))
     n = 0
     for cat, block in cfg.get("operators", {}).items():
+        cat_id = f"category:{cat}"
+        g.upsert_node(cat_id, "category", cat_names.get(cat, cat),
+                      {"parent": "算子库",
+                       "desc": block.get("description", ""),
+                       "requires_training": bool(block.get("requires_training", False))})
+        g.upsert_edge(cat_id, "library:operators", "belongs_to")
         for op_key, op in (block.get("operators") or {}).items():
             g.upsert_node(f"operator:{cat}:{op_key}", "operator",
                           op.get("name", op_key),
@@ -233,8 +246,15 @@ def _import_operators(g: GraphStore) -> int:
                            "desc": op.get("description", ""),
                            "status": op.get("status", "available"),
                            "priority": op.get("priority", 3)})
+            g.upsert_edge(f"operator:{cat}:{op_key}", cat_id, "belongs_to")
             n += 1
-    # specialized 目录不在 config json 里，按文件补（对违规模式的专用检测器）
+    # specialized 目录不在 config json 里，按文件补（对违规模式的专用检测器）；
+    # 分类节点也要在此建——json 循环只覆盖 json 里有的三类，specialized 的
+    # category 节点漏建会让 belongs_to 边被悬挂守卫拦掉（算子重新变孤点）
+    spec_cat_id = "category:specialized"
+    g.upsert_node(spec_cat_id, "category", "专用类算子",
+                  {"parent": "算子库", "desc": "针对违规模式的专用检测器（shared/operators/specialized）"})
+    g.upsert_edge(spec_cat_id, "library:operators", "belongs_to")
     spec_dir = _ROOT / "shared" / "operators" / "specialized"
     name_map = {"constant_detector": "恒定检测", "change_point_detector": "突变检测",
                 "smoothness_detector": "平滑度检测", "forgery_detector": "造假检测",
@@ -247,8 +267,31 @@ def _import_operators(g: GraphStore) -> int:
         g.upsert_node(f"operator:specialized:{key}", "operator",
                       name_map.get(key, key),
                       {"category": "specialized", "desc": "专用违规模式检测器"})
+        g.upsert_edge(f"operator:specialized:{key}", spec_cat_id, "belongs_to")
         n += 1
     return n
+
+
+def _import_knowledge_tree(g: GraphStore) -> int:
+    """知识库层级骨架：知识库 → 违规模式库/法规库 → 具体模式/法规。
+
+    用户语义：人工拟合属于（知识库的）违规模式库、法规属于法规库——
+    知识实体也要有归属，不只靠 detects/indicates 语义边连。
+    """
+    g.upsert_node("library:knowledge", "library", "知识库",
+                  {"path": "shared/knowledge", "desc": "废水排放知识库（三库一体之一）"})
+    g.upsert_node("category:violation_patterns", "category", "违规模式库",
+                  {"parent": "知识库", "path": "shared/knowledge/violation_patterns"})
+    g.upsert_node("category:regulations", "category", "法规库",
+                  {"parent": "知识库", "path": "shared/knowledge/regulations"})
+    g.upsert_edge("category:violation_patterns", "library:knowledge", "belongs_to")
+    g.upsert_edge("category:regulations", "library:knowledge", "belongs_to")
+    # 模式 → 违规模式库；法规 → 法规库
+    for p in PATTERNS:
+        g.upsert_edge(p["id"], "category:violation_patterns", "belongs_to")
+    for r in REGULATIONS:
+        g.upsert_edge(r["id"], "category:regulations", "belongs_to")
+    return 5  # 库2 + 分类3（边在幂等 upsert 里）
 
 
 def _import_cases(g: GraphStore) -> int:
@@ -328,6 +371,7 @@ def run_seed(db_path=None) -> int:
         g.upsert_node(r["id"], "regulation", r["label"], r["props"])
     report["regulations"] = len(REGULATIONS)
     report["operators"] = _import_operators(g)
+    report["knowledge_tree"] = _import_knowledge_tree(g)
     report["cases"] = _import_cases(g)
     report["agents_services"] = _import_static_topology(g)
     report["relation_edges"] = _import_relation_edges(g)

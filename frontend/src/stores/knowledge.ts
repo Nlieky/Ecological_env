@@ -9,6 +9,8 @@ import type { KGNode, KGEdge, KGStats } from '@/api/modules/knowledge'
 // 颜色经 dataviz 校验器验证（light 面 全 PASS）：降饱和去塑料感；viol红独占暖区语义色；
 // protan 最差对 7.2 在合法带内，靠节点文字标签做辅助编码（图上节点均带 label，天然满足）
 export const NODE_META: Record<string, { label: string; color: string; tab: ('domain' | 'topology')[] }> = {
+  library: { label: '库', color: '#0f172a', tab: ['domain'] },
+  category: { label: '分类', color: '#475569', tab: ['domain'] },
   plant: { label: '厂区', color: '#3b82f6', tab: ['domain'] },
   indicator: { label: '指标', color: '#15876b', tab: ['domain'] },
   violation_pattern: { label: '违规模式', color: '#b91c1c', tab: ['domain'] },
@@ -108,8 +110,11 @@ export interface GraphLinkDatum {
   value: string
 }
 
-/** 尺寸按度数映射：10px（孤立点）~ 52px（枢纽），开方让中小度数差异更可感 */
-function degreeSize(degree: number, isTopologyCore: boolean): number {
+/** 尺寸映射：库/分类层级节点有基础大尺寸（层级感不靠度数——库是顶层枢纽）；
+ * 其余按度数：10px（孤立点）~ 52px（枢纽），开方让中小度数差异更可感 */
+function degreeSize(degree: number, isTopologyCore: boolean, type?: string): number {
+  if (type === 'library') return 56
+  if (type === 'category') return 40
   const base = 8 + Math.sqrt(degree) * 10
   return Math.min(52, isTopologyCore ? base + 6 : base)
 }
@@ -151,7 +156,7 @@ export function toEChartsSeries(
         name: n.label,
         category: catIdx.get(n.type) ?? 0,
         degree: deg,
-        symbolSize: degreeSize(deg, NODE_META[n.type]?.tab.includes('topology') ?? false),
+        symbolSize: degreeSize(deg, NODE_META[n.type]?.tab.includes('topology') ?? false, n.type),
         itemStyle: { color: NODE_META[n.type]?.color },
         hub: deg > Math.max(medianDeg, 2),
       }

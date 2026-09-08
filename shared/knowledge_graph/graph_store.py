@@ -47,10 +47,12 @@ CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type);
 NODE_TYPES = {
     "plant", "indicator", "violation_pattern", "operator",
     "regulation", "case", "agent", "service",
+    "library", "category",  # 库/分类层级节点：算子库→统计类/深度学习类→…；知识库→违规模式库/法规库→…
 }
 EDGE_TYPES = {
     "monitors", "detects", "indicates", "cites", "employs",
     "calls", "orchestrates", "reads", "writes", "involves",
+    "belongs_to",  # 归属层级：算子→分类、分类→库、违规模式→违规模式库、法规→法规库
 }
 
 
