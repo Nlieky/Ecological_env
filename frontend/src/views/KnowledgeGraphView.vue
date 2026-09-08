@@ -1,16 +1,46 @@
 <template>
   <div class="kg-page">
-    <div class="kg-header">
-      <div class="kg-stats">
-        <div v-for="s in statTiles" :key="s.label" class="kg-stat">
-          <span class="kg-stat-value">{{ s.value }}</span>
-          <span class="kg-stat-label">{{ s.label }}</span>
+    <!-- 页面级顶部导航栏：左标题+副标题，中 tab，右搜索+图例开关+重置 -->
+    <div class="kg-navbar">
+      <div class="kg-navbar-left">
+        <div class="kg-navbar-title">
+          <span class="kg-navbar-name">知识图谱</span>
+          <span class="kg-navbar-sub">厂区 · 指标 · 违规模式 · 算子 · 法规 关系地图</span>
         </div>
+        <el-radio-group :model-value="store.activeTab" size="small" @update:model-value="store.setTab">
+          <el-radio-button value="domain">领域知识</el-radio-button>
+          <el-radio-button value="topology">服务拓扑</el-radio-button>
+        </el-radio-group>
       </div>
-      <el-radio-group :model-value="store.activeTab" size="small" @update:model-value="store.setTab">
-        <el-radio-button value="domain">领域知识</el-radio-button>
-        <el-radio-button value="topology">服务拓扑</el-radio-button>
-      </el-radio-group>
+      <div class="kg-navbar-right">
+        <el-select v-model="searchId" filterable clearable placeholder="搜索节点…"
+                   size="small" class="kg-search" :teleported="false"
+                   @change="onSearch">
+          <el-option v-for="n in visibleNodes" :key="n.id" :value="n.id" :label="n.label">
+            <span class="kg-opt">
+              <span class="kg-dot sm" :style="{ background: NODE_META[n.type]?.color }" />
+              {{ n.label }}
+              <span class="kg-opt-type">{{ typeLabel(n.type) }}</span>
+            </span>
+          </el-option>
+        </el-select>
+        <button type="button" class="kg-tool" :class="{ on: legendOpen }" title="图例 / 过滤"
+                @click="legendOpen = !legendOpen">
+          <el-icon :size="14"><Operation /></el-icon> 图例
+        </button>
+        <button type="button" class="kg-tool" title="重置缩放与布局" @click="renderChart">
+          <el-icon :size="14"><RefreshRight /></el-icon> 重置
+        </button>
+      </div>
+    </div>
+
+    <!-- 统计条：紧贴导航栏下沿（tab 切换数字跟着走） -->
+    <div class="kg-statbar" v-if="store.seeded">
+      <div v-for="s in statTiles" :key="s.label" class="kg-stat">
+        <span class="kg-stat-value">{{ s.value }}</span>
+        <span class="kg-stat-label">{{ s.label }}</span>
+      </div>
+      <span class="kg-statbar-hint">节点大小 = 连接数 · 点击图例行显隐 · 拖拽缩放</span>
     </div>
 
     <!-- 加载失败（后端不可达等）——与"未初始化"分开，不给跑 seed 的错误指引 -->
@@ -22,7 +52,7 @@
     </el-empty>
 
     <div v-else class="kg-body">
-      <aside class="kg-legend">
+      <aside v-if="legendOpen" class="kg-legend">
         <div class="kg-panel-title">节点类型</div>
         <button v-for="(meta, t) in tabTypes" :key="t" type="button"
                 class="kg-type-row" :class="{ off: !store.visibleTypes.includes(String(t)) }"
@@ -31,14 +61,11 @@
           <span class="kg-type-name">{{ meta.label }}</span>
           <span class="kg-type-count">{{ typeCount(String(t)) }}</span>
         </button>
-        <div class="kg-legend-foot">节点大小 = 连接数<br/>点击行显隐 · 拖拽缩放</div>
       </aside>
 
       <div class="kg-chart-wrap">
         <el-alert v-if="renderError" type="warning" :closable="false"
                   title="图形渲染失败，已降级为列表视图" />
-        <button v-if="!renderError" type="button" class="kg-reset" title="重置缩放与布局"
-                @click="renderChart">⤢ 重置视图</button>
         <div v-show="!renderError" ref="chartEl" class="kg-chart" />
         <el-table v-if="renderError" class="kg-table" :data="visibleNodes" size="small" height="100%"
                   @row-click="(row: any) => openNode(row.id)">
@@ -75,7 +102,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue'
-import { Connection } from '@element-plus/icons-vue'
+import { Connection, Operation, RefreshRight } from '@element-plus/icons-vue'
 import echarts from '@/lib/echarts'
 import { useKnowledgeStore, NODE_META, toEChartsSeries } from '@/stores/knowledge'
 
@@ -83,6 +110,14 @@ const store = useKnowledgeStore()
 const chartEl = ref<HTMLDivElement>()
 const renderError = ref(false)
 let chart: ReturnType<typeof echarts.init> | null = null
+
+// 顶部导航栏状态：图例开合 + 节点搜索（选中即打开详情）
+const legendOpen = ref(true)
+const searchId = ref('')
+function onSearch(id: string) {
+  if (id) openNode(id)
+  searchId.value = ''
+}
 
 // 详情侧栏加载态（store.selectNode 不切换 store.loading，故页面自持）
 const detailLoading = ref(false)
@@ -227,16 +262,40 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
 </script>
 
 <style scoped>
-.kg-page { padding: 20px 24px; height: 100%; display: flex; flex-direction: column; gap: 14px; }
-.kg-header { display: flex; justify-content: space-between; align-items: center; }
+.kg-page { padding: 16px 20px; height: 100%; display: flex; flex-direction: column; gap: 12px; }
 
-/* 统计区：大数字+灰标签+竖分隔（替换彩色 pill 徽标） */
-.kg-stats { display: flex; align-items: stretch; }
-.kg-stat { display: flex; flex-direction: column; gap: 2px; padding-right: 20px; }
-.kg-stat + .kg-stat { padding-left: 20px; border-left: 1px solid var(--el-border-color-lighter, #f1f5f9); }
-.kg-stat-value { font-size: 24px; font-weight: 700; line-height: 1.1; color: var(--text-primary, #1e293b); font-variant-numeric: tabular-nums; }
+/* ── 页面级顶部导航栏 ── */
+.kg-navbar {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: var(--card-radius, 12px);
+  box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,.06));
+  padding: 12px 16px;
+}
+.kg-navbar-left { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.kg-navbar-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kg-navbar-name { font-size: 17px; font-weight: 700; color: var(--text-primary, #1e293b); line-height: 1.2; }
+.kg-navbar-sub { font-size: 12px; color: var(--text-muted, #94a3b8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kg-navbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.kg-search { width: 200px; }
+.kg-tool {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 12px; border: 1px solid var(--el-border-color-light, #e4e7ed); border-radius: 8px;
+  background: #fff; color: var(--text-secondary, #64748b);
+  font-size: 12px; cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.kg-tool:hover, .kg-tool.on { color: var(--primary, #6366f1); border-color: var(--primary, #6366f1); background: rgba(99,102,241,.05); }
+.kg-opt { display: flex; align-items: center; gap: 6px; }
+.kg-opt-type { margin-left: auto; color: var(--text-muted, #94a3b8); font-size: 12px; }
+
+/* ── 统计条（导航栏下沿） ── */
+.kg-statbar { display: flex; align-items: center; gap: 0; padding: 0 4px; }
+.kg-stat { display: flex; flex-direction: column; gap: 1px; padding-right: 18px; }
+.kg-stat + .kg-stat { padding-left: 18px; border-left: 1px solid var(--el-border-color-lighter, #f1f5f9); }
+.kg-stat-value { font-size: 22px; font-weight: 700; line-height: 1.1; color: var(--text-primary, #1e293b); font-variant-numeric: tabular-nums; }
 .kg-stat-label { font-size: 12px; color: var(--text-muted, #94a3b8); letter-spacing: .04em; }
-.kg-stat + .kg-stat .kg-stat-value::after { content: ''; }
+.kg-statbar-hint { margin-left: auto; font-size: 12px; color: var(--text-muted, #94a3b8); }
 
 .kg-body { flex: 1; display: flex; gap: 14px; min-height: 0; }
 
@@ -262,7 +321,6 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
 .kg-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .kg-type-name { font-size: 13px; flex: 1; }
 .kg-type-count { font-size: 12px; color: var(--text-muted, #94a3b8); font-variant-numeric: tabular-nums; }
-.kg-legend-foot { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--el-border-color-lighter, #f1f5f9); font-size: 11px; color: var(--text-muted, #94a3b8); line-height: 1.5; }
 
 /* 图区：整卡承托（与图例/详情同质感），给图完整画布 */
 .kg-chart-wrap {
@@ -274,14 +332,6 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
   overflow: hidden; position: relative;
 }
 .kg-chart { flex: 1; min-height: 0; }
-.kg-reset {
-  position: absolute; top: 12px; right: 12px; z-index: 2;
-  padding: 5px 12px; border: 1px solid var(--el-border-color-light, #e4e7ed); border-radius: 8px;
-  background: rgba(255,255,255,.92); color: var(--text-secondary, #64748b);
-  font-size: 12px; cursor: pointer; font-family: inherit;
-  box-shadow: 0 1px 3px rgba(15,23,42,.08); transition: all .15s;
-}
-.kg-reset:hover { color: var(--primary, #6366f1); border-color: var(--primary, #6366f1); }
 .kg-table :deep(.el-table__row) { cursor: pointer; }
 
 /* 详情侧栏 */
