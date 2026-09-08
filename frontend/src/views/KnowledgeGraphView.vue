@@ -1,11 +1,12 @@
 <template>
   <div class="kg-page">
     <div class="kg-header">
-      <span v-if="store.stats" class="kg-badges">
-        <el-tag size="small">{{ store.stats.nodes }} 节点</el-tag>
-        <el-tag size="small" type="warning">{{ store.stats.edges }} 关系</el-tag>
-        <el-tag size="small" type="danger">{{ caseCount }} 案例</el-tag>
-      </span>
+      <div class="kg-stats">
+        <div v-for="s in statTiles" :key="s.label" class="kg-stat">
+          <span class="kg-stat-value">{{ s.value }}</span>
+          <span class="kg-stat-label">{{ s.label }}</span>
+        </div>
+      </div>
       <el-radio-group :model-value="store.activeTab" size="small" @update:model-value="store.setTab">
         <el-radio-button value="domain">领域知识</el-radio-button>
         <el-radio-button value="topology">服务拓扑</el-radio-button>
@@ -21,19 +22,23 @@
     </el-empty>
 
     <div v-else class="kg-body">
-      <div class="kg-legend">
-        <div class="label">图例 / 过滤</div>
-        <el-checkbox-group :model-value="checkedTypes" @update:model-value="onLegendChange">
-          <el-checkbox v-for="(meta, t) in tabTypes" :key="t" :value="t">
-            <span :style="{ color: meta.color }">●</span> {{ meta.label }}
-            <span class="kg-count">{{ typeCount(String(t)) }}</span>
-          </el-checkbox>
-        </el-checkbox-group>
-      </div>
+      <aside class="kg-legend">
+        <div class="kg-panel-title">节点类型</div>
+        <button v-for="(meta, t) in tabTypes" :key="t" type="button"
+                class="kg-type-row" :class="{ off: !store.visibleTypes.includes(String(t)) }"
+                @click="store.toggleType(String(t))">
+          <span class="kg-swatch" :style="{ background: meta.color }" />
+          <span class="kg-type-name">{{ meta.label }}</span>
+          <span class="kg-type-count">{{ typeCount(String(t)) }}</span>
+        </button>
+        <div class="kg-legend-foot">节点大小 = 连接数<br/>点击行显隐 · 拖拽缩放</div>
+      </aside>
 
       <div class="kg-chart-wrap">
         <el-alert v-if="renderError" type="warning" :closable="false"
                   title="图形渲染失败，已降级为列表视图" />
+        <button v-if="!renderError" type="button" class="kg-reset" title="重置缩放与布局"
+                @click="renderChart">⤢ 重置视图</button>
         <div v-show="!renderError" ref="chartEl" class="kg-chart" />
         <el-table v-if="renderError" class="kg-table" :data="visibleNodes" size="small" height="100%"
                   @row-click="(row: any) => openNode(row.id)">
@@ -45,19 +50,23 @@
 
       <div v-if="store.selectedNode || detailLoading" v-loading="detailLoading" class="kg-detail">
         <div class="kg-detail-head">
+          <span class="kg-dot" :style="{ background: NODE_META[store.selectedNode?.type ?? '']?.color }" />
           <h3>{{ store.selectedNode?.label }}</h3>
-          <el-tag size="small">{{ typeLabel(store.selectedNode?.type ?? '') }}</el-tag>
+          <span class="kg-detail-type">{{ typeLabel(store.selectedNode?.type ?? '') }}</span>
           <el-button text size="small" @click="store.clearSelection">关闭</el-button>
         </div>
         <el-descriptions v-if="store.selectedNode" :column="1" size="small" border>
           <el-descriptions-item v-for="(v, k) in store.selectedNode.props" :key="k"
                                 :label="String(k)">{{ String(v) }}</el-descriptions-item>
         </el-descriptions>
-        <div class="label kg-nb-title">关联（一跳）</div>
+        <div class="kg-panel-title kg-nb-title">关联（一跳）</div>
         <div v-for="(list, ntype) in store.selectedNeighbors" :key="ntype" class="kg-nb-group">
-          <div class="label">{{ typeLabel(String(ntype)) }}（{{ list.length }}）</div>
-          <el-tag v-for="n in list" :key="n.id" class="kg-nb-tag"
-                  @click="openNode(n.id)">{{ n.label }}</el-tag>
+          <div class="kg-nb-type">
+            <span class="kg-dot sm" :style="{ background: NODE_META[String(ntype)]?.color }" />
+            {{ typeLabel(String(ntype)) }} · {{ list.length }}
+          </div>
+          <button v-for="n in list" :key="n.id" type="button" class="kg-nb-chip"
+                  @click="openNode(n.id)">{{ n.label }}</button>
         </div>
       </div>
     </div>
@@ -86,25 +95,30 @@ async function openNode(id: string) {
   }
 }
 
-const caseCount = computed(() => store.stats?.node_types?.case ?? 0)
+// 统计区：大数字 + 灰标签（计数跟当前 tab 走——全图数字与所见不符会造成"68 vs 57"困惑）
+const statTiles = computed(() => {
+  if (store.activeTab === 'topology') {
+    return [
+      { value: visibleNodes.value.length, label: '节点' },
+      { value: visibleLinksCount.value, label: '关系' },
+    ]
+  }
+  return [
+    { value: visibleNodes.value.length, label: '节点' },
+    { value: visibleLinksCount.value, label: '关系' },
+    { value: store.stats?.node_types?.case ?? 0, label: '案例' },
+  ]
+})
+const visibleLinksCount = computed(() => {
+  const vis = new Set(store.visibleTypes)
+  const ids = new Set(store.allNodes.filter(n => vis.has(n.type)).map(n => n.id))
+  return store.allEdges.filter(e => ids.has(e.src) && ids.has(e.dst)).length
+})
 const tabTypes = computed(() =>
   Object.fromEntries(Object.entries(NODE_META)
     .filter(([, m]) => m.tab.includes(store.activeTab))))
 const visibleNodes = computed(() =>
   store.allNodes.filter(n => store.visibleTypes.includes(n.type)))
-
-/** 勾选态=不在 hiddenTypes 里（hiddenTypes 空=全显） */
-const checkedTypes = computed(() =>
-  store.visibleTypes) // 当前可见即勾选
-function onLegendChange(vals: string[]) {
-  // 把 tab 内全部类型里不在 vals 的加进 hiddenTypes；在的移出
-  const all = Object.keys(NODE_META).filter(k => NODE_META[k].tab.includes(store.activeTab))
-  for (const t of all) {
-    const shouldHide = !vals.includes(t)
-    const isHidden = store.hiddenTypes.includes(t)
-    if (shouldHide !== isHidden) store.toggleType(t)
-  }
-}
 
 function typeLabel(t: string) { return NODE_META[t]?.label ?? t }
 function typeCount(t: string) { return store.stats?.node_types?.[t] ?? 0 }
@@ -116,30 +130,72 @@ function renderChart() {
     const series = toEChartsSeries(store.allNodes, store.allEdges, store.visibleTypes)
     chart.setOption({
       tooltip: {
+        backgroundColor: 'rgba(255,255,255,.96)',
+        borderColor: '#e2e8f0',
+        borderWidth: 1,
+        padding: [8, 12],
+        textStyle: { color: '#1e293b', fontSize: 12 },
+        extraCssText: 'box-shadow: 0 4px 16px rgba(15,23,42,.12); border-radius: 8px;',
         // 注意：graph series tooltip 参数无 p.id，节点 id 在 p.data.id（与点击处理一致）
         formatter: (p: any) => p.dataType === 'node'
-          ? `${p.name}（${typeLabel(store.allNodes.find(n => n.id === p.data?.id)?.type ?? '')}）`
+          ? `<b>${p.name}</b><br/><span style="color:#64748b">${typeLabel(store.allNodes.find(n => n.id === p.data?.id)?.type ?? '')} · ${p.data?.degree ?? 0} 条关联</span>`
           : String(p.value ?? ''),
       },
-      legend: { data: series.categories.map(c => c.name), bottom: 0 },
       series: [{
         type: 'graph',
         layout: 'force',
-        force: { repulsion: 120, edgeLength: [40, 90], gravity: 0.08 },
+        force: {
+          // 注：echarts 5.6 force.repulsion 只接受 number|number[]（函数形式会让力计算
+          // 崩成 NaN、整图不渲染——zrender 连 canvas 都不建）。
+          // gravity 拉高把孤立算子收向中心防"沙尘"漂满画布；repulsion 调高防大节点互叠
+          repulsion: 300, edgeLength: [55, 130], gravity: 0.35,
+          friction: 0.28, layoutAnimation: true,
+          initLayout: 'circular',
+        },
         roam: true,
         draggable: true,
-        label: { show: true, fontSize: 11 },
-        emphasis: { focus: 'adjacency' },
+        scaleLimit: { min: 0.4, max: 4 },
+        // 标签：白色描边(halo)让文字在任何底色上可读；宽度截断兜底（tooltip 有全名）
+        label: {
+          show: true, fontSize: 11, color: '#334155',
+          position: 'right', distance: 4,
+          width: 130, overflow: 'truncate',
+          textBorderColor: '#f6f8fb', textBorderWidth: 2.5,
+        },
+        labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
+        // 边：淡灰细线退后；hover 邻接高亮——结构靠交互读不靠线抢戏
+        lineStyle: { color: '#94a3b8', width: 1.2, opacity: 0.6, curveness: 0.12 },
+        emphasis: {
+          focus: 'adjacency',
+          lineStyle: { width: 2.4, opacity: 1, color: '#475569' },
+          label: { fontSize: 12, fontWeight: 600 },
+          itemStyle: { shadowBlur: 12, shadowColor: 'rgba(15,23,42,.25)' },
+        },
+        blur: { itemStyle: { opacity: 0.25 }, lineStyle: { opacity: 0.08 } },
+        itemStyle: { borderColor: '#fff', borderWidth: 1.5 },
         categories: series.categories,
         data: series.data,
         links: series.links,
       }],
     }, { notMerge: true })
     renderError.value = false
+    // 力导向收敛后把图心居中（防重心偏移/顶边裁切）
+    if (series.data.length) centerAfterLayout()
   } catch (e) {
     console.error('知识图谱渲染失败', e)
     renderError.value = true // 降级表格
   }
+}
+
+/** 力导向收敛后把图心移到画布中心（多次渲染复用同一计时器） */
+let centerTimer: ReturnType<typeof setTimeout> | null = null
+function centerAfterLayout() {
+  if (centerTimer) clearTimeout(centerTimer)
+  centerTimer = setTimeout(() => {
+    if (!chart || !chartEl.value) return
+    chart.setOption({ series: [{ center: ['50%', '50%'] }] })
+    centerTimer = null
+  }, 700)
 }
 
 function onNodeClick(params: any) {
@@ -156,6 +212,7 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
+  if (centerTimer) clearTimeout(centerTimer)
   chart?.dispose()
   chart = null
 })
@@ -170,21 +227,85 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
 </script>
 
 <style scoped>
-.kg-page { padding: 16px; height: 100%; display: flex; flex-direction: column; }
-.kg-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.kg-badges { display: flex; gap: 6px; }
-.kg-body { flex: 1; display: flex; gap: 12px; min-height: 0; }
-.kg-legend { width: 180px; flex-shrink: 0; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 12px; overflow-y: auto; }
-.kg-legend .el-checkbox { display: flex; margin-right: 0; }
-.kg-count { color: var(--el-text-color-secondary); font-size: 12px; margin-left: 4px; }
-.kg-chart-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.kg-page { padding: 20px 24px; height: 100%; display: flex; flex-direction: column; gap: 14px; }
+.kg-header { display: flex; justify-content: space-between; align-items: center; }
+
+/* 统计区：大数字+灰标签+竖分隔（替换彩色 pill 徽标） */
+.kg-stats { display: flex; align-items: stretch; }
+.kg-stat { display: flex; flex-direction: column; gap: 2px; padding-right: 20px; }
+.kg-stat + .kg-stat { padding-left: 20px; border-left: 1px solid var(--el-border-color-lighter, #f1f5f9); }
+.kg-stat-value { font-size: 24px; font-weight: 700; line-height: 1.1; color: var(--text-primary, #1e293b); font-variant-numeric: tabular-nums; }
+.kg-stat-label { font-size: 12px; color: var(--text-muted, #94a3b8); letter-spacing: .04em; }
+.kg-stat + .kg-stat .kg-stat-value::after { content: ''; }
+
+.kg-body { flex: 1; display: flex; gap: 14px; min-height: 0; }
+
+/* 图例：类型行（色点+名+计数），非表单观感；点击整行切换显隐 */
+.kg-legend {
+  width: 168px; flex-shrink: 0; padding: 14px 12px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: var(--card-radius, 12px);
+  box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,.06));
+  display: flex; flex-direction: column; gap: 2px;
+}
+.kg-panel-title { font-size: 11px; font-weight: 600; color: var(--text-muted, #94a3b8); letter-spacing: .08em; margin-bottom: 8px; }
+.kg-type-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 8px; border: 0; background: transparent; border-radius: 8px;
+  cursor: pointer; text-align: left; font: inherit; color: var(--text-primary, #1e293b);
+  transition: background .15s;
+}
+.kg-type-row:hover { background: var(--sidebar-hover, #f1f5f9); }
+.kg-type-row.off { opacity: .38; }
+.kg-type-row.off .kg-type-name { text-decoration: line-through; text-decoration-color: var(--text-muted); }
+.kg-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.kg-type-name { font-size: 13px; flex: 1; }
+.kg-type-count { font-size: 12px; color: var(--text-muted, #94a3b8); font-variant-numeric: tabular-nums; }
+.kg-legend-foot { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--el-border-color-lighter, #f1f5f9); font-size: 11px; color: var(--text-muted, #94a3b8); line-height: 1.5; }
+
+/* 图区：整卡承托（与图例/详情同质感），给图完整画布 */
+.kg-chart-wrap {
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f6f8fb 100%);
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: var(--card-radius, 12px);
+  box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,.06));
+  overflow: hidden; position: relative;
+}
 .kg-chart { flex: 1; min-height: 0; }
+.kg-reset {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  padding: 5px 12px; border: 1px solid var(--el-border-color-light, #e4e7ed); border-radius: 8px;
+  background: rgba(255,255,255,.92); color: var(--text-secondary, #64748b);
+  font-size: 12px; cursor: pointer; font-family: inherit;
+  box-shadow: 0 1px 3px rgba(15,23,42,.08); transition: all .15s;
+}
+.kg-reset:hover { color: var(--primary, #6366f1); border-color: var(--primary, #6366f1); }
 .kg-table :deep(.el-table__row) { cursor: pointer; }
-.kg-detail { width: 300px; flex-shrink: 0; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 12px; overflow-y: auto; }
-.kg-detail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.kg-detail-head h3 { margin: 0; font-size: 15px; flex: 1; }
-.kg-nb-title { margin-top: 12px; }
-.kg-nb-group { margin-bottom: 8px; }
-.kg-nb-tag { cursor: pointer; margin: 2px; }
-.kg-hint { color: var(--el-text-color-secondary); font-size: 12px; }
+
+/* 详情侧栏 */
+.kg-detail {
+  width: 296px; flex-shrink: 0; padding: 16px 14px; overflow-y: auto;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: var(--card-radius, 12px);
+  box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,.06));
+}
+.kg-detail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.kg-detail-head h3 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; color: var(--text-primary, #1e293b); }
+.kg-detail-type { font-size: 12px; color: var(--text-muted, #94a3b8); flex-shrink: 0; }
+.kg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.kg-dot.sm { width: 7px; height: 7px; }
+.kg-nb-title { margin-top: 14px; }
+.kg-nb-group { margin-bottom: 10px; }
+.kg-nb-type { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary, #64748b); margin-bottom: 6px; }
+.kg-nb-chip {
+  display: inline-block; margin: 0 4px 4px 0; padding: 3px 10px;
+  border: 1px solid var(--el-border-color-light, #e4e7ed); border-radius: 999px;
+  background: #fff; font-size: 12px; color: var(--text-primary, #1e293b);
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.kg-nb-chip:hover { border-color: var(--primary, #6366f1); color: var(--primary, #6366f1); background: rgba(99,102,241,.04); }
+.kg-hint { color: var(--text-secondary, #64748b); font-size: 12px; }
 </style>

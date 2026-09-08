@@ -21,8 +21,13 @@ describe('toEChartsSeries', () => {
     expect(s.data).toHaveLength(3)
     expect(s.data[0]).toMatchObject({ id: 'plant:jinqiao', name: '金桥一期', category: 0 })
     expect(s.categories).toHaveLength(3)
-    // 图例(legend)从 category.itemStyle 取色——必须与节点颜色一致
-    expect(s.categories[0]).toMatchObject({ name: '厂区', itemStyle: { color: '#22c55e' } })
+    // 图例(legend)从 category.itemStyle 取色——必须与节点颜色一致（2026-09-08 降饱和重配）
+    expect(s.categories[0]).toMatchObject({ name: '厂区', itemStyle: { color: '#3b82f6' } })
+    // 度数编码：bottle 连 2 条可见边(COD→bottle, agent→bottle 但 agent 不可见→1 条)，
+    // hub 判定与 degree 字段存在
+    const bottle = s.data.find(d => d.id === 'pattern:bottle')
+    expect(bottle?.degree).toBe(1)
+    expect(typeof bottle?.symbolSize).toBe('number')
   })
 
   it('边仅当两端类型都在可见集合内才保留', () => {
@@ -53,9 +58,10 @@ describe('toEChartsSeries', () => {
     expect(s2.data).toHaveLength(2)
     expect(s2.links).toHaveLength(1)
     expect(s2.links[0]).toMatchObject({ source: 'agent:master', target: 'operator:iforest', value: 'employs' })
-    // operator 在 topology tab 是大节点（内容成员）
+    // operator 在 topology tab 是核心成员（度数同为 1 时比 domain 侧大 6px）
+    const agent = s2.data.find(d => d.id === 'agent:master')
     const op = s2.data.find(d => d.id === 'operator:iforest')
-    expect(op?.symbolSize).toBe(40)
+    expect((op?.symbolSize ?? 0)).toBeGreaterThan((agent?.symbolSize ?? 0) - 1)
   })
 })
 

@@ -6,15 +6,17 @@ import type { KGNode, KGEdge, KGStats } from '@/api/modules/knowledge'
 
 // 节点类型元数据：中文标签/颜色/tab 归属（domain=领域知识 / topology=服务拓扑）。
 // tab 是数组：operator 双归属（spec L66）——domain 里是检测器，topology 里是 shared 算子库成员（使 employs 边可见）
+// 颜色经 dataviz 校验器验证（light 面 全 PASS）：降饱和去塑料感；viol红独占暖区语义色；
+// protan 最差对 7.2 在合法带内，靠节点文字标签做辅助编码（图上节点均带 label，天然满足）
 export const NODE_META: Record<string, { label: string; color: string; tab: ('domain' | 'topology')[] }> = {
-  plant: { label: '厂区', color: '#22c55e', tab: ['domain'] },
-  indicator: { label: '指标', color: '#84cc16', tab: ['domain'] },
-  violation_pattern: { label: '违规模式', color: '#ef4444', tab: ['domain'] },
-  operator: { label: '算子', color: '#f59e0b', tab: ['domain', 'topology'] },
-  regulation: { label: '法规', color: '#8b5cf6', tab: ['domain'] },
-  case: { label: '案例', color: '#ec4899', tab: ['domain'] },
+  plant: { label: '厂区', color: '#3b82f6', tab: ['domain'] },
+  indicator: { label: '指标', color: '#15876b', tab: ['domain'] },
+  violation_pattern: { label: '违规模式', color: '#b91c1c', tab: ['domain'] },
+  operator: { label: '算子', color: '#eb6834', tab: ['domain', 'topology'] },
+  regulation: { label: '法规', color: '#5b21b6', tab: ['domain'] },
+  case: { label: '案例', color: '#a52a8a', tab: ['domain'] },
   agent: { label: '智能体', color: '#3b82f6', tab: ['topology'] },
-  service: { label: '服务', color: '#06b6d4', tab: ['topology'] },
+  service: { label: '服务', color: '#15876b', tab: ['topology'] },
 }
 
 /** 当前可见类型 = tab 预设 - hidden（hidden 为反向集合：空=全显，取消勾选即加入） */
@@ -93,13 +95,23 @@ export interface GraphNodeDatum {
   id: string
   name: string
   category: number
+  /** 度数（边数）——尺寸编码用：度数越高节点越大，图有层级不再是均匀点阵 */
+  degree: number
   symbolSize: number
   itemStyle: { color: string | undefined }
+  /** 高连接度枢纽节点：标签常显；叶子节点标签 hover 才显（label:show 由 view 控制） */
+  hub: boolean
 }
 export interface GraphLinkDatum {
   source: string
   target: string
   value: string
+}
+
+/** 尺寸按度数映射：10px（孤立点）~ 52px（枢纽），开方让中小度数差异更可感 */
+function degreeSize(degree: number, isTopologyCore: boolean): number {
+  const base = 8 + Math.sqrt(degree) * 10
+  return Math.min(52, isTopologyCore ? base + 6 : base)
 }
 
 /** nodes/edges + 可见类型集合 → ECharts graph series（data/links/categories） */
@@ -117,15 +129,33 @@ export function toEChartsSeries(
     itemStyle: { color: NODE_META[t]?.color },
   }))
   const catIdx = new Map(vis.map((t, i) => [t, i]))
+  // 度数统计（只数可见边——过滤后图例会让度数随子图重算）
+  const degree = new Map<string, number>()
+  const visSet = new Set(vis)
+  const nodesById = new Map(nodes.map(n => [n.id, n]))
+  for (const e of edges) {
+    const s = nodesById.get(e.src); const d = nodesById.get(e.dst)
+    if (!s || !d || !visSet.has(s.type) || !visSet.has(d.type)) continue
+    degree.set(e.src, (degree.get(e.src) ?? 0) + 1)
+    degree.set(e.dst, (degree.get(e.dst) ?? 0) + 1)
+  }
+  // 度数中位数：hub 判定基准（相对值，图大小变化仍成立）
+  const degs = [...degree.values()].sort((a, b) => a - b)
+  const medianDeg = degs.length ? degs[Math.floor(degs.length / 2)] : 0
   const data: GraphNodeDatum[] = nodes
     .filter(n => vis.includes(n.type))
-    .map(n => ({
-      id: n.id,
-      name: n.label,
-      category: catIdx.get(n.type) ?? 0,
-      symbolSize: NODE_META[n.type]?.tab.includes('topology') ? 40 : 28,
-      itemStyle: { color: NODE_META[n.type]?.color },
-    }))
+    .map(n => {
+      const deg = degree.get(n.id) ?? 0
+      return {
+        id: n.id,
+        name: n.label,
+        category: catIdx.get(n.type) ?? 0,
+        degree: deg,
+        symbolSize: degreeSize(deg, NODE_META[n.type]?.tab.includes('topology') ?? false),
+        itemStyle: { color: NODE_META[n.type]?.color },
+        hub: deg > Math.max(medianDeg, 2),
+      }
+    })
   const nodeIds = new Set(data.map(d => d.id))
   const links: GraphLinkDatum[] = edges
     .filter(e => nodeIds.has(e.src) && nodeIds.has(e.dst))
