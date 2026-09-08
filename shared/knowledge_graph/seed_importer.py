@@ -291,6 +291,9 @@ def _import_operators(g: GraphStore) -> int:
                            "sub_category": op.get("sub_category", ""),
                            "formula": op.get("formula", ""),
                            "desc": op.get("description", ""),
+                           "note": op.get("note", ""),
+                           "params": op.get("params", {}),
+                           "data_type": op.get("data_type", []),
                            "status": op.get("status", "available"),
                            "priority": op.get("priority", 3)})
             g.upsert_edge(f"operator:{cat}:{op_key}", cat_id, "belongs_to")
@@ -307,13 +310,41 @@ def _import_operators(g: GraphStore) -> int:
                 "smoothness_detector": "平滑度检测", "forgery_detector": "造假检测",
                 "trend_detector": "趋势检测", "periodicity_detector": "周期检测",
                 "high_freq_detector": "高频波动检测"}
+    # specialized 检测器的真实默认参数：从代码 __init__ 签名抽（inspect），
+    # 点开节点即见"参数设定是多少"（用户需求），而非笼统描述
+    spec_params: Dict[str, Dict] = {}
+    try:
+        import inspect
+        import importlib
+        import sys as _sys
+        if str(_ROOT) not in _sys.path:
+            _sys.path.insert(0, str(_ROOT))
+        for key in name_map:
+            try:
+                mod = importlib.import_module(
+                    f"shared.operators.specialized.{key}")
+                cls = next((getattr(mod, c) for c in dir(mod)
+                            if c[0].isupper() and inspect.isclass(getattr(mod, c))
+                            and getattr(getattr(mod, c), "__module__", "").endswith(key)),
+                           None)
+                if cls:
+                    sig = inspect.signature(cls.__init__)
+                    spec_params[key] = {
+                        p.name: (p.default if p.default is not inspect.Parameter.empty else "必填")
+                        for p in sig.parameters.values() if p.name != "self"
+                    }
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[seed] 提示: 专用检测器参数抽取失败({e})，仅导名称")
     for py in sorted(spec_dir.glob("*.py")):
         key = py.stem
         if key == "__init__":
             continue
         g.upsert_node(f"operator:specialized:{key}", "operator",
                       name_map.get(key, key),
-                      {"category": "specialized", "desc": "专用违规模式检测器"})
+                      {"category": "specialized", "desc": "专用违规模式检测器",
+                       "params": spec_params.get(key, {})})
         g.upsert_edge(f"operator:specialized:{key}", spec_cat_id, "belongs_to")
         n += 1
     return n

@@ -83,9 +83,17 @@
           <el-button text size="small" @click="store.clearSelection">关闭</el-button>
         </div>
         <el-descriptions v-if="store.selectedNode" :column="1" size="small" border>
-          <el-descriptions-item v-for="(v, k) in store.selectedNode.props" :key="k"
+          <el-descriptions-item v-for="(v, k) in basicProps" :key="k"
                                 :label="String(k)">{{ String(v) }}</el-descriptions-item>
         </el-descriptions>
+        <!-- 参数设定区：算子的 params 单独成表（点开节点即见参数是多少——用户需求） -->
+        <template v-if="paramRows.length">
+          <div class="kg-panel-title kg-nb-title">参数设定</div>
+          <el-table :data="paramRows" size="small" :border="true" class="kg-param-table">
+            <el-table-column prop="name" label="参数" width="150" />
+            <el-table-column prop="value" label="值 / 说明" />
+          </el-table>
+        </template>
         <div class="kg-panel-title kg-nb-title">关联（一跳）</div>
         <div v-for="(list, ntype) in store.selectedNeighbors" :key="ntype" class="kg-nb-group">
           <div class="kg-nb-type">
@@ -157,6 +165,21 @@ const visibleNodes = computed(() =>
 
 function typeLabel(t: string) { return NODE_META[t]?.label ?? t }
 function typeCount(t: string) { return store.stats?.node_types?.[t] ?? 0 }
+
+// 详情侧栏：params 抽出单独成表，其余 props 走基础描述表
+const basicProps = computed(() => {
+  const p = { ...store.selectedNode?.props }
+  delete (p as Record<string, unknown>).params
+  return p
+})
+const paramRows = computed(() => {
+  const params = store.selectedNode?.props?.params
+  if (!params || typeof params !== 'object') return []
+  return Object.entries(params as Record<string, unknown>).map(([name, value]) => ({
+    name,
+    value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+  }))
+})
 
 function renderChart() {
   if (!chartEl.value || !store.seeded) return
@@ -348,6 +371,7 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
 .kg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .kg-dot.sm { width: 7px; height: 7px; }
 .kg-nb-title { margin-top: 14px; }
+.kg-param-table { margin-top: 4px; }
 .kg-nb-group { margin-bottom: 10px; }
 .kg-nb-type { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary, #64748b); margin-bottom: 6px; }
 .kg-nb-chip {
