@@ -19,6 +19,9 @@ def svc(tmp_path, monkeypatch):
     TestSession = sessionmaker(bind=engine)
     import backend.services.event_service as es
     monkeypatch.setattr(es, "SessionLocal", TestSession)
+    # 写回图谱指向不存在的临时路径：采集会触发研判写回（子项目3 阶段B），
+    # 不隔离会把测试案例节点写进真实 shared/data/knowledge_graph.db
+    monkeypatch.setattr(es, "_graph_db_path", tmp_path / "no_kg.db")
     s = EventService(sessions_root=tmp_path)
     yield s
     engine.dispose()

@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SEVERITY_CN = {"high": "高风险", "medium": "中风险", "low": "低风险"}
+# 研判写回的图谱 DB（可 patch，测试指向临时图/不存在路径）。
+# graph 模块只在 _writeback_case_to_graph 内延迟 import——顶部无条件 import
+# 会让事件测试环境连带加载图谱链路（子项目3 约定）。
+_graph_db_path = _PROJECT_ROOT / "shared" / "data" / "knowledge_graph.db"
 
 
 def _plant_lookup() -> tuple[set, dict]:
@@ -82,6 +86,51 @@ def _to_local_naive(s: str) -> datetime:
     return dt
 
 
+def _writeback_case_to_graph(ev: dict, db_path) -> None:
+    """研判结论写回图谱（子项目3 阶段B）：case 节点 + involves(厂) + cites(模式)。
+
+    幂等（upsert）；图缺失静默跳过；厂/模式节点不存在跳过对应边（防悬挂边）。
+    图损坏（GraphStore 构造抛"file is not a database"）由调用方 try/except 兜住。
+    """
+    db_path = Path(db_path)
+    if not db_path.exists():
+        logger.info(f"[events] 图谱不存在({db_path.name})，写回跳过")
+        return
+    from shared.knowledge_graph.graph_store import GraphStore
+    from shared.knowledge_graph.graph_query import GraphKnowledgeSource
+    g = GraphStore(db_path)
+    try:
+        case_id = f"case:{ev['id']}"
+        ts = ev.get("timestamp", "")[:10] or "案例"
+        g.upsert_node(case_id, "case", f"研判案例 {ts}",
+                      {"timestamp": ev.get("timestamp", ""),
+                       "plant_id": ev.get("plantId", ""),
+                       "severity": ev.get("severity", ""),
+                       "violation_types": ev.get("violationTypes", []),
+                       "confidence": ev.get("confidence"),
+                       "action": ev.get("action", ""),
+                       "source_event": ev.get("id", ""),
+                       "source": "研判写回(子项目3)"})
+        # involves → 厂（先查存在防悬挂；plant 节点 id=plant:<中文全称>）
+        plant_id = ev.get("plantId", "")
+        if plant_id and g.get_node(f"plant:{plant_id}") is not None:
+            g.upsert_edge(case_id, f"plant:{plant_id}", "involves",
+                          {"note": "研判涉及"})
+        elif plant_id:
+            logger.info(f"[events] 厂节点不存在({plant_id})，involves 跳过")
+        # cites → 模式（中文类型名反查 slug；图不可用时反查 None 跳过）
+        src = GraphKnowledgeSource(db_path=db_path)
+        for vt in ev.get("violationTypes", []) or []:
+            pid = src.pattern_id_by_label(str(vt))
+            if pid:
+                g.upsert_edge(case_id, pid, "cites", {"note": "研判认定"})
+            else:
+                logger.info(f"[events] 模式反查失败({vt})，cites 跳过")
+        logger.info(f"[events] 图谱写回完成: {case_id}")
+    finally:
+        g.close()
+
+
 class EventService:
     def __init__(self, sessions_root: Optional[Path] = None):
         self.sessions_root = Path(sessions_root) if sessions_root else _PROJECT_ROOT / "sessions"
@@ -137,7 +186,14 @@ class EventService:
             )
             db.add(ev)
             db.commit()
-            return self._to_dict(ev)
+            ev_dict = self._to_dict(ev)
+            # 研判写回图谱（子项目3 阶段B）：案例节点+involves厂+cites模式。
+            # 独立 try/except——图谱写失败只记日志，事件已入库不受影响。
+            try:
+                _writeback_case_to_graph(ev_dict, db_path=_graph_db_path)
+            except Exception as wb_err:
+                logger.warning(f"[events] 图谱写回失败(不影响事件): {wb_err}")
+            return ev_dict
         except IntegrityError:
             # 并发竞态：另一个采集者已插入同 session_id 的行。保持"已采集→None"契约。
             db.rollback()
