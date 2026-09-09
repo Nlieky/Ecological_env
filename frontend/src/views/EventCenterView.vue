@@ -58,10 +58,12 @@
         </div>
 
         <!-- 指标异常点 -->
-        <div class="d-sec" v-if="splitEvidence(current.evidence).anomalies.length">
-          <div class="d-ttl">指标异常点（{{ splitEvidence(current.evidence).anomalies.length }}）</div>
-          <el-table :data="splitEvidence(current.evidence).anomalies" size="small" style="width: 100%">
-            <el-table-column label="指标" prop="indicator" width="70" />
+        <div class="d-sec" v-if="evParts.anomalies.length">
+          <div class="d-ttl">指标异常点（{{ evParts.anomalies.length }}）</div>
+          <el-table :data="evParts.anomalies" size="small" style="width: 100%">
+            <el-table-column label="指标" width="70">
+              <template #default="{ row }">{{ row.indicator || '—' }}</template>
+            </el-table-column>
             <el-table-column label="时间" width="140">
               <template #default="{ row }"><span class="ts">{{ row.timestamp || '—' }}</span></template>
             </el-table-column>
@@ -78,13 +80,24 @@
         </div>
 
         <!-- 专家模式命中 -->
-        <div class="d-sec" v-if="splitEvidence(current.evidence).patterns.length">
-          <div class="d-ttl">专家模式命中（{{ splitEvidence(current.evidence).patterns.length }}）</div>
-          <div v-for="p in splitEvidence(current.evidence).patterns" :key="p.pattern_key || p.pattern" class="li">
+        <div class="d-sec" v-if="evParts.patterns.length">
+          <div class="d-ttl">专家模式命中（{{ evParts.patterns.length }}）</div>
+          <div v-for="p in evParts.patterns" :key="p.pattern_key || p.pattern" class="li">
             ▸ <b>{{ p.pattern }}</b>
             <span class="muted">匹配 {{ p.match_score != null ? (p.match_score * 100).toFixed(0) + '%' : '—' }}</span>
             <span class="muted">置信 {{ p.confidence != null ? (p.confidence * 100).toFixed(0) + '%' : '—' }}</span>
             <el-tag size="small" :type="suspicionType(p.suspicion_level)" effect="plain">{{ p.suspicion_level || '—' }}</el-tag>
+          </div>
+        </div>
+
+        <!-- 其他证据：法规条款 / 工艺机理 / 同类案例（字段异构，按键值简表渲染） -->
+        <div class="d-sec" v-if="evParts.others.length">
+          <div class="d-ttl">其他证据（{{ evParts.others.length }}）</div>
+          <div v-for="(o, i) in evParts.others" :key="i" class="o-evi">
+            <el-tag size="small" effect="plain">{{ otherLabel(o) }}</el-tag>
+            <div v-for="row in kvRows(o)" :key="row[0]" class="li">
+              <span class="k2">{{ row[0] }}</span>{{ row[1] }}
+            </div>
           </div>
         </div>
 
@@ -102,10 +115,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventsService } from '@/api/modules/events'
-import { splitEvidence } from '@/views/eventEvidence'
+import { splitEvidence, OTHER_CATEGORY_LABELS } from '@/views/eventEvidence'
 import type { AlertEvent } from '@/api/types/api.types'
 
 const events = ref<AlertEvent[]>([])
@@ -115,6 +128,18 @@ const status = ref('')
 
 const drawerVisible = ref(false)
 const current = ref<AlertEvent | null>(null)
+
+// 详情抽屉渲染用拆分（单次计算，替代模板里 6 处重复调用）
+const evParts = computed(() => splitEvidence(current.value?.evidence))
+function otherLabel(o: Record<string, unknown>): string {
+  return OTHER_CATEGORY_LABELS[String(o?.category)] || String(o?.category || '其他')
+}
+// 键值简表：跳过 category 本身，值统一转字符串（null/对象安全）
+function kvRows(o: Record<string, unknown>): [string, string][] {
+  return Object.entries(o)
+    .filter(([k]) => k !== 'category')
+    .map(([k, v]) => [k, v == null ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v)])
+}
 
 async function load() {
   loading.value = true
@@ -173,4 +198,7 @@ onMounted(load)
 .li { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; margin-bottom: 3px }
 .li b { color: var(--text-primary) }
 .muted { color: var(--text-muted); font-size: 11px }
+.o-evi { background: var(--surface-1); border: 1px solid var(--brd); border-radius: 8px;
+  padding: 8px 10px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 3px }
+.o-evi .k2 { display: inline-block; min-width: 92px; color: var(--text-muted); font-size: 11px }
 </style>

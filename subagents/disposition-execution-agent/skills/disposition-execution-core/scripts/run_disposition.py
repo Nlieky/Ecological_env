@@ -202,7 +202,7 @@ def main():
             res = violation_result["result"]
             suspicion_level = res.get("suspicion_level", "none")
             violation_types = res.get("violation_types") or res.get("violation_type_names") or []
-            evidence_points = res.get("evidence_points", [])
+            evidence_points = res.get("evidence_points") or []
             violation_confidence = res.get("confidence", 0.0)
 
         # 嫌疑等级 → 处置行动映射

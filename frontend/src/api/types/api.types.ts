@@ -145,7 +145,7 @@ export interface EventListRequest {
   pageSize?: number
 }
 
-// evidence_points 两类混合数组（anomaly / expert_pattern），结构见 @/views/eventEvidence
+// evidence_points 混合数组（anomaly / expert_pattern / regulation / process_mechanism / similar_case），结构见 @/views/eventEvidence
 export interface AlertEvent {
   id: string
   timestamp: string
@@ -156,7 +156,7 @@ export interface AlertEvent {
   severity: 'low' | 'medium' | 'high'
   status: 'pending' | 'processing' | 'resolved' | 'ignored'
   action: string
-  confidence: number
+  confidence: number | null
   evidence: Record<string, unknown>[]
   workOrder?: Record<string, unknown> | null
   createdAt: string
