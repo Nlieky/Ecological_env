@@ -3,6 +3,8 @@
 全走 EventService（不直查 DB），export 必须定义在 /{event_id} 之前，
 否则 "export" 会被当成 event_id 命中详情路由（旧版 404 根因）。
 """
+from typing import Literal, Optional
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
@@ -24,6 +26,7 @@ async def export_events(
     """导出事件报告（json 全量列表；xlsx/pdf 待实现→501）。"""
     if format != "json":
         return Response(content="xlsx/pdf export not implemented yet", media_type="text/plain", status_code=501)
+    # TODO(export): page_size=10000 单页截断——事件量过万时静默丢尾，需改游标/分批
     result = event_service.list_events(start_time=start_time, end_time=end_time,
                                        type_q=type, page=1, page_size=10000)
     import json
@@ -37,8 +40,10 @@ async def get_events(
     end_time: str | None = None,
     type: str | None = None,
     plantId: str | None = None,
-    severity: str | None = None,
-    status: str | None = None,
+    # M4: Literal 校验让 FastAPI 自动 422 非法枚举（原先静默空结果易掩盖前端拼写错误）；
+    # service 层的手工枚举检查保留作双保险（绕过路由直调 service 时仍不炸）
+    severity: Optional[Literal["high", "medium", "low"]] = Query(default=None),
+    status: Optional[Literal["pending", "processing", "resolved", "ignored"]] = Query(default=None),
     page: int = Query(1, ge=1),
     pageSize: int = Query(20, ge=1, le=100),
 ):

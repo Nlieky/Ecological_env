@@ -40,6 +40,27 @@ conversation_service = ConversationService()
 event_service = EventService()
 
 
+def _ran_disposition(calls) -> bool:
+    """I1 采集门控：本轮是否真的调了处置子智能体。
+
+    追问轮 _fresh_session_dir 会把上一轮 disposition_result.json 续传进新
+    session 目录——文件在 ≠ 本轮跑了处置。若只看文件存在就采集，同会话每追问
+    一次都会插一条重复事件（session_id 唯一索引只防同目录重复，防不住跨目录）。
+    只有本轮调用记录里出现 disposition 才采集。两处调用点共用：
+    非流式读 trace.subagent_calls，流式读 progress done 收集的 subagent_executions，
+    两者记录形如 {"subagent_name": "disposition-execution"}。
+    """
+    if not calls:
+        return False
+    for c in calls:
+        if not isinstance(c, dict):
+            continue
+        name = str(c.get("subagent_name") or c.get("name") or "")
+        if "disposition" in name:
+            return True
+    return False
+
+
 def check_agent_service() -> bool:
     """检查Agent服务是否可用"""
     try:
@@ -176,9 +197,11 @@ def execute_query(request: QueryRequest):
             logger.warning(f"Failed to persist conversation exchange: {persist_error}")
 
         # 采集处置研判事件（session_dir 来自 agent 响应；失败不阻断主链路）
+        # I1 门控：追问轮续传的 disposition_result.json 在但本轮没跑处置——
+        # 只在本轮真调了处置子智能体时才采集，防止多轮续传重复插事件
         try:
             session_dir = agent_data.get("session_dir") if isinstance(agent_data, dict) else None
-            if session_dir:
+            if session_dir and _ran_disposition(subagent_calls):
                 event_service.collect_from_session(session_dir, conversation_id=final_session_id)
         except Exception as ev_err:
             logger.warning(f"Event collection failed: {ev_err}")
@@ -351,8 +374,10 @@ async def query_stream(request: QueryRequest):
                 except Exception as persist_error:
                     logger.warning(f"Failed to persist stream conversation exchange: {persist_error}")
             # 采集处置研判事件（session_dir 来自 done 事件；失败不阻断主链路）
+            # I1 门控：同非流式——只有本轮 progress done 里有处置调用才采集，
+            # 追问轮续传的 disposition_result.json 不算本轮产出
             try:
-                if last_session_dir:
+                if last_session_dir and _ran_disposition(subagent_executions):
                     event_service.collect_from_session(last_session_dir, conversation_id=final_session_id)
             except Exception as ev_err:
                 logger.warning(f"Event collection failed: {ev_err}")

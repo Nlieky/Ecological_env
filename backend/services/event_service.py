@@ -66,6 +66,22 @@ def _parse_ts(s: str) -> datetime:
         return datetime.now()
 
 
+def _to_local_naive(s: str) -> datetime:
+    """解析时间串并归一化到本地 naive（I2）。
+
+    存储是 naive 本地时间（datetime.now()），SQLite TIMESTAMP 绑定会静默丢
+    tzinfo——aware 输入（前端 toISOString 产 Z 后缀）若不先转本地，按字面
+    UTC 数值比本地会错窗 8 小时。aware→本地 naive；naive 原样返回；非法→None。
+    """
+    try:
+        dt = datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone().replace(tzinfo=None)
+    return dt
+
+
 class EventService:
     def __init__(self, sessions_root: Optional[Path] = None):
         self.sessions_root = Path(sessions_root) if sessions_root else _PROJECT_ROOT / "sessions"
@@ -152,20 +168,19 @@ class EventService:
 
         conds = []
         if start_time:
-            try:
-                conds.append(AlertEvent.timestamp >= datetime.fromisoformat(start_time))
-            except ValueError:
-                pass
+            dt = _to_local_naive(start_time)
+            if dt is not None:
+                conds.append(AlertEvent.timestamp >= dt)
         if end_time:
-            try:
-                conds.append(AlertEvent.timestamp <= datetime.fromisoformat(end_time))
-            except ValueError:
-                pass
+            dt = _to_local_naive(end_time)
+            if dt is not None:
+                conds.append(AlertEvent.timestamp <= dt)
         if type_q:
             # JSON 列做包含匹配。SQLite 的 JSON 序列化会把非 ASCII 转义成 \uXXXX，
             # 直接 cast 成文本 LIKE 匹配不到中文——用 json_each 解码后再 LIKE。
+            # M5: 表名用 __tablename__ 拼，模型改表名时同步
             conds.append(text(
-                "exists (select 1 from json_each(alert_events.violation_types) "
+                f"exists (select 1 from json_each({AlertEvent.__tablename__}.violation_types) "
                 "where json_each.value like :type_q)"
             ).bindparams(type_q=f"%{type_q}%"))
         if plant_id:

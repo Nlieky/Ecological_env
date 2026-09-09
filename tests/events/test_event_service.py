@@ -103,3 +103,42 @@ def test_incomplete_status_skipped(svc, tmp_path):
     d["status"] = "failed"
     (sd / "disposition_result.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     assert svc.collect_from_session("session_t5") is None
+
+
+# ---------- I2: 时间过滤 tz 归一化 ----------
+
+def test_list_events_tz_aware_normalized_to_local_naive(svc, tmp_path):
+    """aware 查询窗必须先归一化到本地 naive 再比（存储是 naive 本地时间）。
+
+    入库一条本地 2026-09-08 10:00。前端 toISOString 形态的
+    start="2026-09-07T17:00:00Z"（=本地 09-08 01:00）/ end="2026-09-08T02:01:00Z"
+    （=本地 10:01）应命中；若 SQLAlchemy 绑定时静默丢 tz 按字面 UTC 数值比，
+    end=02:01 < 10:00 会 0 命中——此断言锁归一化行为。
+    """
+    import backend.services.event_service as es
+    from datetime import datetime as dt
+    from backend.models.alert_event import AlertEvent, EventSeverity
+    s = es.SessionLocal()
+    s.add(AlertEvent(id="evt_tz001", timestamp=dt(2026, 9, 8, 10, 0, 0),
+                     session_id="session_tz1", plant_id="当阳市金桥污水处理厂一期",
+                     violation_types=["插瓶干扰"], severity=EventSeverity.high,
+                     action="", evidence=[], status="pending"))
+    s.commit()
+    s.close()
+
+    hit = svc.list_events(start_time="2026-09-07T17:00:00Z",
+                          end_time="2026-09-08T02:01:00Z")
+    assert hit["total"] == 1
+    assert hit["data"][0]["id"] == "evt_tz001"
+    # +08 显式偏移（与 Z 等价）
+    hit2 = svc.list_events(start_time="2026-09-08T01:00:00+08:00",
+                           end_time="2026-09-08T10:01:00+08:00")
+    assert hit2["total"] == 1
+    # naive 输入不动（基线行为）
+    hit3 = svc.list_events(start_time="2026-09-08T09:00:00",
+                           end_time="2026-09-08T10:01:00")
+    assert hit3["total"] == 1
+    # 出窗：end = 本地 09:59
+    hit4 = svc.list_events(start_time="2026-09-07T17:00:00Z",
+                           end_time="2026-09-08T01:59:00Z")
+    assert hit4["total"] == 0
