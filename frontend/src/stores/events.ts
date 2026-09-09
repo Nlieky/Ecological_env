@@ -8,7 +8,7 @@ export const useEventsStore = defineStore('events', () => {
   const total = ref(0)
   const loading = ref(false)
 
-  async function fetchEvents(params: any = { page: 1, page_size: 20 }) {
+  async function fetchEvents(params: any = { page: 1, pageSize: 20 }) {
     loading.value = true
     try {
       const res = await eventsService.list(params)

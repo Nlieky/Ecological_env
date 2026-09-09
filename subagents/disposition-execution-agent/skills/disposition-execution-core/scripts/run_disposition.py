@@ -256,13 +256,14 @@ def main():
 
         # 打印摘要
         print(f"\n=== 预警处置完成 ===")
-        alert = output["result"]["alert"]
-        print(f"预警级别: {alert['level_cn']}")
-        print(f"融合置信度: {alert['confidence']:.1%}")
-        print(f"处置行动: {alert['action_cn']}")
-        print(f"违规类型: {', '.join(output['result']['violation_types'])}")
-        print(f"工单编号: {work_order['id']}")
-        print(f"报告编号: {alert_report.report_id}")
+        print(f"[disposition] 完成: level={output['result']['suspicion_level']}, "
+              f"action={output['result']['action']}, "
+              f"violations={output['result']['violation_types']}, "
+              f"evidence={len(output['result']['evidence_points'])}条")
+        if work_order:
+            print(f"工单编号: {work_order['id']}")
+        if alert_report:
+            print(f"报告编号: {alert_report.report_id}")
         print(f"结果已保存到: {output_file}")
 
         logger.info(f"任务完成：{task_id}")

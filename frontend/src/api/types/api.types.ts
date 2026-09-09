@@ -145,20 +145,22 @@ export interface EventListRequest {
   pageSize?: number
 }
 
-export interface EventEvidence {
-  dataSnapshot?: Record<string, unknown>
-  operators?: { name: string; result: unknown }[]
-  rules?: { name: string; matched: boolean }[]
-  llmReasoning?: string
-}
+// evidence_points 两类混合数组（anomaly / expert_pattern），结构见 @/views/eventEvidence
 export interface AlertEvent {
   id: string
   timestamp: string
-  type: string
+  sessionId: string
+  conversationId: string | null
   plantId: string
+  violationTypes: string[]
   severity: 'low' | 'medium' | 'high'
   status: 'pending' | 'processing' | 'resolved' | 'ignored'
-  evidence?: EventEvidence
+  action: string
+  confidence: number
+  evidence: Record<string, unknown>[]
+  workOrder?: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface EventListResponse {

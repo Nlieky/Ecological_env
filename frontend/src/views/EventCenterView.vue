@@ -16,7 +16,9 @@
       <el-table-column label="时间" width="170">
         <template #default="{ row }"><span class="ts">{{ fmt(row.timestamp) }}</span></template>
       </el-table-column>
-      <el-table-column label="类型" min-width="130" prop="type" />
+      <el-table-column label="类型" min-width="130">
+        <template #default="{ row }">{{ (row.violationTypes || []).join('、') || '—' }}</template>
+      </el-table-column>
       <el-table-column label="厂区" width="120" prop="plantId" />
       <el-table-column label="严重度" width="100">
         <template #default="{ row }"><el-tag size="small" :type="sevType(row.severity)" effect="dark">{{ sevLabel(row.severity) }}</el-tag></template>
@@ -31,7 +33,7 @@
     <el-drawer v-model="drawerVisible" :title="`事件详情 · ${current?.id || ''}`" direction="rtl" size="560px">
       <template v-if="current">
         <div class="d-meta">
-          <div><span class="k">类型</span>{{ current.type }}</div>
+          <div><span class="k">类型</span>{{ (current.violationTypes || []).join('、') || '—' }}</div>
           <div><span class="k">厂区</span>{{ current.plantId }}</div>
           <div><span class="k">时间</span>{{ fmt(current.timestamp) }}</div>
           <div><span class="k">严重度</span>
@@ -47,22 +49,52 @@
           </el-select>
         </div>
 
-        <!-- 证据 -->
-        <div class="d-sec" v-if="current.evidence">
-          <div class="d-ttl">数据快照</div>
-          <div class="kv"><span v-for="(v,k) in current.evidence.dataSnapshot" :key="k"><b>{{ k }}</b>: {{ v }}</span></div>
-
-          <div class="d-ttl" v-if="current.evidence.operators?.length">命中算子</div>
-          <div v-for="op in current.evidence.operators" :key="op.name" class="li">▸ <b>{{ op.name }}</b>：{{ fmtResult(op.result) }}</div>
-
-          <div class="d-ttl" v-if="current.evidence.rules?.length">规则匹配</div>
-          <div v-for="r in current.evidence.rules" :key="r.name" class="li">
-            <b>{{ r.name }}</b>
-            <el-tag size="small" :type="r.matched ? 'danger' : 'info'" effect="plain">{{ r.matched ? '命中' : '未命中' }}</el-tag>
+        <!-- 研判行动 -->
+        <div class="d-sec">
+          <div class="d-ttl">研判行动</div>
+          <div class="li">▸ <b>{{ current.action || '—' }}</b>
+            <span v-if="current.confidence != null" class="muted">置信度 {{ (current.confidence * 100).toFixed(1) }}%</span>
           </div>
+        </div>
 
-          <div class="d-ttl" v-if="current.evidence.llmReasoning">LLM 推理</div>
-          <div class="reasoning">{{ current.evidence.llmReasoning }}</div>
+        <!-- 指标异常点 -->
+        <div class="d-sec" v-if="splitEvidence(current.evidence).anomalies.length">
+          <div class="d-ttl">指标异常点（{{ splitEvidence(current.evidence).anomalies.length }}）</div>
+          <el-table :data="splitEvidence(current.evidence).anomalies" size="small" style="width: 100%">
+            <el-table-column label="指标" prop="indicator" width="70" />
+            <el-table-column label="时间" width="140">
+              <template #default="{ row }"><span class="ts">{{ row.timestamp || '—' }}</span></template>
+            </el-table-column>
+            <el-table-column label="实测值" width="90">
+              <template #default="{ row }">{{ row.value != null ? row.value : '—' }}</template>
+            </el-table-column>
+            <el-table-column label="期望区间">
+              <template #default="{ row }">{{ row.expected_range ? row.expected_range.join(' ~ ') : '—' }}</template>
+            </el-table-column>
+            <el-table-column label="得分" width="80">
+              <template #default="{ row }">{{ row.score != null ? row.score.toFixed(2) : '—' }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <!-- 专家模式命中 -->
+        <div class="d-sec" v-if="splitEvidence(current.evidence).patterns.length">
+          <div class="d-ttl">专家模式命中（{{ splitEvidence(current.evidence).patterns.length }}）</div>
+          <div v-for="p in splitEvidence(current.evidence).patterns" :key="p.pattern_key || p.pattern" class="li">
+            ▸ <b>{{ p.pattern }}</b>
+            <span class="muted">匹配 {{ p.match_score != null ? (p.match_score * 100).toFixed(0) + '%' : '—' }}</span>
+            <span class="muted">置信 {{ p.confidence != null ? (p.confidence * 100).toFixed(0) + '%' : '—' }}</span>
+            <el-tag size="small" :type="suspicionType(p.suspicion_level)" effect="plain">{{ p.suspicion_level || '—' }}</el-tag>
+          </div>
+        </div>
+
+        <!-- 工单摘要 -->
+        <div class="d-sec" v-if="current.workOrder">
+          <div class="d-ttl">处置工单</div>
+          <div class="li">▸ <b>{{ String(current.workOrder.id ?? '—') }}</b>
+            <span class="muted">{{ fmt(String(current.workOrder.generated_at ?? '')) }}</span>
+          </div>
+          <div class="li" v-for="a in recommendedActions(current.workOrder)" :key="a">· {{ a }}</div>
         </div>
       </template>
     </el-drawer>
@@ -73,6 +105,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventsService } from '@/api/modules/events'
+import { splitEvidence } from '@/views/eventEvidence'
 import type { AlertEvent } from '@/api/types/api.types'
 
 const events = ref<AlertEvent[]>([])
@@ -104,7 +137,14 @@ async function saveStatus(s: string) {
 }
 
 function fmt(t: string) { return t ? t.replace('T', ' ').slice(0, 19) : '—' }
-function fmtResult(r: unknown) { return typeof r === 'string' ? r : JSON.stringify(r) }
+// 工单推荐行动切前三条
+function recommendedActions(wo: Record<string, unknown> | null | undefined): string[] {
+  const a = wo?.recommended_actions
+  return Array.isArray(a) ? (a as unknown[]).map(String).slice(0, 3) : []
+}
+function suspicionType(s: string): 'info' | 'warning' | 'danger' {
+  return s === 'critical' || s === 'high' ? 'danger' : s === 'medium' ? 'warning' : 'info'
+}
 const SEV_LBL: Record<string, string> = { low: '低', medium: '中', high: '高' }
 const STATUS_LBL: Record<string, string> = { pending: '待处理', processing: '处理中', resolved: '已解决', ignored: '已忽略' }
 function sevLabel(s: string) { return SEV_LBL[s] || s }
@@ -130,11 +170,7 @@ onMounted(load)
 .d-sec { display: flex; flex-direction: column; gap: 4px }
 .d-ttl { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin: 12px 0 4px; letter-spacing: .5px }
 .d-ttl:first-child { margin-top: 0 }
-.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px }
-.kv span { font-size: 12px; color: var(--text-secondary); font-family: ui-monospace, monospace }
-.kv b { color: var(--text-primary) }
 .li { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; margin-bottom: 3px }
 .li b { color: var(--text-primary) }
-.reasoning { font-size: 12.5px; color: var(--text-primary); line-height: 1.7; background: var(--surface-1);
-  border: 1px solid var(--brd); border-radius: 9px; padding: 10px 12px; white-space: pre-wrap }
+.muted { color: var(--text-muted); font-size: 11px }
 </style>
