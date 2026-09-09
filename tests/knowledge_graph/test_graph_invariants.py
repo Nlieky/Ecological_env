@@ -52,12 +52,14 @@ def test_false_shutdown_indicates_s23(g):
 
 
 def test_tampering_has_penalty_anchor(g):
-    """篡改类(插瓶/人工拟合)必须双连禁止条款与罚则(§23/§39+§83)"""
+    """篡改类(插瓶/人工拟合)必须双连禁止条款与罚则(§39+§83)——
+    §39 明文"禁止篡改、伪造监测数据"是行为定性，§83(三)是罚则。
+    2026-09-09 裁决补全：篡改类不再连 §23（那是监测义务/虚假申报类条款）"""
     for pid in ("pattern:bottle_interference", "pattern:artificial_fitting"):
         nb = g.neighbors(pid, edge_types=["indicates"], direction="out", depth=1)
         ids = {n["id"] for n in nb["nodes"]}
+        assert "regulation:water_law_s39" in ids, f"{pid} 缺禁止条款锚点 §39"
         assert "regulation:water_law_s83" in ids, f"{pid} 缺罚则锚点 §83"
-        assert "regulation:water_law_s23" in ids, f"{pid} 缺 §23 锚点"
 
 
 def test_anomaly_agent_employs_all_five_feature_detectors(g):

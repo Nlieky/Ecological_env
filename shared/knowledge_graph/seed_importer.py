@@ -73,10 +73,13 @@ PATTERNS: List[Dict] = [
 REGULATIONS: List[Dict] = [
     {"id": "regulation:water_law_s23", "label": "水污染防治法§23",
      "props": {"law": "中华人民共和国水污染防治法", "article": "第二十三条",
-               "note": "监测设备安装/运行/联网要求"}},
+               "note": "监测义务：自行监测/保存原始记录/保证监测设备正常运行"}},
+    {"id": "regulation:water_law_s39", "label": "水污染防治法§39",
+     "props": {"law": "中华人民共和国水污染防治法", "article": "第三十九条",
+               "note": "禁止条款：禁止私设暗管/篡改伪造监测数据/不正常运行设施等逃避监管方式排放"}},
     {"id": "regulation:water_law_s83", "label": "水污染防治法§83",
      "props": {"law": "中华人民共和国水污染防治法", "article": "第八十三条",
-               "note": "私设暗管等逃避监管方式排放的法律责任"}},
+               "note": "罚则：§83(三)逃避监管方式排放的行政处罚（10-100万）"}},
 ]
 
 # operator → pattern (detects)；来源注释为证
@@ -93,22 +96,30 @@ _DETECTS: List[Tuple[str, str, str]] = [
      "平滑度检测（smoothness_detector.py:104）"),
 ]
 # pattern → regulation (indicates)；法条号来自典型违规模式.md 各节"违规定性"
-# 审计 2026-09-09 修正：虚假停产→§23（源文 :93 引第二十三条，虚假申报类，
-# 原连 §83 是硬错）；人工拟合/插瓶补 §83 罚则锚点（源文 :74 引两条、
-# §83(三)明列篡改伪造监测数据——篡改类需禁止条款+罚则双连）
+# 审计 2026-09-09 修正+裁决补全：篡改类（插瓶/人工拟合）锚 §39(禁止)+§83(罚则)
+# ——§39 明文"禁止篡改、伪造监测数据"是行为定性条款，§83(三)是罚则；
+# §23(监测义务)留给虚假申报类（虚假停产，源文 :93）；原错：篡改类只连 §23、
+# 虚假停产错连 §83。暗管/稀释也补 §39（§39 明列"私设暗管"与逃避监管方式）。
 _INDICATES: List[Tuple[str, str, str]] = [
-    ("pattern:bottle_interference", "regulation:water_law_s23",
-     "干扰采样监测，违反监测设备运行要求（§一）"),
+    ("pattern:bottle_interference", "regulation:water_law_s39",
+     "干扰采样=篡改伪造监测数据，§39 禁止条款（行为定性）"),
     ("pattern:bottle_interference", "regulation:water_law_s83",
-     "插瓶=干扰采样属篡改伪造类，§83(三)是罚则锚点"),
-    ("pattern:secret_pipe", "regulation:water_law_s83", "私设暗管（§二）"),
-    ("pattern:dilution_discharge", "regulation:water_law_s83", "清水稀释（§三）"),
-    ("pattern:artificial_fitting", "regulation:water_law_s23", "数据篡改（§四）"),
+     "插瓶属篡改伪造类，§83(三)是罚则锚点"),
+    ("pattern:secret_pipe", "regulation:water_law_s39",
+     "§39 明文禁止私设暗管（行为定性）"),
+    ("pattern:secret_pipe", "regulation:water_law_s83", "私设暗管罚则（§二）"),
+    ("pattern:dilution_discharge", "regulation:water_law_s39",
+     "稀释属逃避监管方式排放，§39 禁止（§三）"),
+    ("pattern:dilution_discharge", "regulation:water_law_s83", "清水稀释罚则（§三）"),
+    ("pattern:artificial_fitting", "regulation:water_law_s39",
+     "数据篡改，§39 禁止篡改伪造监测数据（§四）"),
     ("pattern:artificial_fitting", "regulation:water_law_s83",
      "篡改伪造监测数据，§83(三)罚则（源文 :74 引两条）"),
     ("pattern:false_shutdown", "regulation:water_law_s23",
-     "虚假申报类，源文 :93 引第二十三条（原错连 §83）"),
-    ("pattern:malicious_evasion", "regulation:water_law_s83", "恶意逃避监管"),
+     "虚假申报类违反监测义务，源文 :93 引第二十三条（原错连 §83）"),
+    ("pattern:malicious_evasion", "regulation:water_law_s39",
+     "恶意逃避属逃避监管方式，§39 禁止"),
+    ("pattern:malicious_evasion", "regulation:water_law_s83", "恶意逃避监管罚则"),
 ]
 # agent → operator (employs)；来源 run_anomaly_detection_simple.py imports
 # (:25-27 五特征算子 import + :266-269 detectors 列表)

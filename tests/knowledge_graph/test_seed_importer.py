@@ -72,7 +72,7 @@ def test_seed_missing_source_skips(tmp_path, monkeypatch):
     assert st["edge_types"].get("detects", 0) == 0
     assert st["edge_types"].get("employs", 0) == 0
     # 模式/法规源不受影响；篡改类双连后 6 模式 → 8 条 indicates（审计修正）
-    assert st["edge_types"].get("indicates", 0) == 8
+    assert st["edge_types"].get("indicates", 0) == 11  # 2026-09-09 裁决补全 §39 后 8→11
     # 数据完整性：任一边两端都必须是存在的节点（直查 sqlite，绕开
     # subgraph/neighbors 会静默丢悬挂边的 JOIN 过滤）
     import sqlite3
