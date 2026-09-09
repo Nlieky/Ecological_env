@@ -321,6 +321,14 @@ Natural language report + alerts
 - 已知边界：Docker 双容器需共享 sessions 卷（未做，本地单机正常）
 - 后续子项目：3 智能体集成（图查询+研判写回）→ 4 根因分析（消费本表事件）
 
+### 智能体集成（2026-09-09 子项目 3/4）
+- `shared/knowledge_graph/graph_query.py`：GraphKnowledgeSource——规则推理知识源（优先图谱/回退硬编码字典/回退可观测 fallback_log+usage_report；KNOWLEDGE_GRAPH_DB 环境变量可注入）
+- 规则推理 expert_reasoner/regulation_matcher 知识消费接图查询（阶段A）：图优先+fallback 字典补字段合并；process_validator 不动（判定逻辑非知识）；**基线门 8 case 关键结论 100% 一致**（tests/rule_reasoning/）
+- 研判写回（阶段B）：event_service.collect_from_session 事件入库后同步写 case 节点+involves厂+cites模式（幂等/图缺失损坏静默/防悬挂边）——图谱案例随研判自动增长（页面图例"案例"计数可见）
+- graph-query 技能（阶段C）：LLM 可选查图（模式/案例/法条紧凑 JSON，全路径 exit 0）；knowledge-search 已删（路径 bug 从未生效）；**10 轮实测：脚本执行率 10/10、图查询 10/10 生效（fallbacks=0）、LLM 主动调用 0/10**（根因：历史类问题在主智能体层消化，到不了③任务文本——非 LLM 不听话，报告在 tests/rule_reasoning/reliability_report.md）
+- 图谱语义审计（前置）：2026-09-09 对抗审计 10 错边+8 夸大全整改（detects 3 错/法条锚 §39+§83 重整/删 3 条零依据边）+ 守卫测试 test_graph_invariants.py 10 条防回归；**seed_importer 纯 upsert 删边不生效的坑已修**（run_seed 先清种子自有边）
+- 回退频率观察：10 轮全 used_graph=true、fallbacks=0——观察期（~50 轮）后几乎不触发则按用户指示移除兜底
+
 ### 配置
 - `.env`: 环境变量配置
 - `.hermes/config.yaml`: Hermes 框架配置
