@@ -9,11 +9,55 @@
 
 import logging
 from typing import Dict, Any, List
-from pathlib import Path
 import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# 共享图谱知识源：与 expert_reasoner / run_rule_reasoning 同一实例，
+# metadata.graph_usage 汇总同一份查询/回退记录。
+# 双路径导入：脚本场景（run_rule_reasoning 把 scripts/ 加进 sys.path，
+# expert_reasoner 是顶层模块）走第一行；包导入场景（import scripts，
+# __init__.py 相对导入链）走相对导入。
+try:
+    from expert_reasoner import _GRAPH_SOURCE
+except ImportError:
+    from .expert_reasoner import _GRAPH_SOURCE
+
+# ---------- fallback 法规字典（原硬编码内容一字不动；图挂/空图时兜底） ----------
+_FALLBACK_DISCHARGE_LIMITS = {
+    "COD": {"一级A": 50, "一级B": 60, "二级": 100},
+    "TN": {"一级A": 15, "一级B": 20, "二级": None},
+    "AN": {"一级A": 5, "一级B": 8, "二级": 25},
+    "TP": {"一级A": 0.5, "一级B": 1, "二级": 3},
+    "pH": {"min": 6, "max": 9}
+}
+
+_FALLBACK_REGULATIONS = {
+    "online_monitoring": {
+        "name": "水污染源在线监测技术规范",
+        "code": "HJ 355-2019",
+        "rules": {
+            "data_validity": "在线监测数据有效率应≥90%",
+            "calibration": "每周至少进行一次校准",
+            "maintenance": "每月至少进行一次维护"
+        }
+    },
+    "prevention_law": {
+        "name": "水污染防治法",
+        "rules": {
+            "article_10": "禁止超标排放水污染物",
+            "article_23": "禁止以逃避监管的方式排放水污染物",
+            "article_83": "超标排放的，处十万元以上一百万元以下罚款"
+        }
+    }
+}
+
+# constant 异常（数据造假分支）模式关联的法条 fallback：
+# 原实现 inline 文本原样保留
+_FALLBACK_CONSTANT_LAWS = [
+    {"article": "以逃避监管的方式排放水污染物", "note": "", "anchor": ""}
+]
 
 
 class RegulationMatcher:
@@ -31,10 +75,6 @@ class RegulationMatcher:
         self.name = "法规规则匹配器"
         self.version = "2.0.0"
 
-        # 法规库路径
-        # 项目根 = 本脚本(subagents/.../scripts/)上 5 层
-        self.regulations_dir = Path(__file__).resolve().parents[5] / "shared" / "knowledge" / "regulations"
-
         # 加载法规规则
         self.regulations = self._load_regulations()
 
@@ -42,42 +82,49 @@ class RegulationMatcher:
         logger.info(f"[INIT] 已加载法规: {len(self.regulations)} 部")
 
     def _load_regulations(self) -> Dict[str, Any]:
-        """加载法规规则"""
-        regulations = {}
+        """加载法规规则：限值接图谱（limits 边），其余走 fallback 字典。
 
-        # 默认法规规则
+        限值合并策略（行为保持优先）：
+        - match() 里 limits 只作键集门（`indicator in limits` 决定异常是否
+          进入超标判定；真实链路 match(anomalies) 不传 data，_check_exceedance
+          走 score>0.8 分支，数值分级不参与比较）；
+        - 图返回的 value 是字符串（"50 mg/L"），与 _check_exceedance 消费的
+          数值分级（一级A/一级B/二级、pH min/max）结构不兼容——数值结构
+          一律保留 fallback，图的 value/standard 作元数据追加（graph_value/
+          standard 键不与数值键冲突）；
+        - 键集保持 fallback 键集不变：图独有的键（如 suspended_solids）
+          若入门会让该类异常新进 score>0.8 超标分支，属行为变化，不做——
+          待图谱长出数值分级后一并接入（阶段A边界，见 T2 自审）。
+        - 图挂时 get_indicator_limits 返回 fallback 字典本身，同一路径合并。
+        """
+        graph_limits = _GRAPH_SOURCE.get_indicator_limits(
+            fallback=_FALLBACK_DISCHARGE_LIMITS)
+
+        limits = {}
+        for key, fb in _FALLBACK_DISCHARGE_LIMITS.items():
+            g = graph_limits.get(key)
+            if isinstance(g, dict) and g.get("value") not in (None, ""):
+                limits[key] = {**fb,
+                               "graph_value": g.get("value", ""),
+                               "standard": g.get("standard", "")}
+            else:
+                limits[key] = dict(fb)
+
+        regulations = {}
         regulations["discharge_standard"] = {
             "name": "城镇污水处理厂污染物排放标准",
             "code": "GB 18918-2002",
-            "limits": {
-                "COD": {"一级A": 50, "一级B": 60, "二级": 100},
-                "TN": {"一级A": 15, "一级B": 20, "二级": None},
-                "AN": {"一级A": 5, "一级B": 8, "二级": 25},
-                "TP": {"一级A": 0.5, "一级B": 1, "二级": 3},
-                "pH": {"min": 6, "max": 9}
-            }
+            "limits": limits
         }
-
-        regulations["online_monitoring"] = {
-            "name": "水污染源在线监测技术规范",
-            "code": "HJ 355-2019",
-            "rules": {
-                "data_validity": "在线监测数据有效率应≥90%",
-                "calibration": "每周至少进行一次校准",
-                "maintenance": "每月至少进行一次维护"
-            }
-        }
-
-        regulations["prevention_law"] = {
-            "name": "水污染防治法",
-            "rules": {
-                "article_10": "禁止超标排放水污染物",
-                "article_23": "禁止以逃避监管的方式排放水污染物",
-                "article_83": "超标排放的，处十万元以上一百万元以下罚款"
-            }
-        }
+        for key, reg in _FALLBACK_REGULATIONS.items():
+            regulations[key] = json.loads(json.dumps(reg))  # 深拷贝防共享态
 
         return regulations
+
+    def _pattern_laws(self, pattern_label: str) -> List[Dict[str, Any]]:
+        """模式关联法条（图 indicates 边，篡改类双锚 §39+§83）。"""
+        return _GRAPH_SOURCE.get_pattern_laws(
+            pattern_label, fallback=_FALLBACK_CONSTANT_LAWS)
 
     def match(self, anomalies: List[Dict[str, Any]],
              data: Any = None) -> Dict[str, Any]:
@@ -122,13 +169,21 @@ class RegulationMatcher:
                     results["violations"].append(violation)
                     results["matches"].append(violation)
 
-            # 数据造假检测
+            # 数据造假检测（法条接图谱 indicates 边：插瓶干扰→§39+§83；
+            # 图挂时回退原 inline 文本，violation 结构与计数不变）
             if anomaly.get("pattern") == "constant":
+                laws = self._pattern_laws("插瓶干扰")
+                if laws and laws[0].get("anchor"):
+                    article = "；".join(
+                        f"{l['anchor']}（{l['note']}）" if l.get("note") else l["anchor"]
+                        for l in laws)
+                else:
+                    article = _FALLBACK_CONSTANT_LAWS[0]["article"]
                 violation = {
                     "indicator": indicator,
                     "regulation": "水污染防治法",
                     "violation_type": "data_forgery",
-                    "article": "以逃避监管的方式排放水污染物",
+                    "article": article,
                     "penalty": "处十万元以上一百万元以下罚款",
                     "evidence": f"{indicator}数据长时间恒定，疑似人为干预"
                 }

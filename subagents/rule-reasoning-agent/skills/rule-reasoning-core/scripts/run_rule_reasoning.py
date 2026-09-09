@@ -36,7 +36,7 @@ if str(script_dir) not in sys.path:
 
 # 导入模块
 from regulation_matcher import RegulationMatcher
-from expert_reasoner import ExpertReasoner
+from expert_reasoner import ExpertReasoner, _GRAPH_SOURCE  # 共享图谱实例（usage 汇总）
 from process_validator import ProcessValidator
 
 logging.basicConfig(
@@ -333,7 +333,8 @@ def main():
                 },
                 "metadata": {
                     "subagent": "rule-reasoning-agent",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
+                    "graph_usage": _GRAPH_SOURCE.usage_report()
                 }
             }
         else:
@@ -446,7 +447,10 @@ def main():
                     "subagent": "rule-reasoning-agent",
                     "timestamp": datetime.now().isoformat(),
                     "anomaly_task_id": anomaly_result.get("task_id"),
-                    "has_mechanism_violation": reasoning_result.get("has_mechanism_violation", False)
+                    "has_mechanism_violation": reasoning_result.get("has_mechanism_violation", False),
+                    # 图谱使用观测（子3阶段A）：used_graph/queries/fallbacks——
+                    # 线上统计回退频率，几乎不触发则移除兜底
+                    "graph_usage": _GRAPH_SOURCE.usage_report()
                 }
             }
 
