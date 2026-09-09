@@ -92,6 +92,8 @@ def test_plant_id_alias(svc, tmp_path):
 
 
 def test_parse_plant_id_unknown():
+    # 厂名解析读真实 shared/data/plant-hierarchy.yaml（与运行时同源）——
+    # "unknown" 兜底不依赖 yaml 内容，故此用例对 yaml 变更稳健。
     assert _parse_plant_id("今天天气怎么样") == "unknown"
 
 

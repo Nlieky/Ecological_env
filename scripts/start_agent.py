@@ -87,6 +87,9 @@ class QueryResponse(BaseModel):
     # Optional[dict](pydantic v2 下裸 dict=None 声明仍要求 dict——quick_response
     # 无 trace 键时 .get() 得 None 直接 ValidationError 500,2026-08-30 实测)
     trace: Optional[dict] = None
+    # 本轮查询的 session 目录名(session_<ts>_<hex6>),backend 采集 disposition
+    # 研判事件用;quick_response 等无目录路径为 None。不声明会被 response_model 剥离。
+    session_dir: Optional[str] = None
 
 
 class AgentService:
@@ -584,7 +587,8 @@ def query(request: QueryRequest):
             session_id=result["session_id"],
             timestamp=result["timestamp"],
             success=True,
-            trace=result.get("trace")
+            trace=result.get("trace"),
+            session_dir=result.get("session_dir")
         )
     else:
         raise HTTPException(
@@ -626,6 +630,9 @@ def query_stream(request: QueryRequest):
             except Exception:
                 pass
             q.put({"type": "delta", "text": short})
+            # 短路路径不跑子智能体管线、不新建 session 目录——这里的 session_dir 是
+            # _session_dirs 里残留的上轮目录（若同会话先查过）。语义不精确但无害：
+            # 短路轮不产出 disposition_result，backend 采集时自然跳过。
             q.put({"type": "done", "content": short, "session_id": session_id,
                    "session_dir": agent_service._cur_session_dir(session_id)})
             return

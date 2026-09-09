@@ -1,5 +1,6 @@
 """预警事件表——处置子智能体研判结果的采集落地（事件中心/告警中心真数据源）。"""
 import enum
+from datetime import datetime
 from sqlalchemy import Column, String, TIMESTAMP, Float, JSON, Enum as SQLEnum
 
 from backend.database.base import Base
@@ -33,5 +34,6 @@ class AlertEvent(Base):
     evidence = Column(JSON, default=list)                    # evidence_points 原文
     work_order = Column(JSON, nullable=True)
     status = Column(SQLEnum(EventStatus), default=EventStatus.pending, nullable=False)
-    created_at = Column(TIMESTAMP, nullable=False)
-    updated_at = Column(TIMESTAMP, nullable=False)
+    # 列级 default/onupdate：Task2 的状态更新(PUT status)只改 status 字段即可，updated_at 自动维护
+    created_at = Column(TIMESTAMP, default=datetime.now, nullable=False)
+    updated_at = Column(TIMESTAMP, default=datetime.now, onupdate=datetime.now, nullable=False)

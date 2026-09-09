@@ -6,15 +6,19 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.database.session import SessionLocal
 from backend.models.alert_event import AlertEvent, EventSeverity
+
+logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SEVERITY_CN = {"high": "高风险", "medium": "中风险", "low": "低风险"}
@@ -78,7 +82,7 @@ class EventService:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
         except Exception as e:
-            print(f"[events] disposition_result 解析失败({session_dir_name}): {e}")
+            logger.warning(f"[events] disposition_result 解析失败({session_dir_name}): {e}")
             return None
         result = data.get("result") or {}
         if data.get("status") != "completed":
@@ -113,12 +117,14 @@ class EventService:
                 evidence=result.get("evidence_points") or [],
                 work_order=result.get("work_order"),
                 status="pending",
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
             )
             db.add(ev)
             db.commit()
             return self._to_dict(ev)
+        except IntegrityError:
+            # 并发竞态：另一个采集者已插入同 session_id 的行。保持"已采集→None"契约。
+            db.rollback()
+            return None
         except Exception:
             db.rollback()
             raise
