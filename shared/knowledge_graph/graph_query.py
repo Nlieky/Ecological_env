@@ -135,7 +135,9 @@ class GraphKnowledgeSource:
         """模式关联法条（indicates 边，篡改类双锚 §39+§83）：
         [{article, note, anchor}]。"""
         pid = self.pattern_id_by_label(pattern_label)
-        if pid is None:
+        # 审查 Important-1：熔断守卫——available=False 时不再撞库（此前绕过 _subgraph
+        # 直调 neighbors，熔断后每次白撞一次；pid 可用但图已坏时归因走 _broken_reason）
+        if pid is None or not self.available:
             return self._fallback("get_pattern_laws",
                                   self._unavailable_reason("pattern_not_found"),
                                   list(fallback or []))
@@ -145,6 +147,8 @@ class GraphKnowledgeSource:
             self._query_count += 1
         except Exception as e:
             logger.warning(f"[graph-query] 法条查询失败: {e}")
+            self._broken_reason = f"error:{type(e).__name__}"
+            self.available = False  # 与 _subgraph 熔断语义对齐
             return self._fallback("get_pattern_laws", f"error:{type(e).__name__}",
                                   list(fallback or []))
         return [{"article": n["props"].get("article", n["label"]),

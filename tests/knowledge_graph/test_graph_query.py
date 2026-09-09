@@ -94,3 +94,21 @@ def test_usage_report(seeded_db):
     assert report["used_graph"] is True
     assert report["queries"] >= 2
     assert report["fallbacks"] == 0
+
+
+def test_pattern_laws_respects_circuit_break(seeded_db, monkeypatch):
+    """审查 Important-1 防回归：熔断后 get_pattern_laws 不再撞 neighbors。"""
+    src = GraphKnowledgeSource(db_path=seeded_db)
+    pid = src.pattern_id_by_label("插瓶干扰")
+    assert pid is not None  # 先成功（缓存 pid）
+    calls = {"n": 0}
+    real_neighbors = src._store.neighbors
+    def counting(*a, **kw):
+        calls["n"] += 1
+        raise RuntimeError("boom")
+    monkeypatch.setattr(src._store, "neighbors", counting)
+    src.get_pattern_laws("插瓶干扰", fallback=[])   # 第一次撞上并熔断
+    assert src.available is False
+    src.get_pattern_laws("插瓶干扰", fallback=[])   # 第二次必须直接回退
+    src.get_pattern_laws("插瓶干扰", fallback=[])
+    assert calls["n"] == 1, "熔断后不应再调 neighbors"
