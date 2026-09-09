@@ -312,6 +312,15 @@ Natural language report + alerts
 - `frontend/src/views/KnowledgeGraphView.vue`：/agents/knowledge 双 tab（领域知识/服务拓扑）力导向图 + hiddenTypes 反选图例 + 详情侧栏
 - 后续子项目：2 事件中心真实化 → 3 智能体集成（图查询+研判写回）→ 4 根因分析；spec 在 docs/superpowers/specs/2026-09-07-knowledge-graph-core-design.md
 
+### 事件中心真实化（2026-09-09 子项目 2/4）
+- `backend/models/alert_event.py`：alert_events 表（severity/status 枚举、evidence/work_order JSON、session_id 唯一防重复采集）
+- `backend/services/event_service.py`：采集器（query.py 两处落库点调 collect_from_session；**门控 _ran_disposition**——本轮真跑了处置才采集，防多轮续传拷贝文件产生重复事件；非 none 入库；厂名从 task.json 经 plant_aliases 解析）+ 查询/状态机服务（时间窗 tz 归一化防前端 toISOString 错 8h）
+- `backend/api/routes/events.py`：真数据源（export 已修路由顺序、PUT status 状态机白名单校验、severity/status 非法 422、type 过滤走 SQLite json_each——JSON 列 cast 会把中文转义成 \uXXXX 导致 LIKE 失配）
+- `frontend/src/views/eventEvidence.ts`：evidence_points 三分支拆分（指标异常点/专家模式命中/其他证据=法规+工艺+同类案例）
+- agent 服务 done 事件/QueryResponse 带 session_dir（目录名≠session_id，采集器定位靠它）
+- 已知边界：Docker 双容器需共享 sessions 卷（未做，本地单机正常）
+- 后续子项目：3 智能体集成（图查询+研判写回）→ 4 根因分析（消费本表事件）
+
 ### 配置
 - `.env`: 环境变量配置
 - `.hermes/config.yaml`: Hermes 框架配置
