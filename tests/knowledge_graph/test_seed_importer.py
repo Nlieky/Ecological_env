@@ -23,10 +23,10 @@ def test_seed_produces_full_graph(seeded_store):
     # （spec 以为 operator_config 只有 17+ 个算子，实际 38），勿为凑数造假节点。
     st = seeded_store.stats()
     assert st["nodes"] >= 60, f"节点数不足: {st['nodes']}"
-    # involves（案例→厂/指标）历史案例无厂字段，留给子项目3研判写回补
-    # （计划 Step3 实现注释亦如此），种子产出其余 9 种边型。
+    # involves（案例→厂/指标）历史案例无厂字段，留给子项目3研判写回补；
+    # writes 审计后无真实依据边（_WRITES 留空表保结构）。种子产出其余边型。
     expected_edges = {"monitors", "detects", "indicates", "cites", "employs",
-                      "calls", "orchestrates", "reads", "writes"}
+                      "calls", "orchestrates", "reads", "uses"}
     missing = expected_edges - set(st["edge_types"].keys())
     assert not missing, f"缺边类型: {missing}"
 
@@ -71,7 +71,8 @@ def test_seed_missing_source_skips(tmp_path, monkeypatch):
     # 算子端点的关系边一并丢弃（detects/employs 的端点全是 operator 节点）
     assert st["edge_types"].get("detects", 0) == 0
     assert st["edge_types"].get("employs", 0) == 0
-    assert st["edge_types"].get("indicates", 0) == 6  # 模式/法规源不受影响
+    # 模式/法规源不受影响；篡改类双连后 6 模式 → 8 条 indicates（审计修正）
+    assert st["edge_types"].get("indicates", 0) == 8
     # 数据完整性：任一边两端都必须是存在的节点（直查 sqlite，绕开
     # subgraph/neighbors 会静默丢悬挂边的 JOIN 过滤）
     import sqlite3

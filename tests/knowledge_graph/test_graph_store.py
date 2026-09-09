@@ -229,3 +229,15 @@ def test_neighbors_edge_filter_also_filters_edges(tmp_path):
     seed_small(g)
     nb = g.neighbors("operator:constant", edge_types=["detects"], depth=4)
     assert {e["type"] for e in nb["edges"]} == {"detects"}
+
+
+def test_delete_edges_by_type(tmp_path):
+    """按类型清边：种子重灌前清陈旧映射边；未知类型拒绝；空清单零操作。"""
+    g = make_store(tmp_path)
+    seed_small(g)
+    assert g.delete_edges(["detects"]) == 1
+    assert g.stats()["edges"] == 3  # 其余类型不受影响
+    assert g.delete_edges(["detects"]) == 0  # 再清为 0（幂等）
+    with pytest.raises(ValueError):
+        g.delete_edges(["bad_edge"])
+    assert g.delete_edges([]) == 0

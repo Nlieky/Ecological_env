@@ -108,6 +108,26 @@ class GraphStore:
                 (src, dst, etype, json.dumps(props or {}, ensure_ascii=False)))
             self._conn.commit()
 
+    def delete_edges(self, edge_types: List[str]) -> int:
+        """删除给定类型的全部边，返回删除数（种子重灌前清陈旧映射用）。
+
+        种子边的 UNIQUE(src,dst,type) 幂等只对"仍存在的映射"生效——映射表里
+        删掉的边重灌不会消失（审计 2026-09-09 的 4 条错边教训）。种子重灌前
+        应先清自有边类型再重写；cites（种子案例+研判沉淀共用）与 involves
+        （研判写回）不在清理范围。
+        """
+        for et in edge_types:
+            if et not in EDGE_TYPES:
+                raise ValueError(f"未知边类型: {et}")
+        if not edge_types:
+            return 0
+        with self._lock:
+            cur = self._conn.execute(
+                f"DELETE FROM edges WHERE type IN "
+                f"({','.join('?' * len(edge_types))})", edge_types)
+            self._conn.commit()
+            return cur.rowcount
+
     def set_meta(self, key: str, value: str) -> None:
         with self._lock:
             self._conn.execute(

@@ -24,7 +24,7 @@ from typing import Dict, List, Optional, Tuple
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT))  # 允许 python path/to/seed_importer.py 直跑
 
-from shared.knowledge_graph.graph_store import GraphStore  # noqa: E402
+from shared.knowledge_graph.graph_store import EDGE_TYPES, GraphStore  # noqa: E402
 
 _HIERARCHY_FILE = _ROOT / "shared" / "data" / "plant-hierarchy.yaml"
 _OPERATOR_CONFIG = _ROOT / "shared" / "operators" / "config" / "operator_config.json"
@@ -57,7 +57,8 @@ PATTERNS: List[Dict] = [
                "source": "violation_patterns.md §1.3"}},
     {"id": "pattern:malicious_evasion", "label": "恶意逃避",
      "props": {"status": "todo",
-               "desc": "停产申报类逃避检测，缺停产申报数据（TODO）",
+               "desc": "数据缺失率异常(>20%)/夜间缺失/设备离线/时段空白类逃避监测"
+                       "（缺检测实现 TODO）",
                "source": "violation_patterns.md §1.4"}},
     {"id": "pattern:secret_pipe", "label": "暗管偷排",
      "props": {"status": "knowledge_only",
@@ -79,34 +80,49 @@ REGULATIONS: List[Dict] = [
 ]
 
 # operator → pattern (detects)；来源注释为证
+# 审计 2026-09-09 修正：删 forgery_detector/isolation_forest→malicious_evasion
+# 两条错边（造假四法检测在场数据统计异常、孤立森林是通用离群打分，
+# 而恶意逃避是数据缺失型——方法与定义错位，见 violation_patterns.md §1.4）
 _DETECTS: List[Tuple[str, str, str]] = [
     ("operator:specialized:constant_detector", "pattern:bottle_interference",
      "恒定检测 std/CV/唯一值三法（constant_detector.py）"),
     ("operator:specialized:change_point_detector", "pattern:dilution_discharge",
-     "稀释排放的突变前提（run_anomaly_detection_simple.py 特征算子）"),
+     "突变特征是插瓶(工艺规则2)与稀释(工艺规则3)的共有前提；稀释判定实际由 "
+     "process_validator 规则3(多指标同步突降>50%+浓度低位)完成"),
     ("operator:specialized:smoothness_detector", "pattern:artificial_fitting",
      "平滑度检测（smoothness_detector.py:104）"),
-    ("operator:specialized:forgery_detector", "pattern:malicious_evasion",
-     "造假检测四法（forgery_detector.py）"),
-    ("operator:machine_learning:isolation_forest", "pattern:malicious_evasion",
-     "孤立森林异常打分 a≥0.5"),
 ]
 # pattern → regulation (indicates)；法条号来自典型违规模式.md 各节"违规定性"
+# 审计 2026-09-09 修正：虚假停产→§23（源文 :93 引第二十三条，虚假申报类，
+# 原连 §83 是硬错）；人工拟合/插瓶补 §83 罚则锚点（源文 :74 引两条、
+# §83(三)明列篡改伪造监测数据——篡改类需禁止条款+罚则双连）
 _INDICATES: List[Tuple[str, str, str]] = [
     ("pattern:bottle_interference", "regulation:water_law_s23",
      "干扰采样监测，违反监测设备运行要求（§一）"),
+    ("pattern:bottle_interference", "regulation:water_law_s83",
+     "插瓶=干扰采样属篡改伪造类，§83(三)是罚则锚点"),
     ("pattern:secret_pipe", "regulation:water_law_s83", "私设暗管（§二）"),
     ("pattern:dilution_discharge", "regulation:water_law_s83", "清水稀释（§三）"),
     ("pattern:artificial_fitting", "regulation:water_law_s23", "数据篡改（§四）"),
-    ("pattern:false_shutdown", "regulation:water_law_s83", "虚假停产（§五）"),
+    ("pattern:artificial_fitting", "regulation:water_law_s83",
+     "篡改伪造监测数据，§83(三)罚则（源文 :74 引两条）"),
+    ("pattern:false_shutdown", "regulation:water_law_s23",
+     "虚假申报类，源文 :93 引第二十三条（原错连 §83）"),
     ("pattern:malicious_evasion", "regulation:water_law_s83", "恶意逃避监管"),
 ]
 # agent → operator (employs)；来源 run_anomaly_detection_simple.py imports
+# (:25-27 五特征算子 import + :266-269 detectors 列表)
 _EMPLOYS: List[Tuple[str, str, str]] = [
     ("agent:anomaly-detection", "operator:specialized:constant_detector",
      "平稳特征检测"),
     ("agent:anomaly-detection", "operator:specialized:change_point_detector",
      "突变特征检测"),
+    ("agent:anomaly-detection", "operator:specialized:trend_detector",
+     "趋势特征检测"),
+    ("agent:anomaly-detection", "operator:specialized:periodicity_detector",
+     "周期特征检测"),
+    ("agent:anomaly-detection", "operator:specialized:high_freq_detector",
+     "高频波动特征检测"),
     ("agent:anomaly-detection", "operator:machine_learning:isolation_forest",
      "孤立森林异常打分"),
 ]
@@ -146,22 +162,25 @@ _CALLS = [
     ("service:frontend", "service:backend", "HTTP /api/*"),
     ("service:backend", "service:agent_service", "HTTP /query(/stream) 转发"),
     ("service:agent_service", "service:llm", "OpenAI 兼容 API"),
-    ("service:agent_service", "service:frontend", "SSE progress/delta 流式回传"),
+    ("service:agent_service", "service:frontend",
+     "经 backend /api/query/stream 透传的逻辑数据流(非直连)"),
 ]
+# 审计 2026-09-09 修正：删 rule-reasoning→sqlite_logs（零代码依据）；
+# 删 disposition→sqlite_logs 的 writes（处置真实写的是会话目录结果文件
+# sessions/<session>/——是中转不是库）。_WRITES 留空表保结构。
 _READS = [
     ("agent:multi-dimensional-data-perception", "service:influxdb",
      "get_data 取数"),
-    ("agent:rule-reasoning", "service:sqlite_logs", "审计追溯"),
 ]
-_WRITES = [
-    ("agent:disposition-execution", "service:sqlite_logs", "处置结果归档"),
-]
+_WRITES: List[Tuple[str, str, str]] = []
 
 # ── 技能（skill）目录：主智能体 + 4 子智能体的真实技能（各 skills/ 目录） ──
 SKILLS: List[Tuple[str, str, str]] = [
     # (skill 名, 归属 agent, 说明)
     ("orchestrator-core", "agent:master", "编排技能：停止铁律/task写法/结果整合"),
     ("action-command-core", "agent:master", "动作指令：分类器+检测短路"),
+    ("plant-onboarding", "agent:master", "新厂接入向导"),
+    ("regulation-lookup", "agent:master", "法规查询"),
     ("data-perception-core", "agent:multi-dimensional-data-perception", "取数主技能 get_data"),
     ("data-export", "agent:multi-dimensional-data-perception", "导出 CSV"),
     ("anomaly-detection-core", "agent:anomaly-detection", "检测主技能 5类特征+孤立森林"),
@@ -403,11 +422,13 @@ def _import_knowledge_tree(g: GraphStore) -> int:
                   {"law": "城镇污水处理厂污染物排放标准", "grade": "一级A标",
                    "note": "基本控制项目最高允许排放浓度（日均值）"})
     g.upsert_edge("regulation:gb18918", "category:regulations", "belongs_to")
-    for field, limit in [("pH", "6-9"), ("COD", "50 mg/L"), ("TN", "15 mg/L"),
-                         ("AN", "5(8) mg/L"), ("TP", "0.5 mg/L"),
-                         ("suspended_solids", "10 mg/L")]:
+    limits_rows = [("pH", "6-9", ""), ("COD", "50 mg/L", ""),
+                   ("TN", "15 mg/L", ""), ("AN", "5(8) mg/L",
+                                           "括号内=水温≤12℃时限值"),
+                   ("TP", "0.5 mg/L", ""), ("suspended_solids", "10 mg/L", "")]
+    for field, limit, note in limits_rows:
         g.upsert_edge(f"indicator:{field}", "regulation:gb18918", "limits",
-                      {"value": limit})
+                      {"value": limit, **({"note": note} if note else {})})
     return 5  # 顶层骨架节点数（其余实体在幂等 upsert 里）
 
 
@@ -473,7 +494,8 @@ def _import_static_topology(g: GraphStore) -> int:
         ("agent:anomaly-detection", "library:operators", "reads", "调 shared/operators 算子"),
         ("agent:rule-reasoning", "library:knowledge", "reads", "查知识四库"),
         ("agent:multi-dimensional-data-perception", "library:database", "reads", "InfluxDB 取数"),
-        ("agent:disposition-execution", "library:knowledge", "reads", "处置引用知识/法规"),
+        ("agent:disposition-execution", "library:knowledge", "reads",
+         "工单法规引用为硬编码占位符（work_order_generator.py:111 '第XX条'），未实读知识库"),
     ]:
         _edge_if_ends_exist(g, agent_id, lib_id, etype, {"note": note})
     return len(AGENTS) + len(SERVICES) + len(SKILLS) + len(MASTER_TOOLS) + len(MCPS)
@@ -503,6 +525,10 @@ def run_seed(db_path=None) -> int:
     """跑全量种子。返回退出码（0=成功，含单源跳过）。"""
     g = GraphStore(db_path or _DEFAULT_DB)
     report: Dict[str, int] = {}
+    # 种子自有边类型先清后写：映射表删了边，重灌必须同步从图里消失
+    # （upsert 幂等只更新已存在的键，删掉的映射会留陈旧边——审计教训）。
+    # 仅 cites（种子案例+研判沉淀共用）与 involves（研判写回）不清。
+    g.delete_edges(sorted(EDGE_TYPES - {"cites", "involves"}))
     plant_ids = _import_plants(g)
     report["plants"] = len(plant_ids)
     report["indicators"] = _import_indicators(
