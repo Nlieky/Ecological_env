@@ -94,3 +94,13 @@ def test_no_args_usage_hint():
     assert r.returncode == 0
     d = last_json(r.stdout)
     assert d.get("error") == "usage"
+
+
+def test_known_flag_missing_value_exit0(seeded_db):
+    """审查 Important-1 防回归：已知 flag 缺值（--pattern 不带值/flag 在值位）也 exit 0 + usage JSON。"""
+    for bad_args in (["--pattern"], ["--law"], ["--plant"],
+                     ["--pattern", "--cases"]):
+        r = run(bad_args, seeded_db)
+        assert r.returncode == 0, f"{bad_args} 非 0 退出: {r.returncode}"
+        d = last_json(r.stdout)
+        assert d.get("error") == "usage", f"{bad_args}: {d}"

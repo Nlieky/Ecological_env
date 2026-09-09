@@ -64,8 +64,10 @@ def main():
     p.add_argument("--plant", default="")
     p.add_argument("--law")
     p.add_argument("--db", default="")
-    # parse_known_args：LLM 多传/传错未知参数时按忽略处理（argparse 默认会 exit 2，
-    # 违反"exit 0 永远"契约）
+    # parse_known_args：LLM 多传/传错未知参数时按忽略处理；p.error 覆盖：已知 flag
+    # 缺值（如 "--pattern" 后没跟值）argparse 默认 exit 2 无输出——违反"exit 0 永远"
+    # 契约（LLM 混淆参数时的真实场景），改为打 usage JSON 正常退出
+    p.error = lambda msg: None  # type: ignore[method-assign]
     a, _unknown = p.parse_known_args()
 
     modes = sum(bool(x) for x in (a.pattern, a.cases, a.law))
