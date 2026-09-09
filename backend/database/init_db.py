@@ -25,6 +25,7 @@ from backend.models.conversation import (
     SubagentCall
 )
 from backend.models.agent_config import AgentRuntimeParam, AgentStrategy, LLMProvider  # noqa: F401
+from backend.models.alert_event import AlertEvent  # noqa: F401
 
 
 def init_db():
@@ -47,6 +48,7 @@ def init_db():
     print("  - master_decisions")
     print("  - subagent_calls")
     print("  - agent_runtime_params")
+    print("  - alert_events")
 
 
 if __name__ == "__main__":

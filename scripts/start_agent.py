@@ -297,6 +297,11 @@ class AgentService:
         logger.info(f"[session] 新查询 session 目录: {sd}")
         return str(sd)
 
+    def _cur_session_dir(self, session_id) -> Optional[str]:
+        """本轮查询的 session 目录名（backend 采集事件用；无则 None）。"""
+        d = self._session_dirs.get(session_id) if session_id else None
+        return Path(d).name if d else None
+
     def process_query(self, query: str, session_id: str = None) -> Dict[str, Any]:
         """处理查询请求 - 性能优化版"""
         import time
@@ -407,6 +412,7 @@ class AgentService:
                 "message_count": len(result.get("messages", [])),
                 "cached": False,
                 "quick_response": False,
+                "session_dir": self._cur_session_dir(session_id),
                 "trace": {
                     "decision_path": _decision_order,
                     "subagent_calls": _subagent_calls,
@@ -620,7 +626,8 @@ def query_stream(request: QueryRequest):
             except Exception:
                 pass
             q.put({"type": "delta", "text": short})
-            q.put({"type": "done", "content": short, "session_id": session_id})
+            q.put({"type": "done", "content": short, "session_id": session_id,
+                   "session_dir": agent_service._cur_session_dir(session_id)})
             return
         # 挂队列到 tool_registration 模块全局，让 call_subagent handler（在 executor 线程）吐进度
         if tool_reg is not None:
@@ -664,7 +671,8 @@ def query_stream(request: QueryRequest):
             if isinstance(result, dict) and "messages" in result:
                 agent_service.session_histories[session_id] = result["messages"]
             content = (result.get("final_response") or "（智能体未产出文本回复，请重试或换种问法）") if isinstance(result, dict) else (str(result) if result else "（智能体未产出文本回复）")
-            q.put({"type": "done", "content": content, "session_id": session_id})
+            q.put({"type": "done", "content": content, "session_id": session_id,
+                   "session_dir": agent_service._cur_session_dir(session_id)})
         except Exception as e:
             logger.error(f"流式查询失败: {e}")
             q.put({"type": "error", "message": str(e)})
