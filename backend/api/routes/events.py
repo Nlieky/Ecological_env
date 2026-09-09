@@ -1,128 +1,70 @@
-from fastapi import APIRouter, Query
-from typing import Optional
-from backend.models.event import AlertEvent, EventListResponse, EventEvidence, EventStatusUpdate
-from datetime import datetime, timedelta
+"""事件中心路由——SQLite 真数据源（alert_events 表）。
+
+全走 EventService（不直查 DB），export 必须定义在 /{event_id} 之前，
+否则 "export" 会被当成 event_id 命中详情路由（旧版 404 根因）。
+"""
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
+
+from backend.models.event import AlertEvent, EventListResponse, EventStatusUpdate
+from backend.services.event_service import EventService
 
 router = APIRouter()
 
-# Mock event data
-_mock_events: list[AlertEvent] = [
-    AlertEvent(
-        id="evt_001",
-        timestamp=(datetime.now() - timedelta(minutes=30)).isoformat(),
-        type="cod_high",
-        plantId="plant_a",
-        severity="high",
-        status="pending",
-        evidence=EventEvidence(
-            dataSnapshot={"cod": 125.0, "pH": 7.2, "ammoniaNitrogen": 8.5},
-            operators=[
-                {"name": "statistical.trend_detector", "result": "Upward trend detected"},
-                {"name": "ml.isolation_forest", "result": {"confidence": 0.92}}
-            ],
-            rules=[
-                {"name": "pH-COD协同规则", "matched": False},
-                {"name": "违规模式", "matched": True}
-            ],
-            llmReasoning="Master agent decision: Multi-dimensional data perception -> Anomaly detection -> Rule reasoning\nConclusion: Data supports COD excessive discharge violation determination"
-        )
-    ),
-    AlertEvent(
-        id="evt_002",
-        timestamp=(datetime.now() - timedelta(hours=2)).isoformat(),
-        type="ph_abnormal",
-        plantId="plant_a",
-        severity="medium",
-        status="processing",
-        evidence=EventEvidence(
-            dataSnapshot={"pH": 5.5, "cod": 42.0},
-            operators=[{"name": "statistical.threshold_check", "result": "pH below lower limit"}],
-            rules=[{"name": "pH threshold rule", "matched": True}],
-            llmReasoning="pH value below normal range, needs attention"
-        )
-    ),
-    AlertEvent(
-        id="evt_003",
-        timestamp=(datetime.now() - timedelta(days=1)).isoformat(),
-        type="flow_abnormal",
-        plantId="plant_a",
-        severity="low",
-        status="resolved",
-        evidence=EventEvidence(
-            dataSnapshot={"flow": 0.0},
-            operators=[{"name": "connectivity_check", "result": "Sensor offline"}],
-            rules=[{"name": "Connectivity rule", "matched": True}],
-            llmReasoning="Flow sensor abnormal, maintenance scheduled"
-        )
-    )
-]
-
-@router.get("/events", response_model=EventListResponse)
-async def get_events(
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    type: Optional[str] = None,
-    plantId: Optional[str] = None,
-    severity: Optional[str] = None,
-    status: Optional[str] = None,
-    page: int = Query(1, ge=1),
-    pageSize: int = Query(20, ge=1, le=100)
-):
-    """Get event list"""
-    filtered = _mock_events.copy()
-
-    # Apply filters
-    if type:
-        filtered = [e for e in filtered if e.type == type]
-    if plantId:
-        filtered = [e for e in filtered if e.plantId == plantId]
-    if severity:
-        filtered = [e for e in filtered if e.severity == severity]
-    if status:
-        filtered = [e for e in filtered if e.status == status]
-
-    total = len(filtered)
-    start = (page - 1) * pageSize
-    end = start + pageSize
-    paged = filtered[start:end]
-
-    return EventListResponse(data=paged, total=total)
-
-
-@router.get("/events/{event_id}", response_model=AlertEvent)
-async def get_event_detail(event_id: str):
-    """Get event detail"""
-    for event in _mock_events:
-        if event.id == event_id:
-            return event
-    from fastapi import HTTPException
-    raise HTTPException(status_code=404, detail="Event not found")
-
-
-@router.put("/events/{event_id}/status", response_model=AlertEvent)
-async def update_event_status(event_id: str, update: EventStatusUpdate):
-    """Update event status"""
-    for event in _mock_events:
-        if event.id == event_id:
-            event.status = update.status
-            return event
-    from fastapi import HTTPException
-    raise HTTPException(status_code=404, detail="Event not found")
+event_service = EventService()
 
 
 @router.get("/events/export")
 async def export_events(
     format: str = Query("json", pattern="^(json|xlsx|pdf)$"),
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    type: Optional[str] = None
+    start_time: str | None = None,
+    end_time: str | None = None,
+    type: str | None = None,
 ):
-    """Export event report"""
-    from fastapi.responses import Response
-    if format == "json":
-        import json
-        content = json.dumps([e.dict() for e in _mock_events], ensure_ascii=False, indent=2)
-        return Response(content=content, media_type="application/json")
-    else:
-        # xlsx/pdf coming soon
-        return Response(content="Export feature coming soon", media_type="text/plain")
+    """导出事件报告（json 全量列表；xlsx/pdf 待实现→501）。"""
+    if format != "json":
+        return Response(content="xlsx/pdf export not implemented yet", media_type="text/plain", status_code=501)
+    result = event_service.list_events(start_time=start_time, end_time=end_time,
+                                       type_q=type, page=1, page_size=10000)
+    import json
+    content = json.dumps(result["data"], ensure_ascii=False, indent=2)
+    return Response(content=content, media_type="application/json")
+
+
+@router.get("/events", response_model=EventListResponse)
+async def get_events(
+    start_time: str | None = None,
+    end_time: str | None = None,
+    type: str | None = None,
+    plantId: str | None = None,
+    severity: str | None = None,
+    status: str | None = None,
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100),
+):
+    """事件列表（分页+筛选，timestamp 倒序）"""
+    return event_service.list_events(
+        start_time=start_time, end_time=end_time, type_q=type,
+        plant_id=plantId, severity=severity, status=status,
+        page=page, page_size=pageSize)
+
+
+@router.get("/events/{event_id}", response_model=AlertEvent)
+async def get_event_detail(event_id: str):
+    """事件详情"""
+    ev = event_service.get_event(event_id)
+    if not ev:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return ev
+
+
+@router.put("/events/{event_id}/status", response_model=AlertEvent)
+async def update_event_status(event_id: str, update: EventStatusUpdate):
+    """更新事件状态（白名单状态机：pending→processing→resolved/ignored，终态只容许幂等重放）"""
+    try:
+        ev = event_service.update_status(event_id, update.status)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not ev:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return ev

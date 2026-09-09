@@ -15,6 +15,7 @@ from backend.models.query import QueryRequest, QueryResponse
 from backend.utils.loggers import generate_session_id, log_master_decision, log_subagent_execution
 from backend.core.config import settings
 from backend.services.conversation_service import ConversationService
+from backend.services.event_service import EventService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,6 +34,10 @@ def _agent_timeout() -> int:
 
 # 对话历史服务：把 /api/query 的真实问答落入 conversations 表
 conversation_service = ConversationService()
+
+# 事件采集器：查询完成后从 session 目录采集处置研判结果落入 alert_events 表
+# （失败不阻断主链路，仅告警）
+event_service = EventService()
 
 
 def check_agent_service() -> bool:
@@ -170,6 +175,14 @@ def execute_query(request: QueryRequest):
         except Exception as persist_error:
             logger.warning(f"Failed to persist conversation exchange: {persist_error}")
 
+        # 采集处置研判事件（session_dir 来自 agent 响应；失败不阻断主链路）
+        try:
+            session_dir = agent_data.get("session_dir") if isinstance(agent_data, dict) else None
+            if session_dir:
+                event_service.collect_from_session(session_dir, conversation_id=final_session_id)
+        except Exception as ev_err:
+            logger.warning(f"Event collection failed: {ev_err}")
+
         logger.info(f"查询完成: session={final_session_id}, 耗时={time.time() - start_time:.2f}s")
 
         # 收集 chartData(异常检测优先带标注,否则数据感知)
@@ -258,6 +271,7 @@ async def query_stream(request: QueryRequest):
         final_content = ""
         final_session_id = session_id
         had_done = False
+        last_session_dir = None   # done 事件带的 session 目录（backend 采集事件用）
         sub_starts = {}            # subagent -> 开始时间
         subagent_executions = []   # [{subagent_name, execution_time_ms, status, summary}]
         decision_order = []        # 按调用顺序去重的子智能体名
@@ -316,6 +330,7 @@ async def query_stream(request: QueryRequest):
                         elif etype == "done":
                             final_content = evt.get("content", "")
                             final_session_id = evt.get("session_id", session_id)
+                            last_session_dir = evt.get("session_dir")
                             had_done = True
         # 流结束：落对话历史 + 追踪明细（与 /query 一致，失败仅告警）
         if had_done:
@@ -335,6 +350,12 @@ async def query_stream(request: QueryRequest):
                     )
                 except Exception as persist_error:
                     logger.warning(f"Failed to persist stream conversation exchange: {persist_error}")
+            # 采集处置研判事件（session_dir 来自 done 事件；失败不阻断主链路）
+            try:
+                if last_session_dir:
+                    event_service.collect_from_session(last_session_dir, conversation_id=final_session_id)
+            except Exception as ev_err:
+                logger.warning(f"Event collection failed: {ev_err}")
             # 追踪：真实 decision_path/subagents + 每个子智能体执行明细，供 /logs/trace/{id} 展示
             try:
                 # decision_order 靠 progress start 事件;若流式透传丢 start 导致空,

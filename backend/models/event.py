@@ -1,42 +1,24 @@
+"""事件 API schema（真数据源版）——对齐 alert_events 表与处置输出结构。"""
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-
-
-class EvidenceSnapshot(BaseModel):
-    pH: Optional[float] = None
-    cod: Optional[float] = None
-    ammoniaNitrogen: Optional[float] = None
-    totalNitrogen: Optional[float] = None
-    totalPhosphorus: Optional[float] = None
-    flow: Optional[float] = None
-
-
-class OperatorCall(BaseModel):
-    name: str
-    result: Any
-
-
-class RuleMatch(BaseModel):
-    name: str
-    matched: bool
-
-
-class EventEvidence(BaseModel):
-    dataSnapshot: EvidenceSnapshot
-    operators: List[OperatorCall]
-    rules: List[RuleMatch]
-    llmReasoning: str
 
 
 class AlertEvent(BaseModel):
     id: str
     timestamp: str
-    type: str
-    plantId: str
-    severity: str  # low, medium, high
-    status: str  # pending, processing, resolved, ignored
-    evidence: EventEvidence
+    sessionId: str = ""
+    conversationId: Optional[str] = None
+    plantId: str = ""
+    violationTypes: List[str] = []
+    severity: str
+    action: str = ""
+    confidence: Optional[float] = None
+    evidence: List[Dict[str, Any]] = []
+    workOrder: Optional[Dict[str, Any]] = None
+    status: str
+    createdAt: str = ""
+    updatedAt: str = ""
 
 
 class EventListResponse(BaseModel):

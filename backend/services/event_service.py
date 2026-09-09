@@ -12,11 +12,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.database.session import SessionLocal
-from backend.models.alert_event import AlertEvent, EventSeverity
+from backend.models.alert_event import AlertEvent, EventSeverity, EventStatus
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,88 @@ class EventService:
         except Exception:
             db.rollback()
             raise
+        finally:
+            db.close()
+
+    # ---------- 查询/状态（Task2）----------
+    VALID_TRANSITIONS = {
+        ("pending", "pending"), ("pending", "processing"),
+        ("pending", "resolved"), ("pending", "ignored"),
+        ("processing", "processing"), ("processing", "resolved"),
+        ("processing", "ignored"),
+        ("resolved", "resolved"), ("ignored", "ignored"),
+    }
+
+    def list_events(self, start_time=None, end_time=None, type_q=None,
+                    plant_id=None, severity=None, status=None,
+                    page=1, page_size=20) -> dict:
+        """分页筛选查询（timestamp 倒序）。枚举值非法→空结果（不炸）。"""
+        if severity is not None and severity not in EventSeverity._value2member_map_:
+            return {"data": [], "total": 0}
+        if status is not None and status not in EventStatus._value2member_map_:
+            return {"data": [], "total": 0}
+
+        conds = []
+        if start_time:
+            try:
+                conds.append(AlertEvent.timestamp >= datetime.fromisoformat(start_time))
+            except ValueError:
+                pass
+        if end_time:
+            try:
+                conds.append(AlertEvent.timestamp <= datetime.fromisoformat(end_time))
+            except ValueError:
+                pass
+        if type_q:
+            # JSON 列做包含匹配。SQLite 的 JSON 序列化会把非 ASCII 转义成 \uXXXX，
+            # 直接 cast 成文本 LIKE 匹配不到中文——用 json_each 解码后再 LIKE。
+            conds.append(text(
+                "exists (select 1 from json_each(alert_events.violation_types) "
+                "where json_each.value like :type_q)"
+            ).bindparams(type_q=f"%{type_q}%"))
+        if plant_id:
+            conds.append(AlertEvent.plant_id == plant_id)
+        if severity is not None:
+            conds.append(AlertEvent.severity == EventSeverity(severity))
+        if status is not None:
+            conds.append(AlertEvent.status == EventStatus(status))
+
+        db: Session = SessionLocal()
+        try:
+            q = db.query(AlertEvent)
+            for c in conds:
+                q = q.filter(c)
+            total = q.count()
+            rows = (q.order_by(AlertEvent.timestamp.desc())
+                     .offset((page - 1) * page_size).limit(page_size).all())
+            return {"data": [self._to_dict(r) for r in rows], "total": total}
+        finally:
+            db.close()
+
+    def get_event(self, event_id: str) -> Optional[dict]:
+        db: Session = SessionLocal()
+        try:
+            ev = db.query(AlertEvent).filter(AlertEvent.id == event_id).first()
+            return self._to_dict(ev) if ev else None
+        finally:
+            db.close()
+
+    def update_status(self, event_id: str, new_status: str) -> Optional[dict]:
+        """状态机：非法流转 raise ValueError（路由转 400）；事件不存在 None。"""
+        if new_status not in EventStatus._value2member_map_:
+            raise ValueError(f"非法状态值: {new_status}")
+        db: Session = SessionLocal()
+        try:
+            ev = db.query(AlertEvent).filter(AlertEvent.id == event_id).first()
+            if not ev:
+                return None
+            cur = ev.status.value if ev.status else "pending"
+            if (cur, new_status) not in self.VALID_TRANSITIONS:
+                raise ValueError(f"非法状态流转: {cur} → {new_status}")
+            ev.status = EventStatus(new_status)
+            db.commit()
+            db.refresh(ev)
+            return self._to_dict(ev)
         finally:
             db.close()
 
