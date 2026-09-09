@@ -1,0 +1,353 @@
+{
+  "task_id": "rule_reasoning_20260909_205247",
+  "status": "completed",
+  "result": {
+    "has_violation": true,
+    "suspicion_level": "low",
+    "suspicion_level_cn": "低",
+    "confidence": 0.9,
+    "violation_types": [],
+    "violation_type_names": [
+      "插瓶干扰",
+      "暗管偷排",
+      "多指标恒定组合"
+    ],
+    "evidence_points": [
+      {
+        "category": "regulation",
+        "indicator": "TN",
+        "regulation": "城镇污水处理厂污染物排放标准",
+        "regulation_code": "GB 18918-2002",
+        "violation_type": "exceedance",
+        "article": "TN超标",
+        "penalty": "处十万元以上一百万元以下罚款",
+        "evidence": ""
+      },
+      {
+        "category": "regulation",
+        "indicator": "TN",
+        "regulation": "水污染防治法",
+        "regulation_code": null,
+        "violation_type": "data_forgery",
+        "article": "以逃避监管的方式排放水污染物",
+        "penalty": "处十万元以上一百万元以下罚款",
+        "evidence": "TN数据长时间恒定，疑似人为干预"
+      },
+      {
+        "category": "regulation",
+        "indicator": "COD",
+        "regulation": "城镇污水处理厂污染物排放标准",
+        "regulation_code": "GB 18918-2002",
+        "violation_type": "exceedance",
+        "article": "COD超标",
+        "penalty": "处十万元以上一百万元以下罚款",
+        "evidence": ""
+      },
+      {
+        "category": "regulation",
+        "indicator": "COD",
+        "regulation": "水污染防治法",
+        "regulation_code": null,
+        "violation_type": "data_forgery",
+        "article": "以逃避监管的方式排放水污染物",
+        "penalty": "处十万元以上一百万元以下罚款",
+        "evidence": "COD数据长时间恒定，疑似人为干预"
+      },
+      {
+        "category": "expert_pattern",
+        "pattern": "插瓶干扰",
+        "pattern_key": "bottle_interference",
+        "match_score": 1.0,
+        "confidence": 0.9,
+        "suspicion_level": "high"
+      },
+      {
+        "category": "expert_pattern",
+        "pattern": "暗管偷排",
+        "pattern_key": "secret_pipe",
+        "match_score": 0.9,
+        "confidence": 0.95,
+        "suspicion_level": "critical"
+      },
+      {
+        "category": "expert_pattern",
+        "pattern": "多指标恒定组合",
+        "pattern_key": null,
+        "match_score": 0.95,
+        "confidence": 0.95,
+        "suspicion_level": "critical"
+      },
+      {
+        "category": "anomaly",
+        "indicator": "TN",
+        "type": "constant",
+        "value": 4.23,
+        "timestamp": "2026-07-14 00:00:00",
+        "score": 0.9,
+        "expected_range": [
+          4.84,
+          5.435
+        ]
+      },
+      {
+        "category": "anomaly",
+        "indicator": "COD",
+        "type": "constant",
+        "value": 501.93,
+        "timestamp": "2026-07-14 12:00:00",
+        "score": 0.9,
+        "expected_range": [
+          65.605,
+          96.2
+        ]
+      },
+      {
+        "category": "anomaly",
+        "indicator": "COD",
+        "type": "",
+        "value": 500.1,
+        "timestamp": "2026-07-15 12:00:00",
+        "score": 0.7833027349167143,
+        "expected_range": [
+          65.605,
+          96.2
+        ]
+      },
+      {
+        "category": "anomaly",
+        "indicator": "TP",
+        "type": "",
+        "value": 4.76,
+        "timestamp": "2026-07-15 12:00:00",
+        "score": 0.7762491026697278,
+        "expected_range": [
+          0.47,
+          1.29
+        ]
+      },
+      {
+        "category": "anomaly",
+        "indicator": "TP",
+        "type": "",
+        "value": 4.74,
+        "timestamp": "2026-07-14 12:00:00",
+        "score": 0.7746902749410104,
+        "expected_range": [
+          0.47,
+          1.29
+        ]
+      }
+    ],
+    "anomaly_count": 46,
+    "regulation_matches": {
+      "matches": [
+        {
+          "indicator": "TN",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "TN超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        },
+        {
+          "indicator": "TN",
+          "regulation": "水污染防治法",
+          "violation_type": "data_forgery",
+          "article": "以逃避监管的方式排放水污染物",
+          "penalty": "处十万元以上一百万元以下罚款",
+          "evidence": "TN数据长时间恒定，疑似人为干预"
+        },
+        {
+          "indicator": "COD",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "COD超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        },
+        {
+          "indicator": "COD",
+          "regulation": "水污染防治法",
+          "violation_type": "data_forgery",
+          "article": "以逃避监管的方式排放水污染物",
+          "penalty": "处十万元以上一百万元以下罚款",
+          "evidence": "COD数据长时间恒定，疑似人为干预"
+        }
+      ],
+      "violations": [
+        {
+          "indicator": "TN",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "TN超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        },
+        {
+          "indicator": "TN",
+          "regulation": "水污染防治法",
+          "violation_type": "data_forgery",
+          "article": "以逃避监管的方式排放水污染物",
+          "penalty": "处十万元以上一百万元以下罚款",
+          "evidence": "TN数据长时间恒定，疑似人为干预"
+        },
+        {
+          "indicator": "COD",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "COD超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        },
+        {
+          "indicator": "COD",
+          "regulation": "水污染防治法",
+          "violation_type": "data_forgery",
+          "article": "以逃避监管的方式排放水污染物",
+          "penalty": "处十万元以上一百万元以下罚款",
+          "evidence": "COD数据长时间恒定，疑似人为干预"
+        }
+      ],
+      "compliance_status": "non_compliant"
+    },
+    "process_validation": {
+      "matched_patterns": [],
+      "violations": [],
+      "violations_count": 0,
+      "mechanism_compliance": "compliant"
+    },
+    "expert_reasoning": {
+      "matched_patterns": [
+        {
+          "pattern_key": "bottle_interference",
+          "name": "插瓶干扰",
+          "match_score": 1.0,
+          "confidence": 0.9,
+          "suspicion_level": "high"
+        },
+        {
+          "pattern_key": "secret_pipe",
+          "name": "暗管偷排",
+          "match_score": 0.9,
+          "confidence": 0.95,
+          "suspicion_level": "critical"
+        },
+        {
+          "description": "多指标同时恒定",
+          "interpretation": "高度疑似插瓶干扰",
+          "suspicion_level": "critical",
+          "name": "多指标恒定组合",
+          "match_score": 0.95,
+          "confidence": 0.95
+        }
+      ],
+      "suspicion_level": "critical",
+      "confidence": 0.9,
+      "reasoning_path": [
+        {
+          "step": "feature_extraction",
+          "features": {
+            "indicators": [
+              "TP",
+              "COD",
+              "pH",
+              "TN",
+              "SS",
+              "AN"
+            ],
+            "patterns": {
+              "constant": 2,
+              "": 44
+            },
+            "severities": {
+              "medium": 46
+            },
+            "constant_indicators": [
+              "TN",
+              "COD"
+            ],
+            "high_score_indicators": [
+              "TN",
+              "COD",
+              "COD",
+              "TP",
+              "TP",
+              "COD",
+              "AN",
+              "AN",
+              "AN",
+              "AN",
+              "SS",
+              "SS",
+              "pH",
+              "TN",
+              "TN",
+              "AN",
+              "AN",
+              "AN",
+              "pH",
+              "COD",
+              "TP",
+              "TP",
+              "pH",
+              "pH",
+              "TN",
+              "TN",
+              "AN",
+              "AN",
+              "AN",
+              "TN",
+              "TP",
+              "COD",
+              "COD",
+              "pH",
+              "pH",
+              "pH",
+              "TN",
+              "TN",
+              "COD",
+              "pH",
+              "COD",
+              "COD",
+              "TN",
+              "TN",
+              "TP",
+              "TP"
+            ]
+          }
+        },
+        {
+          "step": "pattern_matching",
+          "matched_patterns": [
+            "插瓶干扰",
+            "暗管偷排"
+          ]
+        },
+        {
+          "step": "combination_analysis",
+          "result": {
+            "description": "多指标同时恒定",
+            "interpretation": "高度疑似插瓶干扰",
+            "suspicion_level": "critical",
+            "name": "多指标恒定组合",
+            "match_score": 0.95,
+            "confidence": 0.95
+          }
+        }
+      ],
+      "matched_cases": [],
+      "has_mechanism_violation": false
+    },
+    "missing_data": [
+      "工况数据(人工拟合降级)",
+      "停产申报数据(恶意逃避 TODO)"
+    ],
+    "conclusion": "嫌疑等级：存在轻微异常，需关注。"
+  },
+  "metadata": {
+    "subagent": "rule-reasoning-agent",
+    "timestamp": "2026-09-09T20:52:47.415719",
+    "anomaly_task_id": "task_20260806092252_f07c62b5",
+    "has_mechanism_violation": false
+  }
+}
