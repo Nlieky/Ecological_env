@@ -147,7 +147,7 @@ AGENTS: List[Dict] = [
      "props": {"role": "检测", "skills": ["anomaly-detection-core"]}},
     {"id": "agent:rule-reasoning", "label": "③规则推理",
      "props": {"role": "判定",
-               "skills": ["rule-reasoning-core", "knowledge-search"]}},
+               "skills": ["rule-reasoning-core", "graph-query"]}},
     {"id": "agent:disposition-execution", "label": "④研判处置",
      "props": {"role": "处置",
                "skills": ["disposition-execution-core", "report-generator"]}},
@@ -196,7 +196,7 @@ SKILLS: List[Tuple[str, str, str]] = [
     ("data-export", "agent:multi-dimensional-data-perception", "导出 CSV"),
     ("anomaly-detection-core", "agent:anomaly-detection", "检测主技能 5类特征+孤立森林"),
     ("rule-reasoning-core", "agent:rule-reasoning", "判定主技能 工艺规则+嫌疑矩阵"),
-    ("knowledge-search", "agent:rule-reasoning", "知识四库检索"),
+    ("graph-query", "agent:rule-reasoning", "查图谱:模式/案例/法条"),
     ("disposition-execution-core", "agent:disposition-execution", "处置主技能 工单+预警"),
     ("report-generator", "agent:disposition-execution", "日报/周报生成"),
 ]
