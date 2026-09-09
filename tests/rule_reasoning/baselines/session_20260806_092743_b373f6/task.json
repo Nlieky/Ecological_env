@@ -1,0 +1,7 @@
+{
+  "task_id": "task_20260806092745_398b4b3b",
+  "task": "针对7月14日到15日pH和COD监测数据生成最终研判处置报告和工单",
+  "context": "{\"previous_step\": \"rule-reasoning completed: 违规=False, 嫌疑=none (pH/COD, 2026-07-14 to 2026-07-15)\"}",
+  "output_format": "json",
+  "timeout": 300
+}

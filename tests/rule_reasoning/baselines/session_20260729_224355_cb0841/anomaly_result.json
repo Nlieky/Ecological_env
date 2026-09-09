@@ -1,0 +1,966 @@
+{
+  "task_id": "task_20260729224414_28100546",
+  "status": "completed",
+  "result": {
+    "anomalies": [
+      {
+        "data_type": "influent",
+        "indicator": "氨氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 12:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.8598547383408418,
+        "confidence": 0.25197094766816835,
+        "pattern_similarity": 0.2,
+        "value": 24.97,
+        "expected_range": [
+          1.5825,
+          2.88
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "化学需氧量浓度（毫克/升）",
+        "timestamp": "2026-07-14 12:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.8363788110396253,
+        "confidence": 0.24727576220792508,
+        "pattern_similarity": 0.2,
+        "value": 501.93,
+        "expected_range": [
+          68.8475,
+          171.77
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总磷浓度（毫克/升）",
+        "timestamp": "2026-07-14 12:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.820741054459263,
+        "confidence": 0.24414821089185262,
+        "pattern_similarity": 0.2,
+        "value": 4.74,
+        "expected_range": [
+          0.68,
+          1.3
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 00:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.7648997741586149,
+        "confidence": 0.23297995483172299,
+        "pattern_similarity": 0.2,
+        "value": 4.23,
+        "expected_range": [
+          5.04,
+          5.5525
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "pH值",
+        "timestamp": "2026-07-14 01:00:00",
+        "features": [
+          "平稳",
+          "高频波动"
+        ],
+        "score": 0.7629773007611744,
+        "confidence": 0.31259546015223494,
+        "pattern_similarity": 0.4,
+        "value": 7.33,
+        "expected_range": [
+          7.34,
+          7.35
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "pH值",
+        "timestamp": "2026-07-14 05:00:00",
+        "features": [
+          "平稳",
+          "高频波动"
+        ],
+        "score": 0.7572388233025739,
+        "confidence": 0.31259546015223494,
+        "pattern_similarity": 0.4,
+        "value": 7.38,
+        "expected_range": [
+          7.34,
+          7.35
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 12:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.7515435058744356,
+        "confidence": 0.23030870117488714,
+        "pattern_similarity": 0.2,
+        "value": 25.15,
+        "expected_range": [
+          13.3925,
+          14.6775
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 11:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.7246142262010113,
+        "confidence": 0.23030870117488714,
+        "pattern_similarity": 0.2,
+        "value": 23.29,
+        "expected_range": [
+          13.3925,
+          14.6775
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "化学需氧量浓度（毫克/升）",
+        "timestamp": "2026-07-14 00:00:00",
+        "features": [
+          "趋势",
+          "高频波动"
+        ],
+        "score": 0.7126718032759798,
+        "confidence": 0.302534360655196,
+        "pattern_similarity": 0.4,
+        "value": 33.54,
+        "expected_range": [
+          28.0475,
+          31.64
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "氨氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 05:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.6847251258556873,
+        "confidence": 0.21694502517113748,
+        "pattern_similarity": 0.2,
+        "value": 0.0,
+        "expected_range": [
+          0.02,
+          0.04
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "氨氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 06:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.6847251258556873,
+        "confidence": 0.21694502517113748,
+        "pattern_similarity": 0.2,
+        "value": 0.0,
+        "expected_range": [
+          0.02,
+          0.04
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "悬浮物浓度（毫克/升）",
+        "timestamp": "2026-07-14 05:00:00",
+        "features": [
+          "平稳",
+          "高频波动"
+        ],
+        "score": 0.6778671743745968,
+        "confidence": 0.2955734348749194,
+        "pattern_similarity": 0.4,
+        "value": 3.02,
+        "expected_range": [
+          2.99,
+          3.01
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "悬浮物浓度（毫克/升）",
+        "timestamp": "2026-07-14 07:00:00",
+        "features": [
+          "平稳",
+          "高频波动"
+        ],
+        "score": 0.6778671743745968,
+        "confidence": 0.2955734348749194,
+        "pattern_similarity": 0.4,
+        "value": 3.02,
+        "expected_range": [
+          2.99,
+          3.01
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总磷浓度（毫克/升）",
+        "timestamp": "2026-07-14 11:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.661177263929975,
+        "confidence": 0.24414821089185262,
+        "pattern_similarity": 0.2,
+        "value": 1.99,
+        "expected_range": [
+          0.68,
+          1.3
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "氨氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 11:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.6445940613675708,
+        "confidence": 0.25197094766816835,
+        "pattern_similarity": 0.2,
+        "value": 4.63,
+        "expected_range": [
+          1.5825,
+          2.88
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "pH值",
+        "timestamp": "2026-07-14 20:00:00",
+        "features": [
+          "平稳"
+        ],
+        "score": 0.6423031624977433,
+        "confidence": 0.20846063249954866,
+        "pattern_similarity": 0.2,
+        "value": 7.35,
+        "expected_range": [
+          7.407500000000001,
+          7.495
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "总磷浓度（毫克/升）",
+        "timestamp": "2026-07-14 15:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.6269952244376722,
+        "confidence": 0.20539904488753447,
+        "pattern_similarity": 0.2,
+        "value": 0.18,
+        "expected_range": [
+          0.11,
+          0.14250000000000002
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "总磷浓度（毫克/升）",
+        "timestamp": "2026-07-14 16:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.6269952244376722,
+        "confidence": 0.20539904488753447,
+        "pattern_similarity": 0.2,
+        "value": 0.18,
+        "expected_range": [
+          0.11,
+          0.14250000000000002
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 00:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.6123146803063937,
+        "confidence": 0.23030870117488714,
+        "pattern_similarity": 0.2,
+        "value": 16.78,
+        "expected_range": [
+          13.3925,
+          14.6775
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 15:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.61109827752374,
+        "confidence": 0.23297995483172299,
+        "pattern_similarity": 0.2,
+        "value": 6.03,
+        "expected_range": [
+          5.04,
+          5.5525
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "总氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 16:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.61109827752374,
+        "confidence": 0.23297995483172299,
+        "pattern_similarity": 0.2,
+        "value": 6.03,
+        "expected_range": [
+          5.04,
+          5.5525
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "化学需氧量浓度（毫克/升）",
+        "timestamp": "2026-07-14 19:00:00",
+        "features": [
+          "趋势",
+          "高频波动"
+        ],
+        "score": 0.6078059128878492,
+        "confidence": 0.302534360655196,
+        "pattern_similarity": 0.4,
+        "value": 26.75,
+        "expected_range": [
+          28.0475,
+          31.64
+        ]
+      },
+      {
+        "data_type": "effluent",
+        "indicator": "化学需氧量浓度（毫克/升）",
+        "timestamp": "2026-07-14 20:00:00",
+        "features": [
+          "趋势",
+          "高频波动"
+        ],
+        "score": 0.6078059128878492,
+        "confidence": 0.302534360655196,
+        "pattern_similarity": 0.4,
+        "value": 26.75,
+        "expected_range": [
+          28.0475,
+          31.64
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "化学需氧量浓度（毫克/升）",
+        "timestamp": "2026-07-14 11:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.6060337819318041,
+        "confidence": 0.24727576220792508,
+        "pattern_similarity": 0.2,
+        "value": 109.95,
+        "expected_range": [
+          68.8475,
+          171.77
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "氨氮浓度（毫克/升）",
+        "timestamp": "2026-07-14 00:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.5941424942592173,
+        "confidence": 0.25197094766816835,
+        "pattern_similarity": 0.2,
+        "value": 4.12,
+        "expected_range": [
+          1.5825,
+          2.88
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "pH值",
+        "timestamp": "2026-07-14 19:00:00",
+        "features": [
+          "平稳"
+        ],
+        "score": 0.5822369899301193,
+        "confidence": 0.20846063249954866,
+        "pattern_similarity": 0.2,
+        "value": 7.36,
+        "expected_range": [
+          7.407500000000001,
+          7.495
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "pH值",
+        "timestamp": "2026-07-14 21:00:00",
+        "features": [
+          "平稳"
+        ],
+        "score": 0.5814499548981873,
+        "confidence": 0.20846063249954866,
+        "pattern_similarity": 0.2,
+        "value": 7.37,
+        "expected_range": [
+          7.407500000000001,
+          7.495
+        ]
+      },
+      {
+        "data_type": "influent",
+        "indicator": "总磷浓度（毫克/升）",
+        "timestamp": "2026-07-14 00:00:00",
+        "features": [
+          "高频波动"
+        ],
+        "score": 0.5457544527158565,
+        "confidence": 0.24414821089185262,
+        "pattern_similarity": 0.2,
+        "value": 0.32,
+        "expected_range": [
+          0.68,
+          1.3
+        ]
+      }
+    ],
+    "summary": {
+      "total_anomalies": 28,
+      "by_data_type": {
+        "influent": 14,
+        "effluent": 14
+      },
+      "by_indicator": {
+        "氨氮浓度（毫克/升）": 5,
+        "化学需氧量浓度（毫克/升）": 5,
+        "总磷浓度（毫克/升）": 5,
+        "总氮浓度（毫克/升）": 6,
+        "pH值": 5,
+        "悬浮物浓度（毫克/升）": 2
+      },
+      "by_feature": {
+        "高频波动": 25,
+        "平稳": 7,
+        "趋势": 3
+      }
+    },
+    "chartData": [
+      {
+        "title": "进水水质趋势",
+        "option": {
+          "title": {
+            "text": "进水水质趋势",
+            "left": "center",
+            "textStyle": {
+              "fontSize": 14,
+              "fontWeight": "bold"
+            }
+          },
+          "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {
+              "type": "cross"
+            }
+          },
+          "legend": {
+            "data": [
+              "pH",
+              "COD"
+            ],
+            "top": 26,
+            "textStyle": {
+              "fontSize": 11
+            }
+          },
+          "grid": {
+            "top": 55,
+            "left": 55,
+            "right": 55,
+            "bottom": 35
+          },
+          "xAxis": {
+            "type": "category",
+            "data": [
+              "07-14 00:00",
+              "07-14 01:00",
+              "07-14 02:00",
+              "07-14 03:00",
+              "07-14 04:00",
+              "07-14 05:00",
+              "07-14 06:00",
+              "07-14 07:00",
+              "07-14 08:00",
+              "07-14 09:00",
+              "07-14 10:00",
+              "07-14 11:00",
+              "07-14 12:00",
+              "07-14 13:00",
+              "07-14 14:00",
+              "07-14 15:00",
+              "07-14 16:00",
+              "07-14 17:00",
+              "07-14 18:00",
+              "07-14 19:00",
+              "07-14 20:00",
+              "07-14 21:00",
+              "07-14 22:00",
+              "07-14 23:00"
+            ],
+            "axisLabel": {
+              "fontSize": 10
+            }
+          },
+          "yAxis": [
+            {
+              "type": "value",
+              "name": "pH",
+              "position": "left",
+              "min": 0,
+              "max": 14,
+              "axisLabel": {
+                "fontSize": 10
+              },
+              "nameTextStyle": {
+                "fontSize": 11
+              }
+            },
+            {
+              "type": "value",
+              "name": "mg/L",
+              "position": "right",
+              "axisLabel": {
+                "fontSize": 10
+              },
+              "nameTextStyle": {
+                "fontSize": 11
+              }
+            }
+          ],
+          "series": [
+            {
+              "name": "pH",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                7.43,
+                7.43,
+                7.48,
+                7.51,
+                7.55,
+                7.56,
+                7.56,
+                7.55,
+                7.54,
+                7.49,
+                7.45,
+                7.49,
+                7.49,
+                7.46,
+                7.46,
+                7.45,
+                7.43,
+                7.41,
+                7.39,
+                7.36,
+                7.35,
+                7.37,
+                7.39,
+                7.4
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#6366f1"
+              },
+              "itemStyle": {
+                "color": "#6366f1"
+              },
+              "yAxisIndex": 0,
+              "markLine": {
+                "symbol": "none",
+                "lineStyle": {
+                  "type": "dashed",
+                  "color": "#ef4444",
+                  "width": 2
+                },
+                "label": {
+                  "color": "#ef4444",
+                  "fontSize": 10
+                },
+                "data": [
+                  {
+                    "xAxis": "07-14 12:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "高频波动"
+                    }
+                  },
+                  {
+                    "xAxis": "07-14 20:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "平稳"
+                    }
+                  },
+                  {
+                    "xAxis": "07-14 11:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "高频波动"
+                    }
+                  },
+                  {
+                    "xAxis": "07-14 19:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "平稳"
+                    }
+                  },
+                  {
+                    "xAxis": "07-14 21:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "平稳"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "COD",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                68.03,
+                57.92,
+                57.92,
+                176.27,
+                176.27,
+                208.91,
+                208.91,
+                171.77,
+                171.77,
+                70.51,
+                70.51,
+                109.95,
+                501.93,
+                88.87,
+                88.87,
+                73.88,
+                73.88,
+                79.58,
+                79.58,
+                69.12,
+                69.12,
+                59.58,
+                59.58,
+                67.55
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#f59e0b"
+              },
+              "itemStyle": {
+                "color": "#f59e0b"
+              },
+              "yAxisIndex": 1
+            }
+          ]
+        }
+      },
+      {
+        "title": "出水水质趋势",
+        "option": {
+          "title": {
+            "text": "出水水质趋势",
+            "left": "center",
+            "textStyle": {
+              "fontSize": 14,
+              "fontWeight": "bold"
+            }
+          },
+          "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {
+              "type": "cross"
+            }
+          },
+          "legend": {
+            "data": [
+              "pH",
+              "COD"
+            ],
+            "top": 26,
+            "textStyle": {
+              "fontSize": 11
+            }
+          },
+          "grid": {
+            "top": 55,
+            "left": 55,
+            "right": 55,
+            "bottom": 35
+          },
+          "xAxis": {
+            "type": "category",
+            "data": [
+              "07-14 00:00",
+              "07-14 01:00",
+              "07-14 02:00",
+              "07-14 03:00",
+              "07-14 04:00",
+              "07-14 05:00",
+              "07-14 06:00",
+              "07-14 07:00",
+              "07-14 08:00",
+              "07-14 09:00",
+              "07-14 10:00",
+              "07-14 11:00",
+              "07-14 12:00",
+              "07-14 13:00",
+              "07-14 14:00",
+              "07-14 15:00",
+              "07-14 16:00",
+              "07-14 17:00",
+              "07-14 18:00",
+              "07-14 19:00",
+              "07-14 20:00",
+              "07-14 21:00",
+              "07-14 22:00",
+              "07-14 23:00"
+            ],
+            "axisLabel": {
+              "fontSize": 10
+            }
+          },
+          "yAxis": [
+            {
+              "type": "value",
+              "name": "pH",
+              "position": "left",
+              "min": 0,
+              "max": 14,
+              "axisLabel": {
+                "fontSize": 10
+              },
+              "nameTextStyle": {
+                "fontSize": 11
+              }
+            },
+            {
+              "type": "value",
+              "name": "mg/L",
+              "position": "right",
+              "axisLabel": {
+                "fontSize": 10
+              },
+              "nameTextStyle": {
+                "fontSize": 11
+              }
+            }
+          ],
+          "series": [
+            {
+              "name": "pH",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                7.34,
+                7.33,
+                7.34,
+                7.35,
+                7.37,
+                7.38,
+                7.37,
+                7.35,
+                7.34,
+                7.35,
+                7.34,
+                7.35,
+                7.35,
+                7.35,
+                7.34,
+                7.34,
+                7.34,
+                7.35,
+                7.35,
+                7.35,
+                7.35,
+                7.35,
+                7.34,
+                7.35
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#6366f1"
+              },
+              "itemStyle": {
+                "color": "#6366f1"
+              },
+              "yAxisIndex": 0,
+              "markLine": {
+                "symbol": "none",
+                "lineStyle": {
+                  "type": "dashed",
+                  "color": "#ef4444",
+                  "width": 2
+                },
+                "label": {
+                  "color": "#ef4444",
+                  "fontSize": 10
+                },
+                "data": [
+                  {
+                    "xAxis": "07-14 01:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "平稳"
+                    }
+                  },
+                  {
+                    "xAxis": "07-14 05:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "平稳"
+                    }
+                  },
+                  {
+                    "xAxis": "07-14 00:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "趋势"
+                    }
+                  },
+                  {
+                    "xAxis": "07-14 19:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "趋势"
+                    }
+                  },
+                  {
+                    "xAxis": "07-14 20:00",
+                    "label": {
+                      "show": true,
+                      "position": "insideEndTop",
+                      "formatter": "趋势"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "COD",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                33.54,
+                32.49,
+                32.49,
+                31.91,
+                31.91,
+                31.64,
+                31.64,
+                30.5,
+                30.5,
+                30.48,
+                30.48,
+                29.83,
+                29.83,
+                29.83,
+                29.83,
+                29.83,
+                29.83,
+                27.8,
+                27.8,
+                26.75,
+                26.75,
+                27.24,
+                27.24,
+                28.13
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#f59e0b"
+              },
+              "itemStyle": {
+                "color": "#f59e0b"
+              },
+              "yAxisIndex": 1
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "subagent": "anomaly-detection-agent",
+    "timestamp": "2026-07-29T22:44:30.306854",
+    "time_range": "data_result(链式消费数据感知)",
+    "data_points": {
+      "influent": 24,
+      "effluent": 24
+    }
+  },
+  "skill_calls": [
+    {
+      "tool": "skills_list",
+      "skill": ""
+    },
+    {
+      "tool": "skill_view",
+      "skill": "anomaly-detection-core"
+    }
+  ]
+}

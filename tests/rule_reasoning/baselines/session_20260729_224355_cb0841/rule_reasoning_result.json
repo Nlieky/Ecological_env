@@ -1,0 +1,260 @@
+{
+  "task_id": "rule_reasoning_20260909_194816",
+  "status": "completed",
+  "result": {
+    "has_violation": true,
+    "suspicion_level": "low",
+    "suspicion_level_cn": "低",
+    "confidence": 0.855,
+    "violation_types": [],
+    "violation_type_names": [
+      "暗管偷排"
+    ],
+    "evidence_points": [
+      {
+        "category": "regulation",
+        "indicator": "AN",
+        "regulation": "城镇污水处理厂污染物排放标准",
+        "regulation_code": "GB 18918-2002",
+        "violation_type": "exceedance",
+        "article": "AN超标",
+        "penalty": "处十万元以上一百万元以下罚款",
+        "evidence": ""
+      },
+      {
+        "category": "regulation",
+        "indicator": "COD",
+        "regulation": "城镇污水处理厂污染物排放标准",
+        "regulation_code": "GB 18918-2002",
+        "violation_type": "exceedance",
+        "article": "COD超标",
+        "penalty": "处十万元以上一百万元以下罚款",
+        "evidence": ""
+      },
+      {
+        "category": "regulation",
+        "indicator": "TP",
+        "regulation": "城镇污水处理厂污染物排放标准",
+        "regulation_code": "GB 18918-2002",
+        "violation_type": "exceedance",
+        "article": "TP超标",
+        "penalty": "处十万元以上一百万元以下罚款",
+        "evidence": ""
+      },
+      {
+        "category": "expert_pattern",
+        "pattern": "暗管偷排",
+        "pattern_key": "secret_pipe",
+        "match_score": 0.9,
+        "confidence": 0.95,
+        "suspicion_level": "critical"
+      },
+      {
+        "category": "anomaly",
+        "indicator": "AN",
+        "type": "",
+        "value": 24.97,
+        "timestamp": "2026-07-14 12:00:00",
+        "score": 0.8598547383408418,
+        "expected_range": [
+          1.5825,
+          2.88
+        ]
+      },
+      {
+        "category": "anomaly",
+        "indicator": "COD",
+        "type": "",
+        "value": 501.93,
+        "timestamp": "2026-07-14 12:00:00",
+        "score": 0.8363788110396253,
+        "expected_range": [
+          68.8475,
+          171.77
+        ]
+      },
+      {
+        "category": "anomaly",
+        "indicator": "TP",
+        "type": "",
+        "value": 4.74,
+        "timestamp": "2026-07-14 12:00:00",
+        "score": 0.820741054459263,
+        "expected_range": [
+          0.68,
+          1.3
+        ]
+      },
+      {
+        "category": "anomaly",
+        "indicator": "TN",
+        "type": "",
+        "value": 4.23,
+        "timestamp": "2026-07-14 00:00:00",
+        "score": 0.7648997741586149,
+        "expected_range": [
+          5.04,
+          5.5525
+        ]
+      },
+      {
+        "category": "anomaly",
+        "indicator": "pH",
+        "type": "",
+        "value": 7.33,
+        "timestamp": "2026-07-14 01:00:00",
+        "score": 0.7629773007611744,
+        "expected_range": [
+          7.34,
+          7.35
+        ]
+      }
+    ],
+    "anomaly_count": 28,
+    "regulation_matches": {
+      "matches": [
+        {
+          "indicator": "AN",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "AN超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        },
+        {
+          "indicator": "COD",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "COD超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        },
+        {
+          "indicator": "TP",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "TP超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        }
+      ],
+      "violations": [
+        {
+          "indicator": "AN",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "AN超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        },
+        {
+          "indicator": "COD",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "COD超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        },
+        {
+          "indicator": "TP",
+          "regulation": "城镇污水处理厂污染物排放标准",
+          "regulation_code": "GB 18918-2002",
+          "violation_type": "exceedance",
+          "article": "TP超标",
+          "penalty": "处十万元以上一百万元以下罚款"
+        }
+      ],
+      "compliance_status": "non_compliant"
+    },
+    "process_validation": {
+      "matched_patterns": [],
+      "violations": [],
+      "violations_count": 0,
+      "mechanism_compliance": "compliant"
+    },
+    "expert_reasoning": {
+      "matched_patterns": [
+        {
+          "pattern_key": "secret_pipe",
+          "name": "暗管偷排",
+          "match_score": 0.9,
+          "confidence": 0.95,
+          "suspicion_level": "critical"
+        }
+      ],
+      "suspicion_level": "critical",
+      "confidence": 0.855,
+      "reasoning_path": [
+        {
+          "step": "feature_extraction",
+          "features": {
+            "indicators": [
+              "COD",
+              "SS",
+              "pH",
+              "AN",
+              "TP",
+              "TN"
+            ],
+            "patterns": {
+              "": 28
+            },
+            "severities": {
+              "medium": 28
+            },
+            "constant_indicators": [],
+            "high_score_indicators": [
+              "AN",
+              "COD",
+              "TP",
+              "TN",
+              "pH",
+              "pH",
+              "TN",
+              "TN",
+              "COD",
+              "AN",
+              "AN",
+              "SS",
+              "SS",
+              "TP",
+              "AN",
+              "pH",
+              "TP",
+              "TP",
+              "TN",
+              "TN",
+              "TN",
+              "COD",
+              "COD",
+              "COD",
+              "AN",
+              "pH",
+              "pH",
+              "TP"
+            ]
+          }
+        },
+        {
+          "step": "pattern_matching",
+          "matched_patterns": [
+            "暗管偷排"
+          ]
+        }
+      ],
+      "matched_cases": [],
+      "has_mechanism_violation": false
+    },
+    "missing_data": [
+      "工况数据(人工拟合降级)",
+      "停产申报数据(恶意逃避 TODO)"
+    ],
+    "conclusion": "嫌疑等级：存在轻微异常，需关注。"
+  },
+  "metadata": {
+    "subagent": "rule-reasoning-agent",
+    "timestamp": "2026-09-09T19:48:17.365718",
+    "anomaly_task_id": "task_20260729224414_28100546",
+    "has_mechanism_violation": false
+  }
+}

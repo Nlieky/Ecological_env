@@ -1,0 +1,7 @@
+{
+  "task_id": "task_20260729224414_28100546",
+  "task": "检测7月14日进出水pH和COD的异常特征。数据摘要：进水pH 7.35-7.56(均7.46)、进水COD 57.92-501.93(均119.18)、出水pH 7.33-7.38(均7.35)、出水COD 26.75-33.54(均29.93)",
+  "context": "{\"time_range\": \"2026-07-14\", \"influent_count\": 24, \"effluent_count\": 24, \"metrics\": [\"pH\", \"COD\"], \"data_stats\": {\"pH\": {\"influent\": {\"min\": 7.35, \"max\": 7.56, \"mean\": 7.46}, \"effluent\": {\"min\": 7.33, \"max\": 7.38, \"mean\": 7.35}}, \"COD\": {\"influent\": {\"min\": 57.92, \"max\": 501.93, \"mean\": 119.18}, \"effluent\": {\"min\": 26.75, \"max\": 33.54, \"mean\": 29.93}}}}",
+  "output_format": "json",
+  "timeout": 300
+}

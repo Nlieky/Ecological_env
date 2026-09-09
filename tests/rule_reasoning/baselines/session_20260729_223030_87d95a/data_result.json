@@ -1,0 +1,1150 @@
+{
+  "task_id": "task_20260729223032_e1940b4c",
+  "status": "completed",
+  "result": {
+    "influent": [
+      {
+        "timestamp": "2026-07-24 14:00:00",
+        "pH": 7.38,
+        "COD": 111.24,
+        "TN": 16.8,
+        "NH3-N": 3.86,
+        "TP": 2.28,
+        "flow_rate": 483.37,
+        "discharge_volume": 1740.13
+      },
+      {
+        "timestamp": "2026-07-24 15:00:00",
+        "pH": 7.38,
+        "COD": 76.16,
+        "TN": 14.95,
+        "NH3-N": 2.62,
+        "TP": 1.07,
+        "flow_rate": 479.54,
+        "discharge_volume": 1726.34
+      },
+      {
+        "timestamp": "2026-07-24 16:00:00",
+        "pH": 7.34,
+        "COD": 76.16,
+        "TN": 14.95,
+        "NH3-N": 2.62,
+        "TP": 1.07,
+        "flow_rate": 486.23,
+        "discharge_volume": 1750.41
+      },
+      {
+        "timestamp": "2026-07-24 17:00:00",
+        "pH": 7.31,
+        "COD": 84.06,
+        "TN": 19.05,
+        "NH3-N": 3.49,
+        "TP": 1.48,
+        "flow_rate": 486.59,
+        "discharge_volume": 1751.71
+      },
+      {
+        "timestamp": "2026-07-24 18:00:00",
+        "pH": 7.32,
+        "COD": 84.06,
+        "TN": 19.05,
+        "NH3-N": 3.49,
+        "TP": 1.48,
+        "flow_rate": 443.0,
+        "discharge_volume": 1594.82
+      },
+      {
+        "timestamp": "2026-07-24 19:00:00",
+        "pH": 7.31,
+        "COD": 61.99,
+        "TN": 18.96,
+        "NH3-N": 2.6,
+        "TP": 0.71,
+        "flow_rate": 390.61,
+        "discharge_volume": 1406.19
+      },
+      {
+        "timestamp": "2026-07-24 20:00:00",
+        "pH": 7.3,
+        "COD": 61.99,
+        "TN": 18.96,
+        "NH3-N": 2.6,
+        "TP": 0.71,
+        "flow_rate": 391.37,
+        "discharge_volume": 1408.93
+      },
+      {
+        "timestamp": "2026-07-24 21:00:00",
+        "pH": 7.29,
+        "COD": 54.85,
+        "TN": 16.6,
+        "NH3-N": 1.64,
+        "TP": 0.36,
+        "flow_rate": 395.99,
+        "discharge_volume": 1425.56
+      },
+      {
+        "timestamp": "2026-07-24 22:00:00",
+        "pH": 7.27,
+        "COD": 54.85,
+        "TN": 16.6,
+        "NH3-N": 1.64,
+        "TP": 0.36,
+        "flow_rate": 400.6,
+        "discharge_volume": 1442.16
+      },
+      {
+        "timestamp": "2026-07-24 23:00:00",
+        "pH": 7.29,
+        "COD": 56.35,
+        "TN": 16.6,
+        "NH3-N": 1.7,
+        "TP": 0.6,
+        "flow_rate": 401.66,
+        "discharge_volume": 1445.96
+      },
+      {
+        "timestamp": "2026-07-25 00:00:00",
+        "pH": 7.32,
+        "COD": 56.35,
+        "TN": 16.6,
+        "NH3-N": 1.7,
+        "TP": 0.6,
+        "flow_rate": 406.11,
+        "discharge_volume": 1462.0
+      },
+      {
+        "timestamp": "2026-07-25 01:00:00",
+        "pH": 7.39,
+        "COD": 56.96,
+        "TN": 16.08,
+        "NH3-N": 1.31,
+        "TP": 0.36,
+        "flow_rate": 416.41,
+        "discharge_volume": 1499.08
+      },
+      {
+        "timestamp": "2026-07-25 02:00:00",
+        "pH": 7.48,
+        "COD": 56.96,
+        "TN": 16.08,
+        "NH3-N": 1.31,
+        "TP": 0.36,
+        "flow_rate": 424.71,
+        "discharge_volume": 1528.95
+      },
+      {
+        "timestamp": "2026-07-25 03:00:00",
+        "pH": 7.52,
+        "COD": 208.27,
+        "TN": 13.92,
+        "NH3-N": 1.45,
+        "TP": 1.33,
+        "flow_rate": 430.47,
+        "discharge_volume": 1549.7
+      },
+      {
+        "timestamp": "2026-07-25 04:00:00",
+        "pH": 7.55,
+        "COD": 208.27,
+        "TN": 13.92,
+        "NH3-N": 1.45,
+        "TP": 1.33,
+        "flow_rate": 476.75,
+        "discharge_volume": 1716.28
+      },
+      {
+        "timestamp": "2026-07-25 05:00:00",
+        "pH": 7.55,
+        "COD": 219.38,
+        "TN": 13.22,
+        "NH3-N": 0.76,
+        "TP": 1.36,
+        "flow_rate": 514.65,
+        "discharge_volume": 1852.75
+      },
+      {
+        "timestamp": "2026-07-25 06:00:00",
+        "pH": 7.56,
+        "COD": 219.38,
+        "TN": 13.22,
+        "NH3-N": 0.76,
+        "TP": 1.36,
+        "flow_rate": 507.43,
+        "discharge_volume": 1826.77
+      },
+      {
+        "timestamp": "2026-07-25 07:00:00",
+        "pH": 7.57,
+        "COD": 205.09,
+        "TN": 13.66,
+        "NH3-N": 0.92,
+        "TP": 1.44,
+        "flow_rate": 504.2,
+        "discharge_volume": 1815.11
+      },
+      {
+        "timestamp": "2026-07-25 08:00:00",
+        "pH": 7.56,
+        "COD": 205.09,
+        "TN": 13.66,
+        "NH3-N": 0.92,
+        "TP": 1.44,
+        "flow_rate": 491.59,
+        "discharge_volume": 1769.71
+      },
+      {
+        "timestamp": "2026-07-25 09:00:00",
+        "pH": 7.54,
+        "COD": 220.5,
+        "TN": 12.91,
+        "NH3-N": 0.65,
+        "TP": 1.34,
+        "flow_rate": 488.63,
+        "discharge_volume": 1759.05
+      },
+      {
+        "timestamp": "2026-07-25 10:00:00",
+        "pH": 7.52,
+        "COD": 220.5,
+        "TN": 12.91,
+        "NH3-N": 0.65,
+        "TP": 1.34,
+        "flow_rate": 485.4,
+        "discharge_volume": 1747.44
+      },
+      {
+        "timestamp": "2026-07-25 11:00:00",
+        "pH": 7.48,
+        "COD": 127.0,
+        "TN": 14.14,
+        "NH3-N": 1.1,
+        "TP": 1.66,
+        "flow_rate": 487.17,
+        "discharge_volume": 1753.8
+      },
+      {
+        "timestamp": "2026-07-25 12:00:00",
+        "pH": 7.47,
+        "COD": 496.74,
+        "TN": 25.0,
+        "NH3-N": 24.04,
+        "TP": 4.76,
+        "flow_rate": 495.49,
+        "discharge_volume": 1783.78
+      },
+      {
+        "timestamp": "2026-07-25 13:00:00",
+        "pH": 7.45,
+        "COD": 89.29,
+        "TN": 17.07,
+        "NH3-N": 1.54,
+        "TP": 1.45,
+        "flow_rate": 503.2,
+        "discharge_volume": 1811.52
+      }
+    ],
+    "effluent": [
+      {
+        "timestamp": "2026-07-24 14:00:00",
+        "pH": 7.31,
+        "COD": 32.78,
+        "TN": 4.09,
+        "NH3-N": 0.02,
+        "TP": 0.2,
+        "flow_rate": 434.65,
+        "discharge_volume": 1564.74,
+        "SS": 2.99
+      },
+      {
+        "timestamp": "2026-07-24 15:00:00",
+        "pH": 7.32,
+        "COD": 32.52,
+        "TN": 4.08,
+        "NH3-N": 0.02,
+        "TP": 0.22,
+        "flow_rate": 441.5,
+        "discharge_volume": 1589.4,
+        "SS": 2.99
+      },
+      {
+        "timestamp": "2026-07-24 16:00:00",
+        "pH": 7.32,
+        "COD": 32.52,
+        "TN": 4.08,
+        "NH3-N": 0.02,
+        "TP": 0.22,
+        "flow_rate": 449.07,
+        "discharge_volume": 1616.67,
+        "SS": 3.0
+      },
+      {
+        "timestamp": "2026-07-24 17:00:00",
+        "pH": 7.33,
+        "COD": 31.9,
+        "TN": 4.1,
+        "NH3-N": 0.02,
+        "TP": 0.19,
+        "flow_rate": 474.03,
+        "discharge_volume": 1706.49,
+        "SS": 2.99
+      },
+      {
+        "timestamp": "2026-07-24 18:00:00",
+        "pH": 7.32,
+        "COD": 31.9,
+        "TN": 4.1,
+        "NH3-N": 0.02,
+        "TP": 0.19,
+        "flow_rate": 450.46,
+        "discharge_volume": 1621.67,
+        "SS": 3.0
+      },
+      {
+        "timestamp": "2026-07-24 19:00:00",
+        "pH": 7.32,
+        "COD": 30.91,
+        "TN": 3.99,
+        "NH3-N": 0.02,
+        "TP": 0.16,
+        "flow_rate": 386.52,
+        "discharge_volume": 1391.46,
+        "SS": 3.0
+      },
+      {
+        "timestamp": "2026-07-24 20:00:00",
+        "pH": 7.31,
+        "COD": 30.91,
+        "TN": 3.99,
+        "NH3-N": 0.02,
+        "TP": 0.16,
+        "flow_rate": 347.28,
+        "discharge_volume": 1250.19,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-24 21:00:00",
+        "pH": 7.31,
+        "COD": 30.28,
+        "TN": 3.89,
+        "NH3-N": 0.02,
+        "TP": 0.14,
+        "flow_rate": 362.96,
+        "discharge_volume": 1306.67,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-24 22:00:00",
+        "pH": 7.3,
+        "COD": 30.28,
+        "TN": 3.89,
+        "NH3-N": 0.02,
+        "TP": 0.14,
+        "flow_rate": 361.34,
+        "discharge_volume": 1300.82,
+        "SS": 2.99
+      },
+      {
+        "timestamp": "2026-07-24 23:00:00",
+        "pH": 7.3,
+        "COD": 30.04,
+        "TN": 3.96,
+        "NH3-N": 0.02,
+        "TP": 0.13,
+        "flow_rate": 375.03,
+        "discharge_volume": 1350.11,
+        "SS": 3.0
+      },
+      {
+        "timestamp": "2026-07-25 00:00:00",
+        "pH": 7.29,
+        "COD": 30.04,
+        "TN": 3.96,
+        "NH3-N": 0.02,
+        "TP": 0.13,
+        "flow_rate": 369.63,
+        "discharge_volume": 1330.66,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-25 01:00:00",
+        "pH": 7.29,
+        "COD": 30.09,
+        "TN": 3.91,
+        "NH3-N": 0.02,
+        "TP": 0.14,
+        "flow_rate": 385.46,
+        "discharge_volume": 1387.65,
+        "SS": 3.0
+      },
+      {
+        "timestamp": "2026-07-25 02:00:00",
+        "pH": 7.3,
+        "COD": 30.09,
+        "TN": 3.91,
+        "NH3-N": 0.02,
+        "TP": 0.14,
+        "flow_rate": 376.97,
+        "discharge_volume": 1357.1,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-25 03:00:00",
+        "pH": 7.3,
+        "COD": 29.34,
+        "TN": 4.09,
+        "NH3-N": 0.02,
+        "TP": 0.13,
+        "flow_rate": 386.22,
+        "discharge_volume": 1390.38,
+        "SS": 3.0
+      },
+      {
+        "timestamp": "2026-07-25 04:00:00",
+        "pH": 7.28,
+        "COD": 29.34,
+        "TN": 4.09,
+        "NH3-N": 0.02,
+        "TP": 0.13,
+        "flow_rate": 395.93,
+        "discharge_volume": 1425.34,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-25 05:00:00",
+        "pH": 7.27,
+        "COD": 29.59,
+        "TN": 4.26,
+        "NH3-N": 0.02,
+        "TP": 0.13,
+        "flow_rate": 465.31,
+        "discharge_volume": 1675.11,
+        "SS": 3.0
+      },
+      {
+        "timestamp": "2026-07-25 06:00:00",
+        "pH": 7.22,
+        "COD": 29.59,
+        "TN": 4.26,
+        "NH3-N": 0.02,
+        "TP": 0.13,
+        "flow_rate": 472.74,
+        "discharge_volume": 1701.86,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-25 07:00:00",
+        "pH": 7.26,
+        "COD": 29.17,
+        "TN": 4.51,
+        "NH3-N": 0.02,
+        "TP": 0.14,
+        "flow_rate": 478.91,
+        "discharge_volume": 1724.06,
+        "SS": 2.99
+      },
+      {
+        "timestamp": "2026-07-25 08:00:00",
+        "pH": 7.28,
+        "COD": 29.17,
+        "TN": 4.51,
+        "NH3-N": 0.02,
+        "TP": 0.14,
+        "flow_rate": 461.88,
+        "discharge_volume": 1662.75,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-25 09:00:00",
+        "pH": 7.29,
+        "COD": 29.27,
+        "TN": 4.69,
+        "NH3-N": 0.03,
+        "TP": 0.14,
+        "flow_rate": 429.79,
+        "discharge_volume": 1547.25,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-25 10:00:00",
+        "pH": 7.32,
+        "COD": 29.27,
+        "TN": 4.69,
+        "NH3-N": 0.03,
+        "TP": 0.14,
+        "flow_rate": 374.96,
+        "discharge_volume": 1349.86,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-25 11:00:00",
+        "pH": 7.34,
+        "COD": 29.28,
+        "TN": 4.8,
+        "NH3-N": 0.03,
+        "TP": 0.14,
+        "flow_rate": 414.86,
+        "discharge_volume": 1493.49,
+        "SS": 3.01
+      },
+      {
+        "timestamp": "2026-07-25 12:00:00",
+        "pH": 7.35,
+        "COD": 29.28,
+        "TN": 4.8,
+        "NH3-N": 0.03,
+        "TP": 0.14,
+        "flow_rate": 435.95,
+        "discharge_volume": 1569.4,
+        "SS": 2.99
+      },
+      {
+        "timestamp": "2026-07-25 13:00:00",
+        "pH": 7.35,
+        "COD": 29.99,
+        "TN": 5.1,
+        "NH3-N": 0.03,
+        "TP": 0.17,
+        "flow_rate": 433.65,
+        "discharge_volume": 1561.15,
+        "SS": 2.99
+      }
+    ],
+    "metadata": {
+      "time_range": "最近24小时",
+      "indicators": [
+        "pH",
+        "COD",
+        "TN",
+        "NH3-N",
+        "TP",
+        "SS",
+        "flow_rate",
+        "discharge_volume"
+      ],
+      "chart_indicators": null,
+      "hrt_hours": 2,
+      "missing_points": [],
+      "data_source": "influxdb"
+    },
+    "chartData": [
+      {
+        "title": "进水水质趋势",
+        "option": {
+          "title": {
+            "text": "进水水质趋势",
+            "left": "center",
+            "textStyle": {
+              "fontSize": 14,
+              "fontWeight": "bold"
+            }
+          },
+          "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {
+              "type": "cross"
+            }
+          },
+          "legend": {
+            "data": [
+              "pH",
+              "COD",
+              "总氮",
+              "氨氮",
+              "总磷"
+            ],
+            "top": 26,
+            "textStyle": {
+              "fontSize": 11
+            }
+          },
+          "grid": {
+            "top": 55,
+            "left": 55,
+            "right": 55,
+            "bottom": 35
+          },
+          "xAxis": {
+            "type": "category",
+            "data": [
+              "07-24 14:00",
+              "07-24 15:00",
+              "07-24 16:00",
+              "07-24 17:00",
+              "07-24 18:00",
+              "07-24 19:00",
+              "07-24 20:00",
+              "07-24 21:00",
+              "07-24 22:00",
+              "07-24 23:00",
+              "07-25 00:00",
+              "07-25 01:00",
+              "07-25 02:00",
+              "07-25 03:00",
+              "07-25 04:00",
+              "07-25 05:00",
+              "07-25 06:00",
+              "07-25 07:00",
+              "07-25 08:00",
+              "07-25 09:00",
+              "07-25 10:00",
+              "07-25 11:00",
+              "07-25 12:00",
+              "07-25 13:00"
+            ],
+            "axisLabel": {
+              "fontSize": 10
+            }
+          },
+          "yAxis": [
+            {
+              "type": "value",
+              "name": "pH",
+              "position": "left",
+              "min": 0,
+              "max": 14,
+              "axisLabel": {
+                "fontSize": 10
+              },
+              "nameTextStyle": {
+                "fontSize": 11
+              }
+            },
+            {
+              "type": "value",
+              "name": "mg/L",
+              "position": "right",
+              "axisLabel": {
+                "fontSize": 10
+              },
+              "nameTextStyle": {
+                "fontSize": 11
+              }
+            }
+          ],
+          "series": [
+            {
+              "name": "pH",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                7.38,
+                7.38,
+                7.34,
+                7.31,
+                7.32,
+                7.31,
+                7.3,
+                7.29,
+                7.27,
+                7.29,
+                7.32,
+                7.39,
+                7.48,
+                7.52,
+                7.55,
+                7.55,
+                7.56,
+                7.57,
+                7.56,
+                7.54,
+                7.52,
+                7.48,
+                7.47,
+                7.45
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#6366f1"
+              },
+              "itemStyle": {
+                "color": "#6366f1"
+              },
+              "yAxisIndex": 0
+            },
+            {
+              "name": "COD",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                111.24,
+                76.16,
+                76.16,
+                84.06,
+                84.06,
+                61.99,
+                61.99,
+                54.85,
+                54.85,
+                56.35,
+                56.35,
+                56.96,
+                56.96,
+                208.27,
+                208.27,
+                219.38,
+                219.38,
+                205.09,
+                205.09,
+                220.5,
+                220.5,
+                127.0,
+                496.74,
+                89.29
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#f59e0b"
+              },
+              "itemStyle": {
+                "color": "#f59e0b"
+              },
+              "yAxisIndex": 1
+            },
+            {
+              "name": "总氮",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                16.8,
+                14.95,
+                14.95,
+                19.05,
+                19.05,
+                18.96,
+                18.96,
+                16.6,
+                16.6,
+                16.6,
+                16.6,
+                16.08,
+                16.08,
+                13.92,
+                13.92,
+                13.22,
+                13.22,
+                13.66,
+                13.66,
+                12.91,
+                12.91,
+                14.14,
+                25.0,
+                17.07
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#10b981"
+              },
+              "itemStyle": {
+                "color": "#10b981"
+              },
+              "yAxisIndex": 1
+            },
+            {
+              "name": "氨氮",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                3.86,
+                2.62,
+                2.62,
+                3.49,
+                3.49,
+                2.6,
+                2.6,
+                1.64,
+                1.64,
+                1.7,
+                1.7,
+                1.31,
+                1.31,
+                1.45,
+                1.45,
+                0.76,
+                0.76,
+                0.92,
+                0.92,
+                0.65,
+                0.65,
+                1.1,
+                24.04,
+                1.54
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#ef4444"
+              },
+              "itemStyle": {
+                "color": "#ef4444"
+              },
+              "yAxisIndex": 1
+            },
+            {
+              "name": "总磷",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                2.28,
+                1.07,
+                1.07,
+                1.48,
+                1.48,
+                0.71,
+                0.71,
+                0.36,
+                0.36,
+                0.6,
+                0.6,
+                0.36,
+                0.36,
+                1.33,
+                1.33,
+                1.36,
+                1.36,
+                1.44,
+                1.44,
+                1.34,
+                1.34,
+                1.66,
+                4.76,
+                1.45
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#8b5cf6"
+              },
+              "itemStyle": {
+                "color": "#8b5cf6"
+              },
+              "yAxisIndex": 1
+            }
+          ]
+        }
+      },
+      {
+        "title": "出水水质趋势",
+        "option": {
+          "title": {
+            "text": "出水水质趋势",
+            "left": "center",
+            "textStyle": {
+              "fontSize": 14,
+              "fontWeight": "bold"
+            }
+          },
+          "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {
+              "type": "cross"
+            }
+          },
+          "legend": {
+            "data": [
+              "pH",
+              "COD",
+              "总氮",
+              "氨氮",
+              "总磷"
+            ],
+            "top": 26,
+            "textStyle": {
+              "fontSize": 11
+            }
+          },
+          "grid": {
+            "top": 55,
+            "left": 55,
+            "right": 55,
+            "bottom": 35
+          },
+          "xAxis": {
+            "type": "category",
+            "data": [
+              "07-24 14:00",
+              "07-24 15:00",
+              "07-24 16:00",
+              "07-24 17:00",
+              "07-24 18:00",
+              "07-24 19:00",
+              "07-24 20:00",
+              "07-24 21:00",
+              "07-24 22:00",
+              "07-24 23:00",
+              "07-25 00:00",
+              "07-25 01:00",
+              "07-25 02:00",
+              "07-25 03:00",
+              "07-25 04:00",
+              "07-25 05:00",
+              "07-25 06:00",
+              "07-25 07:00",
+              "07-25 08:00",
+              "07-25 09:00",
+              "07-25 10:00",
+              "07-25 11:00",
+              "07-25 12:00",
+              "07-25 13:00"
+            ],
+            "axisLabel": {
+              "fontSize": 10
+            }
+          },
+          "yAxis": [
+            {
+              "type": "value",
+              "name": "pH",
+              "position": "left",
+              "min": 0,
+              "max": 14,
+              "axisLabel": {
+                "fontSize": 10
+              },
+              "nameTextStyle": {
+                "fontSize": 11
+              }
+            },
+            {
+              "type": "value",
+              "name": "mg/L",
+              "position": "right",
+              "axisLabel": {
+                "fontSize": 10
+              },
+              "nameTextStyle": {
+                "fontSize": 11
+              }
+            }
+          ],
+          "series": [
+            {
+              "name": "pH",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                7.31,
+                7.32,
+                7.32,
+                7.33,
+                7.32,
+                7.32,
+                7.31,
+                7.31,
+                7.3,
+                7.3,
+                7.29,
+                7.29,
+                7.3,
+                7.3,
+                7.28,
+                7.27,
+                7.22,
+                7.26,
+                7.28,
+                7.29,
+                7.32,
+                7.34,
+                7.35,
+                7.35
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#6366f1"
+              },
+              "itemStyle": {
+                "color": "#6366f1"
+              },
+              "yAxisIndex": 0
+            },
+            {
+              "name": "COD",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                32.78,
+                32.52,
+                32.52,
+                31.9,
+                31.9,
+                30.91,
+                30.91,
+                30.28,
+                30.28,
+                30.04,
+                30.04,
+                30.09,
+                30.09,
+                29.34,
+                29.34,
+                29.59,
+                29.59,
+                29.17,
+                29.17,
+                29.27,
+                29.27,
+                29.28,
+                29.28,
+                29.99
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#f59e0b"
+              },
+              "itemStyle": {
+                "color": "#f59e0b"
+              },
+              "yAxisIndex": 1
+            },
+            {
+              "name": "总氮",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                4.09,
+                4.08,
+                4.08,
+                4.1,
+                4.1,
+                3.99,
+                3.99,
+                3.89,
+                3.89,
+                3.96,
+                3.96,
+                3.91,
+                3.91,
+                4.09,
+                4.09,
+                4.26,
+                4.26,
+                4.51,
+                4.51,
+                4.69,
+                4.69,
+                4.8,
+                4.8,
+                5.1
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#10b981"
+              },
+              "itemStyle": {
+                "color": "#10b981"
+              },
+              "yAxisIndex": 1
+            },
+            {
+              "name": "氨氮",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.02,
+                0.03,
+                0.03,
+                0.03,
+                0.03,
+                0.03
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#ef4444"
+              },
+              "itemStyle": {
+                "color": "#ef4444"
+              },
+              "yAxisIndex": 1
+            },
+            {
+              "name": "总磷",
+              "type": "line",
+              "smooth": true,
+              "symbol": "none",
+              "sampling": "lttb",
+              "data": [
+                0.2,
+                0.22,
+                0.22,
+                0.19,
+                0.19,
+                0.16,
+                0.16,
+                0.14,
+                0.14,
+                0.13,
+                0.13,
+                0.14,
+                0.14,
+                0.13,
+                0.13,
+                0.13,
+                0.13,
+                0.14,
+                0.14,
+                0.14,
+                0.14,
+                0.14,
+                0.14,
+                0.17
+              ],
+              "lineStyle": {
+                "width": 2,
+                "color": "#8b5cf6"
+              },
+              "itemStyle": {
+                "color": "#8b5cf6"
+              },
+              "yAxisIndex": 1
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "subagent": "multi-dimensional-data-perception-agent",
+    "timestamp": "2026-07-29T22:30:52.711599",
+    "llm_driven": true
+  },
+  "skill_calls": [
+    {
+      "tool": "skill_view",
+      "skill": "data-perception-core"
+    }
+  ]
+}

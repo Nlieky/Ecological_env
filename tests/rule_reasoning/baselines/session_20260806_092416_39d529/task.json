@@ -1,0 +1,7 @@
+{
+  "task_id": "task_20260806092417_248d9154",
+  "task": "对7月14日到15日的pH和COD数据进行违规模式判定（插瓶干扰/稀释排放/人工拟合/恶意逃避），输出嫌疑等级",
+  "context": "{\"previous_step\": \"anomaly-detection completed: 46 anomalies detected for pH/COD (2026-07-14 to 2026-07-15)\"}",
+  "output_format": "json",
+  "timeout": 300
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "task_20260729223056_9cdc8d21",
+  "task": "检测7月14日pH和COD数据的异常特征（平稳/突变/趋势/周期/高频）",
+  "context": "{\"time_range\": \"7月14日\", \"data_stats\": {\"pH\": {\"influent\": {\"min\": 7.27, \"max\": 7.57, \"mean\": 7.42}, \"effluent\": {\"min\": 7.22, \"max\": 7.35, \"mean\": 7.3}}, \"COD\": {\"influent\": {\"min\": 54.85, \"max\": 496.74, \"mean\": 137.98}, \"effluent\": {\"min\": 29.17, \"max\": 32.78, \"mean\": 30.31}}}, \"influent_count\": 24, \"effluent_count\": 24}",
+  "output_format": "json",
+  "timeout": 300
+}

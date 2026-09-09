@@ -1,0 +1,7 @@
+{
+  "task_id": "task_20260806092252_f07c62b5",
+  "task": "检测7月14日到15日的pH和COD数据是否有异常特征（平稳/突变/趋势/周期/高频波动）",
+  "context": "{\"previous_step\": \"data-perception completed: 48 influent + 48 effluent records for pH/COD (2026-07-14 to 2026-07-15)\"}",
+  "output_format": "json",
+  "timeout": 300
+}

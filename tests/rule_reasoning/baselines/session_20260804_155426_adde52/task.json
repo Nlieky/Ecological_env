@@ -1,0 +1,7 @@
+{
+  "task_id": "task_20260804155427_1bacfff1",
+  "task": "检测7月14日到15日pH和COD数据的异常特征（平稳/突变/趋势/周期/高频）",
+  "context": "{\"effluent_count\": 48, \"influent_count\": 48, \"time_range\": \"2026-07-14 至 2026-07-15\"}",
+  "output_format": "json",
+  "timeout": 300
+}
