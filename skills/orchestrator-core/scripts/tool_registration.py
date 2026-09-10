@@ -332,6 +332,14 @@ def register_orchestrator_tools(agent):
                 "end": {"type": "string", "description": "结束时间,同 start 格式;注记时=注记的段止;无注记无日期传 now"}
             }, "required": ["algorithm", "indicator", "start", "end"]}
         }},
+        {"type": "function", "function": {
+            "name": "query_history",
+            "description": "查询历史研判记录与违规案例（图谱案例库+事件表合并，秒回）。当用户问'XX厂历史上有没有违规''以前的案例''最近的研判结论是什么''上次判了什么'这类历史/案例/既往问题时必须先调本工具再回答——不要现场重跑研判管线、不要拿大屏当前窗口当研判历史。查完有结果直接引用作答；无结果如实说没有记录。普通数据查询/研判类问题（问某天数据如何）不调本工具。",
+            "parameters": {"type": "object", "properties": {
+                "plant": {"type": "string", "description": "厂名或别名（如'金桥'），空=全部厂"},
+                "limit": {"type": "integer", "description": "最多返回条数，默认10"}
+            }, "required": []}
+        }},
     ]
     existing = {t.get('function', {}).get('name') for t in agent.tools if isinstance(t, dict)}
     for s in _ORCH_SCHEMAS:
@@ -378,6 +386,7 @@ def register_orchestrator_tools(agent):
             ("create_session", _create_session_handler, _ORCH_SCHEMAS[2]["function"]),
             ("read_result", _read_result_handler, _ORCH_SCHEMAS[3]["function"]),
             ("run_detector", _run_detector_handler, _ORCH_SCHEMAS[4]["function"]),
+            ("query_history", _query_history_handler, _ORCH_SCHEMAS[5]["function"]),
         ]
         for _n, _h, _sch in _OVR:
             _hg.register(
@@ -390,6 +399,18 @@ def register_orchestrator_tools(agent):
 
 
 # Hermes-agent兼容的工具处理器（灵活签名以兼容多种调用方式）
+def _query_history_handler(*args, **kwargs) -> str:
+    """query_history 工具处理器：查历史研判/案例（图谱+事件表双源，秒回）。
+    实现 query_history.py（2026-09-10 修复实测问题：历史类问题答非所问/漏写回案例）。
+    目录名带连字符（orchestrator-core）不可 import——用 importlib 按文件路径加载。"""
+    import importlib.util as _ilu
+    _p = Path(__file__).resolve().parent / "query_history.py"
+    _spec = _ilu.spec_from_file_location("_qhist", _p)
+    _mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    return _mod._handler(*args, **kwargs)
+
+
 def _guard_perception_result(result, task_text, session_dir):
     """感知①结果守卫(2026-08-27):LLM 构造 get_data 命令丢参(厂/时间)不稳定——
     校验产出,不符则用任务文本解析的参数确定性重跑脚本,覆盖错误结果。
