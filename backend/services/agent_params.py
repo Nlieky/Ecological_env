@@ -18,15 +18,19 @@ logger = logging.getLogger(__name__)
 # 参数目录：default=未配置时的值；type=int/str/secret；effect=立即生效|需重启；
 # reader=哪里读它（页面展示用）；env_key=对应的 .env 变量名（兜底来源）
 PARAM_REGISTRY: dict = {
-    "hermes_total_timeout": {"default": 300, "type": "int", "effect": "restart",
+    # ── 超时层级（2026-09-10 修正倒挂：外层必须层层大于内层）────────────
+    # 层级: AGENT_TIMEOUT(外,backend→agent HTTP) > TOTAL(中,单轮研判墙钟)
+    #       > SUBAGENT_TIMEOUT(内,单子智能体)。
+    # 合理配比: SUBAGENT 300 → TOTAL 900(3个子智能体串行余量) → AGENT 960(+HTTP 余量)
+    "hermes_total_timeout": {"default": 900, "type": "int", "effect": "restart",
         "reader": "scripts/start_agent.py", "env_key": "HERMES_TOTAL_TIMEOUT",
-        "desc": "主智能体单次会话总超时(秒)（注意:当前 hermes v0.16 引擎未读取此 env，为预留参数）"},
-    "subagent_timeout": {"default": 600, "type": "int", "effect": "restart",
+        "desc": "主智能体单次研判墙钟(秒)——start_agent 线程级强制执行(引擎不读此env,服务侧自实现)。必须 > subagent_timeout"},
+    "subagent_timeout": {"default": 300, "type": "int", "effect": "restart",
         "reader": "call_subagent.py", "env_key": "SUBAGENT_TIMEOUT",
-        "desc": "单个子智能体 subprocess 超时(秒)"},
-    "agent_timeout": {"default": 600, "type": "int", "effect": "immediate",
+        "desc": "单个子智能体 subprocess 超时(秒)。实测最快子智能体<90s;300 留 LLM 慢轮余量。必须 < hermes_total_timeout"},
+    "agent_timeout": {"default": 960, "type": "int", "effect": "immediate",
         "reader": "backend/api/routes/query.py", "env_key": "AGENT_TIMEOUT",
-        "desc": "后端→agent 服务 HTTP 超时(秒)，每请求读取"},
+        "desc": "后端→agent 服务 HTTP 超时(秒)，每请求读取。必须 > hermes_total_timeout(留 agent 服务处理余量)"},
     "master_max_iterations": {"default": 15, "type": "int", "effect": "restart",
         "reader": "scripts/start_agent.py", "env_key": None,
         "desc": "主智能体最大迭代轮数"},

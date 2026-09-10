@@ -47,7 +47,7 @@ _ap_spec = _ilu.spec_from_file_location("agent_params_standalone", _ap_path)
 _ap_mod = _ilu.module_from_spec(_ap_spec)
 _ap_spec.loader.exec_module(_ap_mod)
 _gp = _ap_mod.get_param
-os.environ['HERMES_TOTAL_TIMEOUT'] = str(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=300))
+os.environ['HERMES_TOTAL_TIMEOUT'] = str(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=900))
 
 from shared.framework.hermes_agent.run_agent import AIAgent
 
@@ -111,7 +111,9 @@ class AgentService:
         # master_agent 是单例共享，run_conversation 会改它的内部状态（messages/session_id），
         # 并发查询会串台。用锁串行化对 master_agent 的访问（配合 /query 走线程池）。
         self._agent_lock = threading.Lock()
-        self._agent_lock_timeout = 300  # 排队超过 5 分钟直接返回"忙"，不无限等
+        # 排队超时直接返回"忙"（2026-09-10 对齐墙钟 900：排队窗口 ≥ 一轮研判时长，
+        # 排在第二位的用户等第一位跑完还能轮到，而不是 5 分钟就被拒）
+        self._agent_lock_timeout = int(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=900))
 
     def initialize(self):
         """初始化主智能体实例"""
@@ -356,11 +358,40 @@ class AgentService:
             try:
                 self._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
                 _apply_style_strategy(self.master_agent)   # /query 路径:风格策略即时生效
-                result = self.master_agent.run_conversation(
-                    user_message=query,
-                    conversation_history=conversation_history,
-                    task_id=session_id
-                )
+                # ── 单轮研判墙钟（2026-09-10 修层级倒挂）──────────────────
+                # vendored hermes v0.16 引擎不读 HERMES_TOTAL_TIMEOUT env（死配置），
+                # 服务侧自实现：run_conversation 放工作线程，主线程限时 join。
+                # 墙钟 > SUBAGENT_TIMEOUT（默认 900>300）——LLM 疯狂瞎逛时最多
+                # 挂到墙钟即返回明确报错，而不是无限等。工作线程为 daemon，
+                # 超时后它内部的子智能体 subprocess 由各自 timeout 自然收尾。
+                _wall = int(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT",
+                                default=900))
+                _conv_result: dict = {}
+
+                def _run_conv():
+                    try:
+                        _conv_result["r"] = self.master_agent.run_conversation(
+                            user_message=query,
+                            conversation_history=conversation_history,
+                            task_id=session_id
+                        )
+                    except Exception as _e:  # 工作线程异常带回主线程
+                        _conv_result["err"] = _e
+
+                import threading as _th
+                _wt = _th.Thread(target=_run_conv, daemon=True, name="conv-wall")
+                _wt.start()
+                _wt.join(timeout=_wall)
+                if _wt.is_alive():
+                    logger.error(f"研判墙钟超时(>{_wall}s): session={session_id} query={query[:40]}")
+                    result = {"success": False,
+                              "error": (f"研判总超时（>{_wall}s）——主智能体本轮未完成。"
+                                        f"常见原因: LLM 瞎逛/某子智能体卡死。"
+                                        f"排查: sessions/_subagent_traces/ 最新日志")}
+                elif "err" in _conv_result:
+                    raise _conv_result["err"]
+                else:
+                    result = _conv_result.get("r") or {"success": False, "error": "研判无返回"}
             finally:
                 if _tool_reg is not None:
                     _tool_reg._current_progress_queue = None

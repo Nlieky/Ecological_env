@@ -348,8 +348,11 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
             "task_id": task_id,
             "status": "failed",
             "result": None,
-            "error": f"Subagent timed out after {subagent_timeout} seconds",
-            "metadata": {"timestamp": datetime.now().isoformat()}
+            "error": (f"子智能体 [{subagent_name}] 超时（>{subagent_timeout}s）——"
+                      f"该环节卡死。排查: sessions/_subagent_traces/{task_id}_{subagent_name}.log"),
+            "metadata": {"timestamp": datetime.now().isoformat(),
+                         "subagent": subagent_name,
+                         "timeout_seconds": subagent_timeout}
         }
     except Exception as e:
         return {
