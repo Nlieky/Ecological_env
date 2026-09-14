@@ -329,6 +329,15 @@ Natural language report + alerts
 - 图谱语义审计（前置）：2026-09-09 对抗审计 10 错边+8 夸大全整改（detects 3 错/法条锚 §39+§83 重整/删 3 条零依据边）+ 守卫测试 test_graph_invariants.py 10 条防回归；**seed_importer 纯 upsert 删边不生效的坑已修**（run_seed 先清种子自有边）
 - 回退频率观察：10 轮全 used_graph=true、fallbacks=0——观察期（~50 轮）后几乎不触发则按用户指示移除兜底
 
+### 根因分析（2026-09-11 子项目 4/4）
+- `GraphStore.impact(node_id, direction)`：**双向故障推演**——顺边 hosts（承载者挂→被承载者挂）+ 逆边 calls/reads/orchestrates/uses/invokes/mounts（被依赖方挂→依赖方受影响）；逐跳 BFS 上限 6 跳（混链 5 跳超 neighbors MAX_DEPTH=4）；downstream=波及面 / upstream=根因候选；via 标首跳边类型；领域边不参与
+- 六服务健康探测（`backend/api/v1/system/routes.py`）：backend/agent/influxdb（health() 真连 3s 超时）/frontend（HEAD）/llm（models 列表，get_param 配置中心链路）/sqlite（quick_check）；**ThreadPoolExecutor 并行**（冷启 2.3s vs 串行 12.6s）+ 10s 模块级缓存
+- `/api/v1/knowledge/impact/{id}` 端点 + 图谱 service 节点 health 叠加（down 常态红）
+- 前端推演模式（`/agents/knowledge` 拓扑 tab「⚡影响推演」）：点节点→故障红/波及橙/根因紫/无关淡出 + 摘要条；案例链路高亮（厂→模式→法条蓝链）与推演互斥；60s 健康慢轮询；`?focus=` query 直开详情
+- 事件中心详情"关联链路"区块（case:{event_id} 桥）+「在图谱中查看」跳转
+- 故障演练实测：kill agent → 图谱 agent_service 红 + 波及 3 节点（hosts/calls 正确）→ 恢复变绿；frontend upstream 35 根因候选
+- **四子项目全部完成**（图谱核心/事件真实化/智能体集成/根因分析）
+
 ### 配置
 - `.env`: 环境变量配置
 - `.hermes/config.yaml`: Hermes 框架配置
