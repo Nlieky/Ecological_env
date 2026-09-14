@@ -6,6 +6,7 @@
   例外：plant 节点 id 保留真实中文 plant_id，与 InfluxDB tag 一致，活图叠加直接匹配）
 - 边 UNIQUE(src,dst,type) 幂等；写入只走 upsert
 - 多跳邻居用递归 CTE（推理场景）；寻路用 Python BFS（根因场景）
+- 影响面推演 impact()：逐跳 BFS，每跳复用 neighbors 分两批（顺边/逆边）合并
 - depth 硬上限 4（超限抛 ValueError，防递归 CTE 失控）
 - WAL 模式；研判写回与种子重跑靠短事务 + UNIQUE 兜底
 """
@@ -275,6 +276,78 @@ class GraphStore:
                     visited.add(nxt)
                     queue.append((nxt, path + [nxt]))
             return None
+
+    # ── 影响面推演（子项目4）────────────────────────────────────────
+    _IMPACT_FORWARD = ("hosts",)  # 顺边：承载者挂→被承载者挂（反向也传导：被承载者死→承载服务空转）
+    _IMPACT_REVERSE = ("calls", "reads", "orchestrates", "uses", "invokes", "mounts")
+    # 种子拓扑最长故障链 frontend→backend→agent_service→master→①→influxdb=5 跳，留 1 跳余量
+    _IMPACT_MAX_HOPS = 6
+
+    def impact(self, node_id: str, direction: str = "both") -> Dict:
+        """故障影响面双向推演（领域边不参与，只在拓扑子图流动）。
+
+        downstream=该点挂了谁受影响：hosts 边双向传导（承载者挂→被承载者挂；
+        被承载者死→承载服务空转降级）+ 逆边类型沿 in（依赖挂→依赖方挂，
+        如 influxdb 挂→reads 它的①挂）。
+        upstream=该点异常可能是谁引起的：两方向反转（hosts 双向找同机邻居 +
+        逆边沿 out 找它依赖谁/它调用谁）。
+        节点不存在 raise KeyError；direction 非 both/downstream/upstream raise ValueError。
+        返回 {node, downstream:[{id,type,label,depth,via}], upstream:[同]}；
+        via=故障点直接邻居的首跳边类型（多跳留空——摘要条够用）。
+
+        实现注意：故障链会跨边类别流动（reads→hosts→calls 混链，实测种子拓扑
+        influxdb→①→master→agent_service→backend→frontend 达 5 跳），单发一条
+        depth≤4 且边类型白名单固定的递归 CTE 走不完，故逐跳 BFS：每跳对
+        frontier 各节点分两批调 neighbors(depth=1)（forward 批 both + reverse
+        批方向化）合并取小 depth——复用 neighbors，不写新 CTE。
+        """
+        if direction not in ("both", "downstream", "upstream"):
+            raise ValueError("direction 必须是 both/downstream/upstream")
+        node = self.get_node(node_id)
+        if node is None:
+            raise KeyError(f"节点不存在: {node_id}")
+        out: Dict = {"node": node, "downstream": [], "upstream": []}
+        if direction in ("both", "downstream"):
+            out["downstream"] = self._impact_reach(node_id, downstream=True)
+        if direction in ("both", "upstream"):
+            out["upstream"] = self._impact_reach(node_id, downstream=False)
+        return out
+
+    def _impact_reach(self, start: str, downstream: bool) -> List[Dict]:
+        """impact 的单方向 BFS（调用方已校验节点存在与 direction）。"""
+        rev_dir = "in" if downstream else "out"
+        seen: Dict[str, Dict] = {}
+        frontier = [start]
+        for depth in range(1, self._IMPACT_MAX_HOPS + 1):
+            nxt: List[str] = []
+            for nid in frontier:
+                fwd = self.neighbors(nid, edge_types=list(self._IMPACT_FORWARD),
+                                     direction="both", depth=1)
+                rev = self.neighbors(nid, edge_types=list(self._IMPACT_REVERSE),
+                                     direction=rev_dir, depth=1)
+                for n in fwd["nodes"] + rev["nodes"]:
+                    tid = n["id"]
+                    if tid == start or tid in seen:
+                        continue  # 不回起点；BFS 层序保证首次到达即最小 depth
+                    entry = {"id": tid, "type": n["type"], "label": n["label"],
+                             "depth": depth, "via": ""}
+                    if depth == 1:
+                        entry["via"] = self._first_hop_via(start, tid, fwd, rev)
+                    seen[tid] = entry
+                    nxt.append(tid)
+            frontier = nxt
+            if not frontier:
+                break
+        return [seen[k] for k in sorted(seen, key=lambda k: (seen[k]["depth"], k))]
+
+    @staticmethod
+    def _first_hop_via(start: str, tid: str, *batches: Dict) -> str:
+        """首跳直达边类型：从 depth=1 批次的 edges 里找 start↔tid 连边。"""
+        for batch in batches:
+            for e in batch.get("edges", []):
+                if {e["src"], e["dst"]} == {start, tid}:
+                    return e["type"]
+        return ""
 
     def stats(self) -> Dict:
         with self._lock:

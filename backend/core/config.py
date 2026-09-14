@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     AGENT_SERVICE_URL: str = "http://localhost:8642"
     AGENT_TIMEOUT: int = 600  # AgentService 请求超时时间（秒）— 完整pipeline 4子智能体~280-310s，留余量
 
+    # 前端 dev server（/system/status 六服务探测用，.env 可覆盖）
+    FRONTEND_URL: str = "http://localhost:5173"
+
     # LLM 配置（用于展示）
     LLM_MODEL: str = "ctgu-vlm"
 
