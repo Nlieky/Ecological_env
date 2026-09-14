@@ -178,12 +178,20 @@ _CALLS = [
 ]
 # 审计 2026-09-09 修正：删 rule-reasoning→sqlite_logs（零代码依据）；
 # 删 disposition→sqlite_logs 的 writes（处置真实写的是会话目录结果文件
-# sessions/<session>/——是中转不是库）。_WRITES 留空表保结构。
+# sessions/<session>/——是中转不是库）。
+# 2026-09-11 补真实边（子4 审查发现 sqlite_logs 零边孤岛）：backend 真实读写
+# SQLite 日志库——conversation_service（对话历史）/event_service（事件+图谱写回
+# 的入口侧）/logging 中间件（api_call_logs）都经 SessionLocal 连 ecological_logs.db
+# （grep 证据：三文件 SessionLocal import + query.py 落库调用）。
 _READS = [
     ("agent:multi-dimensional-data-perception", "service:influxdb",
      "get_data 取数"),
+    ("service:backend", "service:sqlite_logs",
+     "对话历史/事件/审计日志读写（conversation_service+event_service+logging 中间件）"),
 ]
 _WRITES: List[Tuple[str, str, str]] = []
+# event_service 的图谱写回发生在 backend 进程内，但图数据文件在 shared/data/
+# （与日志库同库族）；图谱连通性由 hosts/reads 已覆盖，不单列 writes。
 
 # ── 技能（skill）目录：主智能体 + 4 子智能体的真实技能（各 skills/ 目录） ──
 SKILLS: List[Tuple[str, str, str]] = [
