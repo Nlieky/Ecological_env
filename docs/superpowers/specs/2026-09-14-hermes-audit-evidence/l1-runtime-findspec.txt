@@ -15,3 +15,7 @@ hermes_constants                                 -> /home/NYJ2025/Ecological_env
 utils                                            -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/utils.py
 hermes_cli                                       -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/hermes_cli/__init__.py
 hermes_agent                                     -> NONE
+== venv 身份（质量审查补测 2026-09-14）==
+sys.executable: /home/NYJ2025/Ecological_env/ecological_env/bin/python
+sys.version: 3.12.12
+说明: 上述 find_spec 全部在该解释器内执行；scripts/start_agent.py 与 start_backend.sh 均以裸 python 启动（#!/usr/bin/env python / python -m uvicorn），解析到哪个解释器取决于 PATH 激活。Task 5 的 E1 计数 wrapper 须注入本解释器。
