@@ -163,11 +163,18 @@ def _heal_perception_by_script(task_text, session_dir):
         args += ["--hours", "24"]
     if plant:
         args += ["--plant", plant]
+    # chart 指标（2026-09-14 修，与 tool_registration 守卫同源判据）：
+    # 只有"只要/仅看"限定词且非"全部"才传——旧版关键词包含匹配会把
+    # "全部指标(pH/COD/TN/...)"误判成点名 pH,COD，自愈重跑把全指标曲线砍成 2 条
+    _named = any(k in text for k in ("只要", "仅看", "只关心", "只需要"))
+    _wants_all = any(k in text for k in ("全部指标", "全指标", "所有指标", "全部监测指标"))
     inds = []
-    for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
-                   ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS")]:
-        if cn in text and en not in inds:
-            inds.append(en)
+    if _named and not _wants_all:
+        for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
+                       ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS"),
+                       ("TN", "TN"), ("NH3-N", "NH3-N"), ("TP", "TP"), ("SS", "SS")]:
+            if cn in text and en not in inds:
+                inds.append(en)
     if inds:
         args += ["--chart-indicators", ",".join(inds)]
 

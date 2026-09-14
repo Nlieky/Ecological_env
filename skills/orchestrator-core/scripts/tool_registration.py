@@ -437,12 +437,20 @@ def _guard_perception_result(result, task_text, session_dir):
                 break
         bad_plant = (not plant) and bool(want_plant)          # 混库
         bad_date = bool(want_date) and want_date not in tr    # 时间窗回退
-        # 指标校验:任务点名了指标(如"只要COD"),图的 series 却画了全指标 → 也重跑
+        # 指标校验(2026-09-14 修):任务**点名**了指标(有"只要/仅看"限定词)而图画了全指标 → 重跑。
+        # 教训:旧版用关键词包含匹配——task"全部指标(pH/COD/TN/NH3-N/TP/SS)"里英文缩写
+        # 只匹配到 pH/COD → 误判点名 → 重跑时传 --chart-indicators pH,COD 把全指标曲线砍成2条。
+        # 新判据:必须出现"只要/仅看/只关心"限定词才视为点名;"全部/所有/全指标"明确豁免。
+        _tt = task_text or ""
+        _named = any(k in _tt for k in ("只要", "仅看", "只关心", "只需要"))
+        _wants_all = any(k in _tt for k in ("全部指标", "全指标", "所有指标", "全部监测指标"))
         want_inds = []
-        for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
-                       ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS")]:
-            if cn in (task_text or "") and en not in want_inds:
-                want_inds.append(en)
+        if _named and not _wants_all:
+            for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
+                           ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS"),
+                           ("TN", "TN"), ("NH3-N", "NH3-N"), ("TP", "TP"), ("SS", "SS")]:
+                if cn in _tt and en not in want_inds:
+                    want_inds.append(en)
         got_series = []
         for c in (r.get("chartData") or []):
             got_series += [s.get("name") for s in (c.get("option") or {}).get("series") or []]
@@ -469,11 +477,18 @@ def _guard_perception_result(result, task_text, session_dir):
             args += ["--hours", "24"]
         if want_plant:
             args += ["--plant", want_plant]
+        # 重跑时的 chart 指标：与上面新判据同源（2026-09-14 修）——只有"只要/仅看"
+        # 限定词且非"全部"才传；默认不传=画全指标（旧版关键词包含匹配会把
+        # "全部指标(pH/COD/TN/...)"误判成只画 pH,COD）
+        _named2 = any(k in (task_text or "") for k in ("只要", "仅看", "只关心", "只需要"))
+        _wants_all2 = any(k in (task_text or "") for k in ("全部指标", "全指标", "所有指标", "全部监测指标"))
         inds = []
-        for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
-                       ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS")]:
-            if cn in (task_text or "") and en not in inds:
-                inds.append(en)
+        if _named2 and not _wants_all2:
+            for cn, en in [("pH", "pH"), ("COD", "COD"), ("化学需氧量", "COD"), ("总氮", "TN"),
+                           ("氨氮", "NH3-N"), ("总磷", "TP"), ("悬浮物", "SS"),
+                           ("TN", "TN"), ("NH3-N", "NH3-N"), ("TP", "TP"), ("SS", "SS")]:
+                if cn in (task_text or "") and en not in inds:
+                    inds.append(en)
         if inds:
             args += ["--chart-indicators", ",".join(inds)]
         env = dict(os.environ)
