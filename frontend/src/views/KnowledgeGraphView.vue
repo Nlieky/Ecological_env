@@ -374,9 +374,19 @@ onMounted(async () => {
   chart?.on('click', onNodeClick)
   window.addEventListener('resize', onResize)
   healthTimer = setInterval(() => { store.refreshHealth().catch(() => {}) }, 60_000)
-  // focus query：?focus=<node_id> 直开详情侧栏（事件中心等外链深入口）
+  // focus query：?focus=<node_id> 直开详情侧栏（事件中心等外链深入口）。
+  // 审查 Issue B：上次停在服务拓扑 tab 时跳 focus（case 等领域类型节点不在拓扑
+  // visibleTypes 里）→ 详情开了画布看不见节点；先切回领域 tab 再开详情
   const focus = typeof route.query.focus === 'string' ? route.query.focus : ''
-  if (focus) openNode(focus)
+  if (focus) {
+    const nodeType = focus.split(':')[0]
+    const domainPrefixes = ['case', 'plant', 'indicator', 'violation_pattern',
+      'operator', 'regulation', 'knowledge_doc', 'category', 'library']
+    if (store.activeTab === 'topology' && domainPrefixes.includes(nodeType)) {
+      store.setTab('domain')
+    }
+    openNode(focus)
+  }
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)

@@ -93,21 +93,28 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const activeTab = ref<'domain' | 'topology'>('domain')
   const hiddenTypes = ref<string[]>([]) // 空=该 tab 全显
 
-  async function loadGraph() {
-    if (loading.value) return // 防重入
+  // 在飞请求复用（审查 Issue A：旧版防重入直接 return——首载 6s+（健康探测慢）期间
+  // highlightCase 看到 allEdges 空 → 误报"无关联链路"。改为存 promise 让后来者 await 同一次）
+  let _inflight: Promise<void> | null = null
+  function loadGraph(): Promise<void> {
+    if (_inflight) return _inflight
     loading.value = true
     error.value = null
-    try {
-      const resp = await knowledgeService.graph()
-      allNodes.value = resp.nodes
-      allEdges.value = resp.edges
-      stats.value = resp.stats
-      seeded.value = resp.seeded
-    } catch (e: any) {
-      error.value = e?.message || '知识图谱加载失败'
-    } finally {
-      loading.value = false
-    }
+    _inflight = (async () => {
+      try {
+        const resp = await knowledgeService.graph()
+        allNodes.value = resp.nodes
+        allEdges.value = resp.edges
+        stats.value = resp.stats
+        seeded.value = resp.seeded
+      } catch (e: any) {
+        error.value = e?.message || '知识图谱加载失败'
+      } finally {
+        loading.value = false
+        _inflight = null
+      }
+    })()
+    return _inflight
   }
 
   function toggleType(t: string) {
@@ -166,7 +173,11 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const caseLinkNodes = ref<Set<string> | null>(null)
   const caseLinkLabel = ref('')
 
-  function highlightCase(caseId: string) {
+  async function highlightCase(caseId: string) {
+    // 图未加载完（首访 6s+ 健康探测窗口）先等加载——否则 allEdges 空会误报"无链路"（审查 Issue A）
+    if (!allEdges.value.length && !seeded.value) {
+      await loadGraph()
+    }
     const set = caseLinkNodesOf(caseId, allEdges.value)
     if (!set) {
       ElMessage.info('该案例无关联链路')

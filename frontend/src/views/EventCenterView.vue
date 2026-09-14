@@ -183,12 +183,16 @@ function openDetail(row: AlertEvent) {
 interface CaseLinkEl { id: string; label: string; type: string }
 const caseLink = ref<CaseLinkEl[] | null>(null)
 const caseLinkLoading = ref(false)
+let caseLinkSeq = 0 // 请求序号守卫（审查 Issue C）
 watch(current, async (ev) => {
   caseLink.value = null
   if (!ev) return
+  // 请求序号守卫（审查 Issue C）：快速关/开抽屉时旧响应晚到不覆盖新事件
+  const seq = ++caseLinkSeq
   caseLinkLoading.value = true
   try {
     const resp = await knowledgeService.node(`case:${ev.id}`)
+    if (seq !== caseLinkSeq) return
     const ORDER: Record<string, number> = { plant: 0, violation_pattern: 1 } // 厂→模式
     const out: CaseLinkEl[] = []
     for (const [type, list] of Object.entries(resp.neighbors || {})) {
@@ -201,9 +205,10 @@ watch(current, async (ev) => {
     out.sort((a, b) => (ORDER[a.type] ?? 9) - (ORDER[b.type] ?? 9))
     caseLink.value = out.length ? out : null
   } catch {
+    if (seq !== caseLinkSeq) return
     caseLink.value = null // 404（无写回）静默
   } finally {
-    caseLinkLoading.value = false
+    if (seq === caseLinkSeq) caseLinkLoading.value = false
   }
 })
 const router = useRouter()
