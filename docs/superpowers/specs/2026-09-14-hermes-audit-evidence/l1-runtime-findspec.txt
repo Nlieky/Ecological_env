@@ -1,0 +1,17 @@
+python: 3.12.12
+sys.path[0:3]: ['/home/NYJ2025/Ecological_env', '', '/home/NYJ2025/.local/share/uv/python/cpython-3.12.12-linux-x86_64-gnu/lib/python312.zip']
+shared.framework.hermes_agent                    -> /home/NYJ2025/Ecological_env/shared/framework/hermes_agent/__init__.py
+shared.framework.hermes_agent.run_agent          -> /home/NYJ2025/Ecological_env/shared/framework/hermes_agent/run_agent.py
+shared.framework.hermes_agent.agent.identity_loader -> /home/NYJ2025/Ecological_env/shared/framework/hermes_agent/agent/identity_loader.py
+run_agent                                        -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/run_agent.py
+agent                                            -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/__init__.py
+agent.process_bootstrap                          -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/process_bootstrap.py
+agent.system_prompt                              -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/system_prompt.py
+tools                                            -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/tools/__init__.py
+tools.registry                                   -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/tools/registry.py
+tools.orchestrator_tool                          -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/tools/orchestrator_tool.py
+model_tools                                      -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/model_tools.py
+hermes_constants                                 -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/hermes_constants.py
+utils                                            -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/utils.py
+hermes_cli                                       -> /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/hermes_cli/__init__.py
+hermes_agent                                     -> NONE
