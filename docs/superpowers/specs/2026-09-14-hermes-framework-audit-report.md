@@ -4,7 +4,23 @@
 - 设计文档：docs/superpowers/specs/2026-09-14-hermes-framework-audit-design.md
 - 严重度图例：🔴 阻塞（正确性/可用性风险）｜🟡 应修（质量/维护风险）｜🟢 建议
 
-## 0. 执行摘要（最后写）
+## 0. 执行摘要
+
+**框架这条路走对了。** 本次评估把 626 个框架文件的真实调用链、对上游的全部本地改动、四个子智能体的接缝、一次真实查询的完整调用过程都查到了文件:行号粒度。对「Hermes 框架对不对」的直接回答：对——它撑起了当前全部活链路，阻塞级问题没有一个出在框架原生代码上。
+
+三个最说明问题的数字：
+
+| 数字 | 含义 | 出处 |
+|---|---|---|
+| **11 处改动 ≈ 1.8%** | 626 个框架文件里被项目改动的只有 11 个，且近半是同一件事（读身份文件）的配套改动——小针脚缝合，不是侵入式手术 | §2.6 |
+| **37 次调用 ≈ 3.1 倍，其中 57% 是浪费** | 实测一个最小监测任务（查进水 pH）全程 37 次 LLM 调用，是旧文档口径「约 12 次」的 3 倍多；多出来的部分主要败在可修的映射表错配与文档过时，不是架构死症 | §4 |
+| **8 个红项，落在框架本体的是 0 个** | 全部阻塞级问题：6 个在项目自己的接缝代码/文档/环境，1 个在已退役旧套件，1 个是零测试这类与选型无关的工程债 | §5.4 论据二 |
+
+**裁决：继续用并加固**（三选一里的明确一项；旧 orchestrator-core 套件按「拆弹→归档→抽取→删除」处置，§5.4）。理由一句话：框架链路是三条候选路线里唯一端到端实证跑通过的，用一个从未跑通过的实现去换它，在一人研究项目里没有胜算。
+
+**需要立即修的是 8 项 P0（§6.1，每项带可检验的验收标准）。最危险的一条是「续传伪装」**：同一会话追问时，一旦本轮数据脚本失败，系统会把上一轮的旧结果文件拷进来、改写任务编号、当作本轮成果返回——实测把 7 周前的数据当成「最近 24 小时」交付，全程无报错（§3.1、§4）。它不崩溃、日志也不难看，错的数据长得和对的一模一样——这是监测系统最不能要的一类错。
+
+**所谓「双路线」其实是「现路线 + 一条 7 月底就已退役的前代」**：旧套件在 07-29 已被一次性替换，遗留的只是处置没做完（没归档、没删、文档还在教人用，还埋着一个让全仓测试一跑就炸的旧测试，§5.0/§5.1）。把 §6 的 P0 清单修完，「继续用并加固」这一结论即可复评（触发条件见 §6.4）。
 
 ## 0.5 基线事实
 
@@ -427,7 +443,7 @@ TDD 完成（计划唯一 TDD 任务）：先写失败测试（ModuleNotFoundErr
 | 主智能体 master | 9 | 9/0 | 2→20 | 完成编排+最终回答 |
 | 子会话1 multi-dimensional-data-perception（下称 mddp） | 7 | 6/1 | 2→16 | failed：读 skill 未跑脚本 |
 | 子会话2 mddp | 7 | 6/1 | 2→15 | failed：同上 |
-| 子会话3 "data-perception"（名称变体） | 7 | 6/1 | 2→16 | **误判 failed**（脚本已产出，文件名错配） |
+| 子会话3 "data-perception"（合法别名·名称变体） | 7 | 6/1 | 2→16 | **误判 failed**（脚本已产出，文件名错配） |
 | 子会话4 mddp | 7 | 6/1 | 2→16 | success |
 | **合计** | **37** | 33/4 | — | 3/4 子会话浪费 |
 
@@ -443,7 +459,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 ### 实证新增发现（§3 未及/升级，移交 §6）
 
-1. 🔴 **别名键在两份重复映射间漂移→成功被误判失败**【触发即必错·数据正确性】：主智能体第 3 次重试用了非规范名 "data-perception"——它是 call_subagent.py:32-33 SUBAGENT_PATHS 白名单里合法的向后兼容别名（8 键 = 4 规范名 + 4 简化别名），call_subagent 自带的 RESULT_FILE_NAMES（:40-48）同样 8 键并正确把该别名映射到 data_result.json，名称校验层**存在**（:167-172 按 8 键表校验，表外名直接拒）；真缺陷在 subagent_entry.py:52-57 维护了**第二份同语义映射却只收 4 个规范名**，且 `.get(name, "result.json")`（:182 取结果、:209/:216 写结果同用）静默兜底——脚本按规范名写 data_result.json、entry 却读 result.json → 误标 failed → 又多烧一整轮会话（7 次）。另注：tool_registration.py:242 的 call_subagent 参数 enum 只列 4 个规范名，但 dispatch 侧未按 enum 强制（LLM 传枚举外的别名仍被别名表放行）。修法应指向「两表合一/给 subagent_entry 补别名键」，而非「加校验层」（校验已在，错在映射漂移）。本例同时是 L3 预警 c 的活体例证：会话 3 的 result.json 把「脚本已跑成」标为 failed——结果文件只作旁证、以 trace 日志+探针计数为准的取证规则再次成立。
+1. 🔴 **别名键在两份重复映射间漂移→成功被误判失败**【触发即必错·数据正确性】：主智能体第 3 次重试用了非规范名 "data-perception"——它是 call_subagent.py:32-33 SUBAGENT_PATHS 白名单里的合法别名（8 键 = 4 规范名 + 4 简化别名），call_subagent 自带的 RESULT_FILE_NAMES（:40-51）同样 8 键并正确把该别名映射到 data_result.json，名称校验层**存在**（:167-172 按 8 键表校验，表外名直接拒）；真缺陷在 subagent_entry.py:52-57 维护了**第二份同语义映射却只收 4 个规范名**，且 `.get(name, "result.json")`（:182 取结果、:209/:216 写结果同用）静默兜底——脚本按规范名写 data_result.json、entry 却读 result.json → 误标 failed → 又多烧一整轮会话（7 次）。另注：tool_registration.py:242 的 call_subagent 参数 enum 只列 4 个规范名，但 dispatch 侧未按 enum 强制（LLM 传枚举外的别名仍被别名表放行）。修法应指向「两表合一/给 subagent_entry 补别名键」，而非「加校验层」（校验已在，错在映射漂移）。本例同时是 L3 预警 c 的活体例证：会话 3 的 result.json 把「脚本已跑成」标为 failed——结果文件只作旁证、以 trace 日志+探针计数为准的取证规则再次成立。
 2. 🔴 **「最近」数据静默返陈（升级 §3.3① 🟡→🔴）**【触发即必错·数据正确性】：任务问"最近数据"，脚本实际返回 2026-07-24（约 7 周前）数据，最终回答仍称"最近 24 小时"——L3 预警 b（InfluxDB 停更于 07-25）在活链路原样兑现。定级对账：与 §3.3① 同一根因（数据停更），但实证新增证据——**用户侧实际拿到顶着「最近 24 小时」话术的 7 周陈数据且无任何提示**，已从「数据新鲜度保留意见」升为用户侧静默数据错误，故 🟡→🔴。
 3. 🟡 **服务层 trace 显著少计**：/query 回传 trace 的 decision_path=2、subagent_calls=1（仅成功项），实际子进程启动 4 次（探针+落盘日志双证）——失败重试对后端审计不可见，「trace 供审计」的承诺打折。
 4. 🟡 **AGENT_PORT 环境覆盖已死**：hermes_cli/env_loader.py:238 以 override=True 加载 HERMES_HOME/.env，import 时碾压一切进程环境变量——start_agent.py 头注「可通过环境变量 AGENT_PORT 配置」失效，.env 永远赢（并行实例被迫临时改 .env）。
@@ -490,7 +506,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 ### 5.2 外部参照一：pi-subagents（检查项 4.2）
 
-机制依据：~/pi-subagent-tutorial.md（本机，2026-09-10 实测版）。核心模式：**角色文件制**（子智能体=一个 .md：frontmatter name/description/tools/model + 正文系统提示，教程 §4.1）、**技能三供给**（全继承/点名/skillPath 私有库，教程 §10 实测表）、**编排交自然语言+固化模板**（链式 {previous}/并行≤8，教程 §5 模式、§9.2 数字出处）、FleetView 观测（§3.5）、maxSubagentSpawnsPerRun=64 递归上限（§6.3）。
+机制依据：~/pi-subagent-tutorial.md（本机，2026-09-10 实测版）。核心模式：**角色文件制**（子智能体=一个 .md：frontmatter name/description/tools/model + 正文系统提示，教程 §4.1）、**技能三供给**（全继承/点名/skillPath 私有库，教程 §10 实测表）、**编排交自然语言+固化模板**（链式 {previous}/并行≤8，教程 §5 模式、§9.2 数字出处）、FleetView 观测（教程 §3.5）、maxSubagentSpawnsPerRun=64 递归上限（教程 §6.3）。
 
 **若采用其模式，本系统哪些痛点消失**：
 
@@ -531,17 +547,17 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 **结论：继续用并加固。** hermes 框架链路保留为唯一编排路线；「收缩框架为库」与「替换路线」否决；被裁方=旧 orchestrator-core 套件，按「先拆弹→归档→抽取→删除」顺序处置（过渡步骤见后）。
 
-**论据一（架构收益）——三条路线中唯一有活实证的。** E1 端到端跑通（§4：最小任务 79.7s 成功返回、未降级）与业务闭环①②③代码+运行时双证（§3.3）都发生在框架链路上；旧套件无任何一次完整五环节运行记录（「~12 次」是设计口径，§4 E3），替换=用一个从未被实证的实现换掉一个刚被实证的实现。框架扩展点使用正确（registry override=True 系上游官方插件机制，§2.4；身份注入锚定于 PATCHES，§2.1 #4），最重耦合面（run_agent/agent_init 整文件 overlay，§2.5）有已列明的松耦合降级路径。专利六层的 3/5 两层以 hermes 为载体成立（§1.7 ✅）——保框架=保专利叙事的载体连续性（该架构是「可演进的初始构想」，载体不变时演进成本最低）。框架承担的会话循环/流式/工具注册/技能发现/上下文压缩若自建，量级不少于旧套件 3772 行，且旧套件只覆盖其中「调度」一职（5.1 矩阵）。
+**论据一（架构收益）——三条路线中唯一有活实证的。** E1 端到端跑通（§4：最小任务 79.7s 成功返回、未降级）与业务闭环①②③代码+运行时双证（§3.3）都发生在框架链路上；旧套件则无一次完整运行记录（§5.0 裁决 3）；替换=用一个从未被实证的实现换掉一个刚被实证的实现。框架扩展点使用正确（registry override=True 系上游官方插件机制，§2.4；身份注入锚定于 PATCHES，§2.1 #4），最重耦合面（run_agent/agent_init 整文件 overlay，§2.5）有已列明的松耦合降级路径。专利六层的 3/5 两层以 hermes 为载体成立（§1.7 ✅）——保框架=保专利叙事的载体连续性（该架构是「可演进的初始构想」，载体不变时演进成本最低）。框架承担的会话循环/流式/工具注册/技能发现/上下文压缩若自建，量级不少于旧套件 3772 行，且旧套件只覆盖其中「调度」一职（5.1 矩阵）。
 
 **论据二（实证数据）——8 个红项无一落在 vendored 框架本体上。** 红项归属盘点（§3 共 6 红：死旋钮、续传重标、④⑤断链、活链路零测试、退役测试必炸；§4 新增 2 红：两表别名漂移、陈数据当「最近 24 小时」）：**项目接缝代码/文档/环境 6 处**——死旋钮（start_agent.py:34-36 假声明）、续传重标（start_agent.py:187-223 + subagent_entry.py:182-216）、④⑤断链（编排顺序无强制 + 知识库假接缝 regulation_matcher.py:35 E:/ 死路径，§3.3）、两表漂移（call_subagent.py:26-48 + subagent_entry.py:52-57）、陈数据（InfluxDB 停更——环境侧，§3.3①/§4 发现 2；SKILL.md 漂移的影响计入浪费侧，见反论②）；**被裁方 1 处**——退役测试必炸（恰由过渡步骤 1 拆除）；**路线无关工程债 1 处**——零测试（§3.5）；**vendored 框架本体 0 处**。框架侧活改动全景=身份扩展链 #1-#4（四处声明齐、§2.5 评分正确性 🟢 低）+ 特化 #7/#8/#9（#7 未声明且已致流式 usage 退化——§4 实证 33/37 次无 usage；#8 声明文本漂移；#9 无注释），合计 11 文件 ≈1.8%（§2.6 表）。框架本体 88.5% 非死重量（执行覆盖口径下界 62.0%，两口径见 §1.3）——它是引擎不是行李。
 
-**论据三（维护成本）——1 人团队、作者不懂框架内部的算术。** 路线 A：修 §2.6 六项清单 + §3 红 4 项 + 两表合一 + 补 3 条接缝测试，量级以天计，且每项验收标准都是业务可观察的（复现管道重放一致、结果不再误标、追问轮不再返陈数据）。路线 B（收缩为库，只取身份与工具系统）：§1.2 已证运行时=「精简包 + vendored 全家桶」混合体（448 静态可达 + 79 动态加载插件）且存在 vendored→精简包反向依赖（system_prompt.py:112）——收缩即自维护一个无上游映射的私有子集，§2.6 四断点原样保留且失去 overlays 管道这一（可修复的）重建机制，上游 PyPI 又无包可装（§2.0），同步成本不降反升，且「懂业务不懂内部」的作者从此独自面对全部框架内部。路线 C（替换）：回旧套件=复活退役代码并丢掉唯一实证基线；引 pi/OpenClaw=形态/体量不符（5.2/5.3 决定性代价）；自建=旧套件 8 周 52 提交的历史已证明 1 人写不全，且其自身也从未跑通五环节（5.0）。另一事实：07-30 后框架零提交仍通过 09-14 活实证（5.0）——框架处于**稳态低维护**，不在持续失血。
+**论据三（维护成本）——1 人团队、作者不懂框架内部的算术。** 路线 A：修 §2.6 六项清单 + §3 红 4 项 + 两表合一 + 补 3 条接缝测试，量级以天计，且每项验收标准都是业务可观察的（复现管道重放一致、结果不再误标、追问轮不再返陈数据）。路线 B（收缩为库，只取身份与工具系统）：§1.2 已证运行时=「精简包 + vendored 全家桶」混合体（448 静态可达 + 79 动态加载插件）且存在 vendored→精简包反向依赖（system_prompt.py:112）——收缩即自维护一个无上游映射的私有子集，§2.6 四断点原样保留且失去 overlays 管道这一（可修复的）重建机制，上游 PyPI 又无包可装（§2.0），同步成本不降反升，且「懂业务不懂内部」的作者从此独自面对全部框架内部。路线 C（替换）：回旧套件=复活退役代码并丢掉唯一实证基线；引 pi/OpenClaw=形态/体量不符（5.2/5.3 决定性代价）；自建=旧套件 8 周 52 提交的历史已证明 1 人写不全，且其自身也从未跑通五环节（5.0）。另一事实：07-30 后框架零提交仍通过 09-14 活实证（5.0）——框架处于**稳态低维护**，不在持续失血（保留意见：活实证仅 n=1，稳态判断系单点证据）。
 
 **四大反论正面回应**：
 
 - **① vendor 管道坏了（§2.6 四断点）**：全盘承认——今日不可复现、重跑即坏（脚本语法错 + PATCHES 文本漂移 + overlays 不完整 + 排除集失真）。但定性是**构建期脚本缺陷**（1 个多余括号、2 条文本漂移、3 项未声明），不是架构死局，修复清单 §2.6 ①-⑥ 已逐项有锚。裁决是条件化的：**修复管道是路线 A 的准入 P0 而非可选项**——若明确不修，vendored 树将持续腐坏，届时结论翻向 B/C（敏感条件 1）。
 - **② 37 次/57% 浪费（§4）**：分解归属——9 次主智能体（框架决策循环，按设计运行）；每子会话 7 次=项目配置（max_iterations=6 + 摘要 1，subagent_entry.py:177）；57% 浪费=3 个失败子会话，其中 ≥1 个直接归因两表漂移误判（§4 发现 1）、「读 skill 未跑脚本」归因 SKILL.md 文档漂移（§3.3②③）——**主因可在不动框架架构的前提下降解**（两表合一 + 文档修正 + 迭代上限调低 + 技能预注入）。保留意见：n=1 样本（§4 样本限度）。
-- **③ 零测试（§3.5）**：承认，且是全路线等价负债——替换不继承任何保护（旧 10 测试押注退役链且 1 个收集即炸）。测试债与框架选型正交；路线 A 下首批接缝测试（续传语义/两表映射/注册覆盖）有 E1 探针基线可对照（§4 E1 方法可复用）。
+- **③ 零测试（§3.5）**：承认，且是全路线等价负债——替换不继承任何保护（旧 10 测试押注退役链且 1 个收集即炸）。测试债与框架选型正交——全新薄协调器同样从零测试起步、且无 E1 探针基线可对照；路线 A 下首批接缝测试（续传语义/两表映射/注册覆盖）有 E1 探针基线可对照（§4 E1 方法可复用）。
 - **④ 上游落后 15 releases（§2.6）**：对内网冻结端点（.env 唯一真源 ctgu-vlm@172.16.12.41，§1.4）的研究项目，升级是低频事件；0.16.0 于 09-14 活实证通过（§4 E4）。处置=把「留在 0.16.0」写成显式决策（PROVENANCE 记基线 7df3aa34，§2.6 建议④）而非被动漂移；升级解锁条件=先修完 ①。
 
 **敏感条件（X 变了，结论会翻）**：
@@ -552,9 +568,11 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 4. ④⑤被证明是框架能力缺失而非单纯未执行（§3.3 现口径：零执行记录，不能排除历史跑通）——框架收益主张削弱，重估。
 5. 反向敏感：上游 0.21.x 原生吸收身份文件/多智能体机制（#1-#4 上游化）——同步成本大降，本结论加固。
 
+以上五条件即 §6 路线图的复评触发器（§6 已设触发器栏收录）。
+
 **过渡步骤（被裁方处置 + 胜出路线启动；细目排期归 §6）**：
 
-1. **先拆弹（P0，立即，先于一切删除动作）**：test_four_layer_architecture.py（pytest 收集即 ImportError，§3.5）移出收集范围或删除；verify_architecture.py（E:/ 硬编码恒错输出，§3.5）删除——不拆则后续任何全树测试动作都被阻断。
+1. **先拆弹（P0，立即，先于一切删除动作）**：test_four_layer_architecture.py（pytest 收集即 ImportError，§3.5）移出收集范围或删除——不拆则后续任何全树测试动作都被阻断；verify_architecture.py（E:/ 硬编码恒错输出，§3.5；在 pytest 收集范围外）顺带清理。
 2. **归档（P0→P1，不直删）**：workspace/skills/orchestrator-core/ 全部 4 文件 3772 行 + 8 个押注测试（§1.7 清单）git mv 入 archive/（或先打 tag）——git 历史即备份，为抽取留窗口。
 3. **抽取可复用件（与 2 同批）**：代码件=**无**（活链路零依赖 §1.7；子智能体业务脚本本就在 subagents/，与旧套件无关）；设计件=旧套件「每子 2 次调用」的经济学（execution_control.py:377-505 单发模式）作为 §6 P2 调用预算研究的输入；文档件=CLAUDE.md 按 §1.7 实测重写（必须与归档同批，否则文档指向已删路径——现 CLAUDE.md 已引用不存在的 task_receiving_and_parsing.py 与 middleware/，5.1/§1.7）。
 4. **删除（P1 末，验收后）**：活链路 E2E 回归测试建立且绿（§6 P1 测试项）后物理删除 archive/；同批清理 workspace/config.yaml 死文件（§1.4/§3.4）。
@@ -564,7 +582,351 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 <!-- 覆盖设计文档 §4 输出物「路线图」（P0 立即修/P1 短期/P2 方向性演进，P2 含借鉴 pi-subagents、OpenClaw 的具体机制清单）+ 验收标准 §7-4（P0 项可直接转化为后续修复任务） -->
 
+### 6.0 发现总表（§2/§3/§4 红黄汇总，绿仅计数）
+
+编号规则：**R** = 运行时红（§3/§4，共 8，即 §5.4 论据二「8 红」口径：项目接缝 6 + 被裁方 1 + 路线无关 1，vendored 框架本体 0）；**Y** = 黄（§3/§4，共 22）；**V** = 改装与 vendor 管道问题（§2 侧，共 9；其 🔴 为「触发即坏」的构建期红/埋雷，不属 8 红口径——两者不矛盾，§2 侧红全部落在项目改装与管道脚本上，同样 0 个在 vendored 本体）。严重度逐条照抄原节，未升未降；🟢 不入表仅计数（各节合计十余处：锁与排队守门、subprocess 超时硬杀、全量 trace 落盘、identity_loader 模块设计、身份文件全载、业务算子层 13 个单测等）。
+
+| 编号 | 严重度 | 一句话 | 证据锚点（原节） | 层 |
+|---|---|---|---|---|
+| R1 | 🔴 | 续传伪装成功：失败轮拷旧结果 + 重标 task_id，旧数据冒充本轮产出 | §3.1 补充裁决（start_agent.py:187-223 + subagent_entry.py:182-216/:214；trace task_20260804153354_79c04c46） | 接入层 |
+| R2 | 🔴 | HERMES_TOTAL_TIMEOUT 死旋钮：宣称的服务级上限全树零消费者 | §3.1 速查①（start_agent.py:34-36） | 接入层 |
+| R3 | 🔴 | ④规则推理零执行记录 + 知识库假接缝（E:/ 死路径、法规内联硬编码） | §3.3④（sessions 全树 0 份；regulation_matcher.py:35） | 业务层 |
+| R4 | 🔴 | ⑤处置执行零执行记录（run_disposition.py:91 因④必空） | §3.3⑤（disposition_result.json = 0 份） | 业务层 |
+| R5 | 🔴 | 活链路零测试（其余红黄项的放大器） | §3.5 押注表（tests/ 关键词 grep 零命中） | 测试 |
+| R6 | 🔴 | 退役测试必炸：全树 pytest 收集即 ImportError + E:/ 恒错输出 | §3.5（test_four_layer_architecture.py:46-50；verify_architecture.py:22） | 被裁方 |
+| R7 | 🔴 | 两表别名漂移：8 键 vs 4 键映射错配，成功被误判失败多烧整轮会话 | §4 发现1（call_subagent.py:26-36/:40-51 + subagent_entry.py:52-57；E2 会话3） | 接入层·实证坐实 |
+| R8 | 🔴 | 陈数据当「最近」数据：7 周前数据顶着「最近 24 小时」话术交付（§3.3① 🟡→🔴，依据 §4） | §4 发现2（E2 实测；升级依据节内载明） | 业务层·实证坐实 |
+| Y1 | 🟡 | skill_manage 未从子智能体剪除，LLM 已实证运行时改写业务脚本 | §3.1 补充裁决2（tool_registration.py:267-276；trace task_20260804151453） | 接入层 |
+| Y2 | 🟡 | 超时体系无端到端 deadline，各层独立最坏叠加 | §3.1 速查② | 接入层 |
+| Y3 | 🟡 | LLM 端点硬编码回退三处 + LongCat 退役默认值 | §3.1 速查③（start_agent.py:89-91 / agent_service.py:95-97 / call_subagent.py:245；subagent_entry.py:169） | 接入层 |
+| Y4 | 🟡 | /health 不反映工具注册成败（注册坏仍全绿） | §3.1 速查④（start_agent.py:123-126/:395-401） | 接入层 |
+| Y5 | 🟡 | agent_service.py 地雷属性：os.chdir 副作用、三级静默 import 降级、恒空 trace 字段、run_conversation 无超时 | §3.1 速查⑤（agent_service.py:39-44/:12-22/:186-188/:163-166） | 并行入口 |
+| Y6 | 🟡 | 死代码对：查询缓存已禁用、身份自检零调用 | §3.1 速查⑥（start_agent.py:137-160；agent_service.py:46-69） | 接入层 |
+| Y7 | 🟡 | /query/stream worker daemon 线程持锁全程 | §3.1 同步阻塞行（start_agent.py:489） | 接入层 |
+| Y8 | 🟡 | 身份文件齐全度不对称（2 个子代理仅 3 件）且与 CLAUDE.md 冲突 | §3.2 加载矩阵 | 身份层 |
+| Y9 | 🟡 | 子智能体 SOUL.md/AGENTS.md 双重注入（原生 + 定制各一次） | §3.2（system_prompt.py:93-100 与 :112-114） | 身份层 |
+| Y10 | 🟡 | SKILL.md/AGENTS.md 文档漂移：canonical 脚本零记载、推荐退役 import | §3.3②③ | 业务层 |
+| Y11 | 🟡 | influxdb-client 未声明依赖（venv 重建即断） | §3.3 依赖接缝（trace 实证 LLM 运行时 pip install） | 业务层 |
+| Y12 | 🟡 | InfluxDB 数据停滞成因未排查（最新止 07-25；用户侧后果已由 R8 承载） | §3.3① | 业务层·环境 |
+| Y13 | 🟡 | 根 SOUL.md 原版人格双重注入（Nous Hermes 抢首位） | §3.4（start_agent.py:33 → 项目根 SOUL.md） | 身份层 |
+| Y14 | 🟡 | workspace/AGENTS.md:135 指退役树 + identity_loader 注释 HERMES_HOME 表述错 | §3.4 | 身份层 |
+| Y15 | 🟡 | MEMORY.md 19K 每轮全量入 prompt 无截断 | §3.4 | 身份层 |
+| Y16 | 🟡 | HEARTBEAT.md 心跳机制未接线（纯 prompt 装饰） | §3.4 | 身份层 |
+| Y17 | 🟡 | workspace/config.yaml 死文件且注释教人设错 HERMES_HOME | §3.4/§1.4 | 身份层 |
+| Y18 | 🟡 | 服务层 trace 少计（仅成功项，失败重试对审计不可见） | §4 发现3 | 实证 |
+| Y19 | 🟡 | AGENT_PORT 环境覆盖已死（.env 碾压，头注失效） | §4 发现4（hermes_cli/env_loader.py:238） | 实证 |
+| Y20 | 🟡 | 每 AIAgent init 10 次盲探，短命进程无缓存复用 | §4 发现5 | 实证 |
+| Y21 | 🟡 | 同一 SKILL.md 重读 3 次，prompt 随轮数 2.4× 线性放大 | §4 发现6 | 实证 |
+| Y22 | 🟡 | CLAUDE.md/Testing 指引漂移：4 处指引无一指向活链路 | §3.5 押注结论 + §1.7 | 文档 |
+| V1 | 🔴 | vendor 脚本语法错误：:89 多一括号，入库即坏，无一版已提交脚本可复现现树 | §2.6 断点1（l2-vendor-script-forensics.txt） | 管道 |
+| V2 | 🔴 | PATCHES 文本漂移：按现声明重跑即产出语法错误文件 | §2.6 断点2（l2-sim-vs-actual.txt 模拟实测） | 管道 |
+| V3 | 🟡 | overlays 不完整：#5/#7/#9 仅存 vendored 树，重跑静默丢失（§2.1 声明列对 #5/#7/#9 标 🔴，表丢失后果） | §2.6 断点3 | 管道 |
+| V4 | 🟡 | 排除集失真：skills/ 467 文件缺席未声明，重跑将改变主智能体可见技能集 | §2.6 断点4 | 管道 |
+| V5 | 🔴 | os.sync×3 必炸埋雷（TypeError；现为死代码，复活即炸） | §2.1#10 / §2.2 / §2.5 | 改装 |
+| V6 | 🔴 | orchestrator_tool 三重损坏（已被 override 隔离，无现行风险，纯噪音双份文件） | §2.4 / §2.5#6 | 改装 |
+| V7 | 🟡 | 精简包死文件处置：utils/process_bootstrap/双 \_\_init\_\_ 对运行时无贡献 | §2.2 | 改装 |
+| V8 | 🟡 | 耦合面：三份拷贝手工同步、跨树反向依赖仅靠 venv 布局巧合、IDENTITY_FILES 双份、无 provenance | §2.6 耦合度（provenance 项已入 P0-6④） | 改装 |
+| V9 | 🟡 | #7 stream_options 全局删除致流式 usage 退化（33/37 次无 usage） | §2.5#7 + §4 E2 | 改装·实证坐实 |
+
+### 6.1 P0 立即修（8 项，每项 = 问题/证据锚点/修法/验收标准，可直接转化为修复任务）
+
+对应关系：P0-1←R1、P0-2←R7、P0-3←R8、P0-4←R2、P0-5←R6、P0-6←V1-V6（§2.6 清单①-⑥）、P0-7←Y1（严重度 🟡、处置级 P0：已实证发生且触及受版本控制的业务代码）、P0-8←R3+R4。R5（零测试）无法「立即修」——它是放大器债，偿还路径：**各 P0 项的验收标准即首批测试用例来源**，系统化补测归 P1-d/过渡步骤 4。P0-6 同时是 §5.4 裁决的路线 A **准入条件**（反论①），须最先启动。
+
+**P0-1 拆掉续传伪装机制（R1）**
+
+- 问题：同会话追问轮里 canonical 脚本一旦失败，上一轮 `*_result.json` 被拷入新目录并强制重标 task_id，旧数据冒充本轮成功（实测：任务要 7/14-15 数据，交付 7/24-25 旧数据）。
+- 证据：start_agent.py:187-223（_fresh_session_dir 续传拷贝）+ subagent_entry.py:182-216（读结果不区分新旧）、:214（重标 task_id）；§3.1 补充裁决；trace task_20260804153354_79c04c46。
+- 修法：失败轮不得拷贝旧结果——续传仅限「上一轮成功且本轮显式消费其输出」的场景，且拷入文件须改名（如 `.prev_` 前缀）或写入 provenance 字段；subagent_entry 只认本轮产出，删除 :214 的 task_id 重标。
+- 验收：复现协议——同会话两轮查询，第二轮人为致败脚本（临时改坏脚本路径），断言第二轮无 status=completed 结果（或显式 failed）、无被重标 task_id 的旧文件、trace 可复核；以 §4 E1 探针复跑含追问轮的任务，全部结果文件的 task_id/时间戳均属本轮。
+
+**P0-2 两表合一，消灭别名漂移（R7）**
+
+- 问题：「子智能体名→结果文件名」同一语义三处硬编码——SUBAGENT_PATHS 8 键（call_subagent.py:26-36）、RESULT_FILE_NAMES 8 键（:40-51）、subagent_entry.py:52-57 第二份仅 4 规范名且 `.get(name,"result.json")` 静默兜底——别名调用时读写文件名错配，成功被误判 failed，多烧一整轮会话（7 次）。
+- 证据：§4 发现1（含 E2 会话3 实证）；另注 tool_registration.py:242 enum 未强制。
+- 修法：两表合一为单一事实源（一个映射模块，call_subagent 与 subagent_entry 共同 import），或最低限度给 subagent_entry 补齐 8 键别名并删除 `.get` 静默兜底（表外名显式报错）。**不是加校验层**——名称校验已在（call_subagent.py:167-172），错在映射漂移（§4 修正后的修法指向）。
+- 验收：参数化单测覆盖 8 个键名→读写文件名一致（8 用例全绿）；以别名 "data-perception" 重跑 §4 同款任务不再误标 failed（子会话数对比会话3 明显下降）；全仓 grep 该映射仅剩单一事实源。
+
+**P0-3 数据时间戳校验：陈数据不得冒充「最近」（R8）**
+
+- 问题：InfluxDB 最新数据止于 07-25，任务问「最近」时脚本返回约 7 周前数据，最终回答仍称「最近 24 小时」，用户全程无感知。
+- 证据：§4 发现2（E2 实测回答）；§3.3①（trace task_20260804153255）。
+- 修法：get_data.py 结果强制携带数据窗起止时间戳，与请求窗（--hours）比对；偏差超阈（建议 >10%）时结果标记 stale 并上抛，主智能体回答必须如实报告实际数据窗或明确拒答说明数据过旧。
+- 验收：构造「请求 24h、库内最新数据 >7 天」场景，最终回答包含实际数据时间窗（或明确拒答），不出现无依据的「最近 24 小时」表述；时间戳校验分支有单测。（数据停更根因排查归 P1-c。）
+
+**P0-4 HERMES_TOTAL_TIMEOUT：实现或删除假声明（R2）**
+
+- 问题：start_agent.py:34-36 注释宣称「服务级上限 300s」并 setdefault，但全 vendored 树零消费者——宣称的保障不存在。
+- 证据：§3.1 速查①（全树 grep；仅 auxiliary_client.py:774 撞名局部参数）。
+- 修法：二选一。(a) 实现：查询 worker 外层加真实 deadline（300s 到点中止并返回超时错误，子进程侧 TimeoutExpired 处理已备可衔接）；(b) 删除：去掉注释承诺与 setdefault，文档如实写明「无服务级超时，各层独立（锁排队 300s / 后端转发 600s / 子进程 600s）」。
+- 验收：(a) mock 慢 LLM（>300s 不响应），/query 在 ~300s 量级返回超时错误而非无限等待；(b) 全仓 grep HERMES_TOTAL_TIMEOUT 零残留（或仅剩真实消费者），注释不再含「服务级上限」字样。
+
+**P0-5 拆弹两个退役测试（R6；§5.4 过渡步骤 1）**
+
+- 问题：test_four_layer_architecture.py:46-50 import 不存在的 master-agent-core 模块，全树 pytest 收集即 ImportError；verify_architecture.py:22 E:/ 硬编码，本机运行所有存在性检查恒 ✗（输出全错）。
+- 证据：§3.5 押注表；§5.4 过渡步骤 1。
+- 修法：test_four_layer_architecture.py 移出收集范围（删除，或 git mv 入 archive/ 与 P1-d 同批——但须先于任何全树测试动作）；verify_architecture.py 顺带清理（pytest 收集外）。
+- 验收：`python -m pytest --collect-only -q tests/` 零 ImportError；两文件不在活测试路径（或已入 archive/ 且不被收集）。
+
+**P0-6 修复 vendor 管道（V1-V6；§2.6 清单①-⑥——路线 A 准入条件）**
+
+- 问题：管道 4 断点使 vendored 树处于「一次性快照」状态——脚本语法错（V1）、PATCHES 漂移（V2）、overlays 不完整（V3）、排除集失真（V4）；另有 orchestrator_tool 双份尸体（V6）与 os.sync 埋雷（V5）。
+- 证据：§2.6 四断点（含 l2-sim-vs-actual.txt 模拟实测）；§2.4/§2.2。
+- 修法（§2.6 ①-⑥）：①修 vendor_hermes.py:89 语法 + 以实树为准回填 PATCHES 文本；②#5/#7/#9 补进 overlays/PATCHES 或显式决策删除；③EXCLUDE_DIRS 显式加入 skills/（或决策保留上游技能库并评估行为差异）；④落 PROVENANCE 文件记录基线 7df3aa34；⑤删除 orchestrator_tool（overlays + vendored 两份，§2.4 建议）；⑥utils.py os.sync 改回 os.fsync 或删除该死文件（§2.2）。
+- 验收：py_compile 通过；对 pristine 7df3aa34 全新重放 vendor 三步，产树与当前 vendored 树 diff 为空（或等于显式声明的差异白名单）；重放后活链路冒烟（/health 200 + 一次查询成功）。
+
+**P0-7 子智能体剪枝对齐主智能体（Y1；严重度 🟡，处置级 P0）**
+
+- 问题：子智能体工具组含 skill_manage，LLM 可运行时改写受版本控制的业务脚本——已实证一次（get_data.py freq H→h，未提交留工作区）；主智能体已剪枝、子智能体未对齐。
+- 证据：§3.1 补充裁决2；subagent_entry.py:174-177 对照 tool_registration.py:267-276；trace task_20260804151453；subagents/ 39 个未提交文件中仅此一处可由 trace 归因。
+- 修法：subagent_entry 构造 AIAgent 后对子智能体同样剪除 skill_manage（复用主智能体剪法）；声明式 per-agent 工具白名单为长期形态（P2-3）。
+- 验收：重启后子智能体 trace 的 "Enabled toolset" 行不含 skill_manage；人为诱导调用被拒；完整查询跑毕 subagents/ 工作区 git status 无业务脚本改动。
+
+**P0-8 ④⑤断链最小闭环：接通或显式禁用（R3+R4）**
+
+- 问题：规则推理/处置执行两环节现存零执行记录；知识库接缝是假的（regulation_matcher.py:35 E:/ 死路径且 _load_regulations 根本不读它，法规内联硬编码，shared/knowledge/regulations/ 零读取）；run_disposition.py:91 因④必空。
+- 证据：§3.3④⑤（sessions/ 全树检索两结果文件均 0 份、_subagent_traces 0 条；记录缺失 ≠ 全称否定的口径限制节内已载明）。
+- 修法（二选一，落书面决策）：(a) 接通——按 §4 E1 探针协议跑一次明确要求「违规判定 + 处置建议」的完整任务，留下两环节结果文件与 trace 实证；(b) 禁用——workspace/AGENTS.md 任务链显式声明④⑤暂不启用（含对用户的回答口径），杜绝 LLM 即兴调起半成品。现状（既不接通也不声明）不可接受。
+- 验收：(a) sessions/ 出现 rule_reasoning_result.json 与 disposition_result.json 各 ≥1 份且 trace 可复核全链路；(b) workspace/AGENTS.md 含显式禁用声明，且 E1 复测中主智能体对违规判定类请求明确说明该能力未启用。法规外置与 E:/ 修复的结构性收尾归 P1-c。
+
+### 6.2 P1 短期（1-2 周；各节 🟡 归并，按批执行）
+
+**P1-a 接缝修复批（§3.1 剩余黄项）**
+
+- Y2 端到端超时预算：文档化分层超时表并使最坏叠加路径有上限（随 P0-4 选型落地）；验收：超时表成文，最坏路径估算 < 外层承诺。
+- Y3 硬编码回退三处改「.env 缺失即启动失败」（或集中单一 config 读取）；验收：删除 .env 后启动报明确错误，而非静默指向内网 IP。
+- Y4 /health 增加工具注册状态（失败降级 degraded）；验收：人为破坏 tool_registration 后 /health 非 healthy。
+- Y5 agent_service.py 地雷排除：去 os.chdir、import 降级链改显式失败、:186-188 恒空字段实现或删除（与 Y18 同批）。
+- Y6 死代码对清理（查询缓存、_check_identity_files）；Y7 /query/stream 持锁问题记录为架构注记（方向解见 P2-4）。
+
+**P1-b 身份与文档批（§3.2/§3.4；与 P1-d 归档同批执行）**
+
+- Y13 删除或清空根 SOUL.md（消灭 Nous Hermes 双重人格，§3.4 总裁决）；
+- Y9 子智能体 SOUL/AGENTS 双重注入：原生注入与定制 identity_loader 块二选一；
+- Y8 补齐 anomaly-detection / rule-reasoning 身份文件，或统一为 3 文件形态并同步文档；
+- Y14 workspace/AGENTS.md:99-135 编排引导改指根 skills/ 活副本 + 修 identity_loader.py:53-54 注释；
+- Y15 MEMORY.md 加截断（对齐原生 load_soul_md 的截断逻辑）；
+- Y16 HEARTBEAT.md 接调度器或删除声明；
+- Y17 删 workspace/config.yaml（§5.4 过渡步骤 4 同批）；
+- Y10 重写感知/异常检测两个 SKILL.md：补 get_data.py、run_anomaly_detection_simple.py 等 canonical 入口记载，删退役 import 示例；
+- Y22 重写 CLAUDE.md（按 §1.7 实测六层映射；Testing 节 4 处指引全部换活链路）——**必须与归档同批**，否则文档指向已删路径（§5.4 过渡步骤 3）。
+- 批级验收：主/子智能体 system prompt 组装后核对单一身份源；CLAUDE.md/AGENTS.md/SKILL.md 中 grep 退役路径（workspace/skills/orchestrator-core、middleware/、stream/dual_data_stream、task_receiving_and_parsing）零命中。
+
+**P1-c 业务与数据批（§3.3）**
+
+- Y11 requirements.txt 补 influxdb-client（一行修法）；
+- Y12 排查 InfluxDB 停更成因（写入侧断流 vs --hours 语义），恢复或书面记录；
+- 知识库真接缝（Y 系结构项）：regulation_matcher 改读 shared/knowledge/regulations/ 外置法规，清理 run_rule_reasoning.py:83/:116 废弃绝对路径 fallback 与全仓 E:/ 功能性残留（P0-8 的结构性收尾）。
+- 验收：全新 venv 按 requirements.txt 重建后 get_data.py 直跑成功；grep E:/ 全仓零功能性残留；rule_reasoning 一次执行可载入外置法规文本。
+
+**P1-d 退役处置批（§5.4 过渡步骤 2-4）**
+
+- 归档：workspace/skills/orchestrator-core/ 4 文件 3772 行 + 8 个押注测试 git mv 入 archive/（git 历史即备份，§5.4 步骤 2）；
+- 抽取：设计件「每子 2 次调用」经济学入 P2-2 输入；文档件 = CLAUDE.md 重写（P1-b 同批）；代码件 = 无（§1.7 活链路零依赖）；
+- 测试：建立活链路 E2E 回归测试（首批：续传语义/两表映射/注册覆盖/时间戳校验——即各 P0 验收标准的固化）并保持绿——R5 偿还的主体（§5.4 步骤 4 前置）；
+- 删除：E2E 回归绿后物理删除 archive/，同批删 workspace/config.yaml（Y17）。
+- 验收：归档后全仓 grep 旧套件直接引用仅剩 archive/ 自身；pytest 全树收集 + 运行零 ImportError；E2E 回归绿。
+
+**P1-e 实证随访批（§4）**
+
+- Y18 trace 修正：decision_path/subagent_calls 计入失败与重试，回传真实调度史；
+- Y19 AGENT_PORT 文档修正（.env 恒赢的真相写进 start_agent.py 头注，或真支持 env 覆盖）；
+- Y20 盲探缓存或禁用（子进程共享探测结论 / 环境开关跳过 Ollama 风格探测）；
+- Y21 技能预注入 + 子智能体迭代上限调低（§5.4 反论②四件套的后两件；前两件 = 两表合一 + 文档修正，已在 P0-2/P1-b）；
+- 样本扩充：E1 协议复跑 n≥3，收窄 37 次 / 57% 浪费率的数值置信（§4 样本限度）。
+- 验收：复跑同款任务，回传 trace 与实际子进程数一致；首轮 prompt 体积下降可测；三次运行的调用数区间记录入档（兼作 §6.4 触发器 2 的基线）。
+
+### 6.3 P2 方向演进
+
+**P2-1 上游同步与改装健康（§2.5/§2.6；§5.4 反论④）**
+
+- 解锁条件：P0-6 完成（管道可复现）之前不启动任何上游升级；
+- 整文件 overlay（run_agent/agent_init，5358+1763 行）降级为最小 patch 或上游 PR——身份扩展向上游提 feature 是最优路径（§2.5 冲突面评估）；
+- 升级评估：vendored 0.16.0 → 0.21.x（落后 16 tag）diff 审阅，重点 system_prompt / conversation_loop / chat_completion_helpers（#7 冲突面）；
+- V9：#7 stream_options 改 provider 条件分支（vLLM 才去除，恢复其余 provider 流式 usage 计量）；先查 172.16.12.41 vLLM 版本是否已原生兼容（§2.5 待查项）；
+- 常态机制：PROVENANCE 随每次 re-vendor 更新；上游 release 巡检关注 §6.4 触发器 5。
+
+**P2-2 调用经济学研究（§5.4 过渡步骤 3 设计件 + 触发器 2 监测）**
+
+- 建立调用预算口径：全 4 子流程目标区间，对照旧套件「每子 2 次」单发模式（execution_control.py:377-505）与现「每子会话 ≥7 次」（subagent_entry.py:177）；
+- 对照实验：同一任务分别以「整会话子智能体」与「单发函数式调用」（薄协调器变体）各跑 n≥3，测调用数/延迟/成功率；
+- 联动触发器：修复后完整流程仍 >100 次或浪费率 >30% ⇒ 触发 §6.4-2。
+
+**P2-3 借鉴 pi-subagents（§5.2；不引运行时，只借机制）**
+
+| 机制（借鉴对象） | 本系统落点 | 对应痛点锚点 |
+|---|---|---|
+| 声明式角色文件 / frontmatter 角色制（name 声明一次即调度名） | 子智能体目录单文件声明身份 + 调度名 + 结果文件名，替代三处硬编码映射 | R7（P0-2 的长期形态） |
+| per-agent tools 白名单（教程 §7 安全表） | 各子智能体可执行工具明细表，替代手写剪枝 | Y1（P0-7 的长期形态） |
+| 技能三供给（全继承/点名/skillPath，教程 §10） | 子智能体启动预注入自身 SKILL 摘要；主智能体不继承框架内建技能库 | Y21 / Y10、V4 行为差异 |
+
+**P2-4 借鉴 OpenClaw（§5.3；不引运行时，只借机制）**
+
+| 机制（借鉴对象） | 本系统落点 | 对应痛点锚点 |
+|---|---|---|
+| 完成状态由 runtime 判定（不经结果文件协商） | call_subagent 以进程退出码 + 产出契约定成败，结果文件降级为纯数据载体 | R1（P0-1 的结构性终态） |
+| announce 推送式完成 + 子级失败原因回传 | 子进程完成事件推送主智能体、失败附 bounded reason，替代无差别整会话重试 | 57% 浪费（§4 E2/E3） |
+| 工具硬围栏（deny 恒赢，allow 不可回加） | 剪枝从 additive 白名单改为硬拒绝层（skill_manage、terminal 写路径类） | Y1 |
+| 每子显式超时（runTimeoutSeconds/announceTimeoutMs） | 每个子智能体会话一个显式 deadline 参数（与 P0-4/Y2 衔接） | R2 / Y2 |
+| 崩溃恢复（gateway 重启自动续跑） | start_agent 重启后续跑被中断子会话（会话目录语义重设计） | 服务重启丢任务 |
+| 深度分级（默认 5 层，叶层剥夺递归工具） | 若未来允许子智能体再派生，叶层剥夺 call_subagent | 递归失控预防（现为 1 层，预防性） |
+
+（并发 lane / maxConcurrent 为 Y7 /query/stream 持锁问题的方向解，属机制池备选，未计入 §5.3 点名四件。）
+
+### 6.4 复评触发器（§5.4 五条敏感条件收录；任一触发 → 重开 §5 裁决）
+
+| # | 触发条件（§5.4 原文口径） | 方向 | 监测时机 |
+|---|---|---|---|
+| 1 | 管道修复（P0-6）被否决/拖延到一次必须的上游升级（安全修复或协议变更）出现——vendored 树「不可复现 + 过期」双坏 | 翻向 C（替换） | P0-6 验收时；上游升级提案时 |
+| 2 | 两表/文档修复后，完整 4 子流程调用数仍显著高于外推基线（≈37 次起，如 >100 次）或浪费率仍 >30%——「每子会话 = 完整 AIAgent」架构税坐实 | 翻向 C 薄协调器变体 | P2-2 对照实验出数时 |
+| 3 | 团队 >1 人或项目产品化（多用户/通道/常驻编排） | OpenClaw 形态入可行集，重开裁决 | 立项/人员变化时 |
+| 4 | ④⑤被证明是框架能力缺失而非单纯未执行（现口径：零执行记录，不能排除历史跑通） | 框架收益主张削弱，重估 | P0-8 执行时 |
+| 5 | 反向：上游 0.21.x 原生吸收身份文件/多智能体机制（#1-#4 上游化） | 本结论加固 | 上游 release 巡检（P2-1） |
+
 ## 附录 A. 触达/未触达文件清单
+
+口径与方法见 §1.3（静态 import 闭包 + pyc 运行时证据）。原始清单：本机 `/tmp/hermes-audit/{touched-all,pyc-evidence,untouched-strict}.txt` + 构建脚本 build_touched.py；严格未触达 72 个的入库副本 = `2026-09-14-hermes-audit-evidence/l1-untouched-strict.txt`（与 /tmp 逐行一致）。触达两口径共 451/554 个文件名，过长，故按 `hermes-agent/` 顶层目录聚合 + 计数；严格未触达 72 个全列于 A.2。
+
+### A.1 触达清单（两口径，按顶层目录聚合）
+
+| hermes-agent/ 顶层 | 静态 import 闭包（451） | 闭包 ∪ pyc（554） | 备注 |
+|---|---|---|---|
+| agent/ | 107 | 109 | 身份注入/会话循环所在 |
+| hermes_cli/ | 156 | 160 | 闭包内 67 个无 pyc（可选依赖/懒加载从未走到，§1.3） |
+| tools/ | 86 | 98 | registry 与工具实现 |
+| gateway/ | 53 | 55 | |
+| plugins/ | 21 | 100 | +79 = 插件扫描动态 import（静态 regex 不可见，§1.3） |
+| acp_adapter/ | 9 | 10 | |
+| cron/ | 3 | 3 | |
+| providers/ | 2 | 2 | |
+| 顶层 .py（run_agent/utils/hermes_constants 等） | 11 | 11 | |
+| **hermes-agent/ 小计** | **448** | **548** | |
+| hermes_agent/（精简包，7 文件） | 3（run_agent、agent_init、identity_loader） | 5（另含两个 `__init__.py`，仅 pyc） | utils.py 与 process_bootstrap.py 严格未触达（§1.2） |
+| hermes-overlays/（3 文件） | 0 | 0 | 构建期源，运行时零参与（§1.2） |
+| shared/framework/\_\_init\_\_.py | 0（父包无静态边） | 1（pyc，父包加载证据） | 并集口径略偏低估的校正项（§1.3） |
+| **合计** | **451（72.0%）** | **554（88.5%）** | 分母 626（0.5.4 口径） |
+
+### A.2 严格未触达 72 个（无静态边且无 pyc，全列）
+
+路径相对 `shared/framework/`；按目录分组（计数）：**hermes-overlays/ 3 · hermes_agent/ 2 · hermes-agent/ 67**（plugins 37、gateway 10、hermes_cli 8、agent 4、tools 2、acp_adapter 1、顶层 5）。
+
+hermes-overlays/（3，全部）：
+
+```
+hermes-overlays/run_agent.py
+hermes-overlays/agent/agent_init.py
+hermes-overlays/tools/orchestrator_tool.py
+```
+
+hermes_agent/（2）：
+
+```
+hermes_agent/utils.py
+hermes_agent/agent/process_bootstrap.py
+```
+
+hermes-agent/ 顶层（5）：
+
+```
+hermes-agent/batch_runner.py
+hermes-agent/mini_swe_runner.py
+hermes-agent/setup.py
+hermes-agent/toolset_distributions.py
+hermes-agent/trajectory_compressor.py
+```
+
+hermes-agent/acp_adapter/（1）：
+
+```
+hermes-agent/acp_adapter/__main__.py
+```
+
+hermes-agent/agent/（4）：
+
+```
+hermes-agent/agent/agent_init.py          ← vendored 副本；活的是精简包 agent_init.py（§1.2 表）
+hermes-agent/agent/curator_backup.py
+hermes-agent/agent/jiter_preload.py       ← Windows 专用 workaround（§2.1#9）
+hermes-agent/agent/transports/hermes_tools_mcp_server.py
+```
+
+hermes-agent/gateway/（10）：
+
+```
+hermes-agent/gateway/builtin_hooks/__init__.py
+hermes-agent/gateway/memory_monitor.py
+hermes-agent/gateway/stream_dispatch.py
+hermes-agent/gateway/platforms/qqbot/adapter.py
+hermes-agent/gateway/platforms/qqbot/chunked_upload.py
+hermes-agent/gateway/platforms/qqbot/constants.py
+hermes-agent/gateway/platforms/qqbot/crypto.py
+hermes-agent/gateway/platforms/qqbot/keyboards.py
+hermes-agent/gateway/platforms/qqbot/onboard.py
+hermes-agent/gateway/platforms/qqbot/utils.py
+```
+
+hermes-agent/hermes_cli/（8）：
+
+```
+hermes-agent/hermes_cli/azure_detect.py
+hermes-agent/hermes_cli/container_boot.py
+hermes-agent/hermes_cli/gateway_windows.py
+hermes-agent/hermes_cli/kanban_diagnostics.py
+hermes-agent/hermes_cli/kanban_specify.py
+hermes-agent/hermes_cli/profile_describer.py
+hermes-agent/hermes_cli/proxy/__init__.py
+hermes-agent/hermes_cli/session_recap.py
+```
+
+hermes-agent/plugins/（37）：
+
+```
+hermes-agent/plugins/disk-cleanup/__init__.py
+hermes-agent/plugins/disk-cleanup/disk_cleanup.py
+hermes-agent/plugins/google_meet/__init__.py
+hermes-agent/plugins/google_meet/audio_bridge.py
+hermes-agent/plugins/google_meet/cli.py
+hermes-agent/plugins/google_meet/meet_bot.py
+hermes-agent/plugins/google_meet/node/__init__.py
+hermes-agent/plugins/google_meet/node/cli.py
+hermes-agent/plugins/google_meet/node/client.py
+hermes-agent/plugins/google_meet/node/protocol.py
+hermes-agent/plugins/google_meet/node/registry.py
+hermes-agent/plugins/google_meet/node/server.py
+hermes-agent/plugins/google_meet/process_manager.py
+hermes-agent/plugins/google_meet/realtime/__init__.py
+hermes-agent/plugins/google_meet/realtime/openai_client.py
+hermes-agent/plugins/google_meet/tools.py
+hermes-agent/plugins/hermes-achievements/dashboard/plugin_api.py
+hermes-agent/plugins/hermes-achievements/tests/test_achievement_engine.py
+hermes-agent/plugins/kanban/dashboard/plugin_api.py
+hermes-agent/plugins/memory/byterover/__init__.py
+hermes-agent/plugins/memory/hindsight/__init__.py
+hermes-agent/plugins/memory/holographic/__init__.py
+hermes-agent/plugins/memory/holographic/holographic.py
+hermes-agent/plugins/memory/holographic/retrieval.py
+hermes-agent/plugins/memory/holographic/store.py
+hermes-agent/plugins/memory/honcho/__init__.py
+hermes-agent/plugins/memory/openviking/__init__.py
+hermes-agent/plugins/memory/retaindb/__init__.py
+hermes-agent/plugins/memory/supermemory/__init__.py
+hermes-agent/plugins/observability/langfuse/__init__.py
+hermes-agent/plugins/observability/nemo_relay/__init__.py
+hermes-agent/plugins/platforms/discord/voice_mixer.py
+hermes-agent/plugins/platforms/google_chat/oauth.py
+hermes-agent/plugins/security-guidance/__init__.py
+hermes-agent/plugins/security-guidance/patterns.py
+hermes-agent/plugins/teams_pipeline/__init__.py
+hermes-agent/plugins/teams_pipeline/cli.py
+```
+
+hermes-agent/tools/（2）：
+
+```
+hermes-agent/tools/neutts_synth.py
+hermes-agent/tools/slash_confirm.py
+```
+
+判读提示：72 个中 37 个为 plugins/（未启用的可选插件为主体，重跑 vendor 时的去留决策见 P0-6③）；hermes-overlays/ 3 个全列为 §1.2「构建期源，运行时零参与」的直接证据；hermes_agent/ 2 个即 §1.2/§2.2 裁决的死改动载体。
 
 ## 附录 B. 实证原始数据
 
@@ -590,3 +952,46 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 ### B.3 原始数据索引（/tmp/hermes-audit/，本机）
 
 llm_calls.jsonl（124 事件原序）、waterfall.md / e1-summary.json（聚合）、e1-query-response.json（/query 完整回响应含 trace）、e1-agent-8643.log（探针实例服务日志，含 5 进程插桩自证行）、e1-guard-before.txt + e1-backup/py.tar（四树快照与备份）、test_llm_probe.py / llm_probe.py / sitecustomize.py / run_probe.py（探针全套，仅存 /tmp）。
+
+## 验收记录（对照设计文档 §7 逐条自检，2026-09-14 Task 7 收官）
+
+§0.5–§5 经六节双审通过；§0/§6/附录 A/本节为收官产出。逐条核验如下。
+
+| # | 设计 §7 验收标准 | 结论 | 证据（报告内锚点） |
+|---|---|---|---|
+| 1 | 报告中每条 🔴/🟡 发现均有文件:行号级证据 | ✅ | §6.0 总表 39 条红黄（R×8、Y×22、V×9）逐条带原节锚点；各节红黄均落文件:行号（§3.1 速查、§2.6 四断点、§4 发现1-6 等）。唯二特殊形态：「零执行记录」类发现（§3.3④⑤）的证据即全树检索记录本身（检索范围与口径节内载明）；环境侧发现（R8 数据停更）证据 = trace + E2 实测回答 |
+| 2 | 双路线裁决给出明确三选一结论及理由 | ✅ | §5.4：结论「继续用并加固」，B/C 两案明确否决；论据一/二/三 + 四反论正面回应 + 五敏感条件 + 过渡步骤 1-5；§5.0/§5.1 为其取证基础 |
+| 3 | 实证瀑布表产出（或明确标注降级原因） | ✅ | §4 E2 会话级瀑布表 + 附录 B.2 关键数字 + evidence/e1-llm-waterfall.md 全表 + e1-llm-call-detail.txt 逐条明细；E4 明确「未降级」。方法偏差说明：设计 E2 建议「优先复用 tests/integration 既有用例或 stream/ 模拟数据」，实证时两者均不可用（stream/ 不存在、tests 指向退役链，§1.7/§3.5），改用真实最小监测任务——证据强度高于设计预期，非降级 |
+| 4 | 路线图 P0 项全部可直接转化为后续修复任务 | ✅ | §6.1 八项，每项含问题/证据锚点/修法/可执行验收标准（如 P0-1 的追问轮致败复现协议、P0-6 的 pristine 重放 diff 为空、P0-7 的 trace 工具组断言）；R5（零测试）的偿还路径已显式归口（P0 各项验收标准 = 首批测试用例 + P1-d 系统化补测） |
+| 5 | 覆盖 §3 全部检查项，无「未检查」留白（做不到的项标注原因） | ✅ | 全 ID 核对见下表，24/24 有锚点，无留白 |
+
+检查项全 ID 覆盖核对（设计 §3 → 本报告）：
+
+| 设计 ID | 报告锚点 | 状态 |
+|---|---|---|
+| 1.1 入口调用链 | §1.1（含对设计「唯一入口」假设的部分修正 + mermaid §1.6） | ✅ |
+| 1.2 overlay 生效机制 | §1.2（venv 可编辑安装实证；§2.0 对其基线再修正） | ✅ |
+| 1.3 触达清单 vs 死重量 | §1.3 + 附录 A（口径按 0.5.4 分列） | ✅ |
+| 1.4 配置与 LLM 端点 | §1.4 | ✅ |
+| 1.5 子代理注册机制 | §1.5 | ✅ |
+| 2.1 改动全集四类归属 | §2.1（审计对象按 0.5.4/§1.2 重聚焦后执行，11 处 + 3 项内容差异） | ✅ |
+| 2.2 hermes_agent/ 差异全集 | §2.2 | ✅ |
+| 2.3 identity_loader 新增还是改写 | §2.3（全新增） | ✅ |
+| 2.4 orchestrator_tool 功能与上游关系 | §2.4 | ✅ |
+| 2.5 四属性评分 | §2.5（逐项评分表） | ✅ |
+| 2.6 量化与耦合度 | §2.6（行数分布 + 耦合面 + 同步策略评估） | ✅ |
+| 3.1 接入层逐行审 | §3.1（按实际三入口审，§1.1 修正） | ✅ |
+| 3.2 四子代理身份齐全度 | §3.2 | ✅ |
+| 3.3 业务闭环验证 | §3.3（五环节证据链：通 3 断 2） | ✅ |
+| 3.4 workspace 身份文件一致性 | §3.4 | ✅ |
+| 3.5 测试覆盖盘点 | §3.5 | ✅ |
+| 4.1 职责矩阵/重复度/时间线 | §5.0 + §5.1 | ✅ |
+| 4.2 参照一 pi-subagents | §5.2 | ✅ |
+| 4.3 参照二 OpenClaw | §5.3 | ✅ |
+| 4.4 终审三选一 | §5.4（结论 + 过渡步骤 + 被裁方处置） | ✅ |
+| E1 计数 wrapper | §4 E1（双层 chokepoint，仅注入 /tmp，TDD） | ✅ |
+| E2 标准化任务实测 | §4 E2（真实最小监测任务；设计建议的既有用例不可用，见上表 #3 说明） | ✅ |
+| E3 对照 ~12 次口径 | §4 E3（37 次 ≈3.1 倍 + 三构成解释） | ✅ |
+| E4 降级声明 | §4 E4（未降级声明） | ✅ |
+
+补充说明：执行中被实证推翻的设计假设（§1.1 事实表第 1/2 行、0.5.3「上游 commit 无法核对」）均已在报告内按证据修正并载明（0.5.4、§1.1、§2.0），属基线修正而非留白；设计 §4 产物五件套对应：评估报告（本报告）、真实架构图（§1.6 mermaid + §1.7 六层映射）、裁决书（§5）、路线图（§6）、实证数据表（§4 + 附录 B）。
