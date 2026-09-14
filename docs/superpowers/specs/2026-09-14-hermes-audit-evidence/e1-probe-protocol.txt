@@ -1,0 +1,53 @@
+E1 计数实证协议与护栏记录（2026-09-14）
+================================================
+
+【TDD（计划唯一 TDD 代码任务）】
+1. 先写失败测试 /tmp/hermes-audit/test_llm_probe.py（CountingProxy 计数 + Waterfall 瀑布断言）
+   → 运行：ModuleNotFoundError: No module named 'llm_probe'（预期失败，红）
+2. 最小实现 /tmp/hermes-audit/llm_probe.py（CountingProxy：包装任意 client，chat/complete/invoke
+   显式覆盖 + __getattr__ 透传计数，_record 记 calls/prompt_tokens/completion_tokens/秒；
+   Waterfall：add/rows/total_calls/markdown）
+   → 复跑：1 passed（绿）。探针库仅存 /tmp，未改框架/项目任何源码。
+
+【chokepoint 选点（Step 5.1）】
+活链路全部 LLM 对话调用经 OpenAI SDK：run_agent.py 单点建 client（_create_openai_client，
+注释自证"the single in-module OpenAI(...) call site"），chat_completion_helpers.py 非流式
+:239 / 流式 :1767 / 迭代上限摘要 :1458/:1501 全部走 client.chat.completions.create；
+auxiliary_client.py 15+ 个辅助 client 构造点同样收敛到该方法（:635-648 shim）。
+故双层计数（互为交叉验证）：
+  a) patch openai.resources.chat.completions.Completions.create —— 精确 LLM 调用计数器
+     （主 client + auxiliary client 全覆盖；非流式可取 usage）
+  b) patch httpx.Client.send / AsyncClient.send（openai SDK 底座），过滤 LLM_BASE_URL
+     authority（172.16.12.41:30000）—— 兜底网：任何不经 a) 的端点请求（/models、
+     Ollama 风格探测路径等）均现形
+注入方式：PYTHONPATH=/tmp/hermes-audit + sitecustomize.py（解释器启动即 patch，
+只读旁路记录，不消费流式响应体）；call_subagent 以 env 继承启动 subagent_entry.py
+子进程 ⇒ 主进程 + 4 个子智能体进程共 5 个 AIAgent 全部被插桩（日志首行
+"[hermes-probe] installed: httpx=True openai=True" × 5 实证）。
+
+【存活探测（Step 5.0，L3 预警 a）】
+- LLM 端点 http://172.16.12.41:30000/v1/models（带 .env key）→ HTTP 200（9ms），
+  模型 ctgu-vlm（vllm-0.28.0-tp8，Qwen3.8-27B-FP8，max_model_len 1010000）
+- agent 服务 :8642/health → 200，{"status":"healthy","agent_initialized":true}，
+  model=ctgu-vlm（PID 1089133，venv 解释器跑 scripts/start_agent.py）
+- InfluxDB :8086/health → 200，influxd 进程在（influxdb2-2.7.10）
+三项全部存活 → 走全活实证，未触发降级链（E4）。
+
+【运行协议（E2）】
+- 探针实例：AGENT_PORT=:8643 独立起 scripts/start_agent.py（不动 :8642 活服务；
+  事后 :8642 health 200 复核）。注意：AGENT_PORT 环境变量覆盖被 hermes env_loader
+  override=True 吃掉（见报告 §4 发现 6），本次以临时改 .env 方式设 8643，
+  跑完即恢复（md5 前后一致：9bcc04ea0ea286b6795061465f47ffe2）。
+- 任务（最小监测，避免拉满 4 子智能体全流程）："查询进水 pH 最近数据并给出一句话结论"
+- 护栏时限：run_probe 内建 900s 总预算（实际 81.9s 完成即停）。
+- 结果以探针 JSONL 为准；sessions/_subagent_traces/ 日志交叉验证（L3 预警 c：
+  结果文件只作旁证——实证中 result.json 确实把"脚本已跑成"误标 failed，旁证）。
+
+【安全护栏执行记录】
+- 跑前快照：subagents/ workspace/ skills/ shared/ 四树 705 个 .py md5 清单
+  （/tmp/hermes-audit/e1-guard-before.txt）+ 全量备份 tar（e1-backup/py.tar）
+- 跑后比对：md5sum -c → 705/705 OK，**零 drift，无需恢复**
+- sessions/ 仅新增本次运行数据（session_20260914_142508_a60719/ + _subagent_traces/
+  4 个当日日志），未删改既有内容；无残留进程/端口（:8643 已释放）
+- 计数产物：/tmp/hermes-audit/{llm_calls.jsonl(124 事件), waterfall.md,
+  e1-summary.json, e1-query-response.json, e1-agent-8643.log}

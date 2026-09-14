@@ -412,6 +412,47 @@ tests/ 共 28 个 .py（含 2 个 `__init__.py`）。关键词 `agent_service|st
 
 <!-- 覆盖设计文档 §3 E 最小实证 E1–E4（E1 计数 wrapper 仅注入 /tmp；E4 降级时本节须显著标注「未实证」）；对照 CLAUDE.md「~12 次调用/流程」口径 -->
 
+**裁决：全活实证（未触发降级链）**。2026-09-14 14:25 对活链路完成一轮带计数插桩的真实运行，LLM 端点（172.16.12.41:30000，ctgu-vlm/vLLM）、agent 服务（:8642）、InfluxDB（:8086）三项存活探测全绿后才执行（L3 预警 a 落实）。核心数字：**最小监测任务（单子智能体即可满足的 pH 查询）全程 37 次 LLM 调用**（主智能体 9 + 子智能体 4 个会话×7），墙钟 79.7s，任务成功。
+
+### E1 方法：计数 wrapper（仅注入 /tmp，零源码改动）
+
+TDD 完成（计划唯一 TDD 任务）：先写失败测试（ModuleNotFoundError，红）→ 最小实现 `CountingProxy`/`Waterfall` → 测试通过（绿）。chokepoint 经代码核实选在**双层**（互为交叉验证）：① patch `openai.resources.chat.completions.Completions.create`——run_agent 单点建 client（:3412 `_create_openai_client`，注释自证唯一构造点）、chat_completion_helpers 非流式 :239/流式 :1767/迭代摘要 :1458 全走此方法、auxiliary_client 15+ 构造点经 :635-648 shim 同样收敛于此，故它是精确的「LLM 调用次数」计数器；② patch `httpx.Client.send/AsyncClient.send`（openai SDK 底座）过滤 :30000 authority 作兜底网，任何不经 ① 的端点请求均现形。注入方式 `PYTHONPATH=/tmp/hermes-audit + sitecustomize.py`（解释器启动即旁路记录，只读不消费流式响应体）；call_subagent 以 env 继承启子进程 ⇒ 主进程 + 4 个子智能体进程共 **5 个 AIAgent 全部插桩**（各进程日志首行实证）。两层数字对账：httpx 层 /chat/completions 请求 37 = openai 层调用 37，**零漏计**。
+
+### E2 执行与瀑布
+
+任务「查询进水 pH 最近数据并给出一句话结论」经探针实例（:8643，独立于活服务 :8642）POST /query 执行；护栏全记录在案（附录 B）：四树 705 .py 跑前 md5 快照+备份、跑后 **705/705 零 drift**、.env 临时改动已恢复（md5 一致）、900s 内建预算实际 81.9s 用毕、无残留进程。瀑布（按进程会话，全表见附录 B）：
+
+| 阶段（会话） | 调用 | 流/非流 | 消息数增长 | 结局 |
+|---|---|---|---|---|
+| 主智能体 master | 9 | 9/0 | 2→20 | 完成编排+最终回答 |
+| 子会话1 mddp | 7 | 6/1 | 2→16 | failed：读 skill 未跑脚本 |
+| 子会话2 mddp | 7 | 6/1 | 2→15 | failed：同上 |
+| 子会话3 "data-perception"（名称变体） | 7 | 6/1 | 2→16 | **误判 failed**（脚本已产出，文件名错配） |
+| 子会话4 mddp | 7 | 6/1 | 2→16 | success |
+| **合计** | **37** | 33/4 | — | 3/4 子会话浪费 |
+
+结构规律：**每个子智能体会话固定 7 次** = 6 轮流式（全部打满 subagent_entry 的 max_iterations=6）+ 1 次非流式收尾摘要（仅此 4 次有 usage：pt 78,025 / ct 2,475）；33 次流式全部无 usage——§3 既有发现 #7（stream_options 删除⇒流式计量退化）在活链路原样复现。累计重发 prompt 1.84M 字符（主智能体首轮 35,785 字符，第 7 轮 81,381）。另有 **50 次非对话探测请求**（每 AIAgent init 2 轮×5 个 Ollama 风格端点×5 进程，/version 200 余 404）。
+
+### E3 对照「~12 次调用/流程」口径
+
+CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 子×2 + 3 中间处理，且是**完整 4 子智能体**流程）；本次活链路**最小单子智能体任务即 37 次**（≈3.1 倍，任务规模还不对等）。偏差三构成：① **架构换代**——旧协调器单发函数（每子 2 次），新链路每个子智能体是完整 hermes AIAgent 会话（≥7 次）；② **失败放大**——3/4 子会话浪费（21 次，占 57%），主智能体对每次失败整会话重试；③ 主智能体多轮决策循环本身 9 次。外推全 4 子流程 ≈ 4×7+主轮（≥9）≈ 37+ 起，≥3 倍旧口径——CLAUDE.md 口径对新链路彻底失效（§1.7 判断获量化确认）。
+
+### E4 降级声明
+
+**未降级**：端点/服务/数据库三项存活，活链路一次跑通并成功返回结论；mock LLM 与静态推演两级降级路径备而未用，本节数字均为实测，无「未实证」标注项。唯一妥协：为与活服务 :8642 并行，探针实例以临时 .env 改动落位 :8643（跑后已恢复并 md5 验证），端口差异不影响调用结构。
+
+### 实证新增发现（§3 未及，移交 §6）
+
+1. 🔴 **子智能体名称变体→结果文件错配→成功被误判失败**：主智能体第 3 次重试用了非规范名 "data-perception"，call_subagent 目录解析成功、脚本真跑出了结果（该会话 final_response 自证），但 subagent_entry 的 RESULT_FILE_NAMES 无此键 → 读 result.json 而脚本写 data_result.json → 误标 failed → 又多烧一整轮会话（7 次）。主智能体自由文本起的工具参数能击穿文件名契约，无任何校验层。
+2. 🔴 **「最近」数据静默返陈**：任务问"最近数据"，脚本实际返回 2026-07-24（约 7 周前）数据，最终回答仍称"最近 24 小时"——L3 预警 b（InfluxDB 停更于 07-25）在活链路原样兑现，且**用户侧无从察觉**。
+3. 🟡 **服务层 trace 显著少计**：/query 回传 trace 的 decision_path=2、subagent_calls=1（仅成功项），实际子进程启动 4 次（探针+落盘日志双证）——失败重试对后端审计不可见，「trace 供审计」的承诺打折。
+4. 🟡 **AGENT_PORT 环境覆盖已死**：hermes_cli/env_loader.py:238 以 override=True 加载 HERMES_HOME/.env，import 时碾压一切进程环境变量——start_agent.py 头注「可通过环境变量 AGENT_PORT 配置」失效，.env 永远赢（并行实例被迫临时改 .env）。
+5. 🟡 **每 AIAgent init 10 次盲探**：5 进程×10 次 Ollama 风格端点探测（404 为主）打向 vLLM；子智能体是短命进程，探测无缓存复用，纯噪音请求。
+6. 🟡 **重复读同一 SKILL.md**：成功会话内 skill_view 同一技能 3 次（trace skill_calls 自证）；主智能体 prompt 9 轮膨胀 2.2 倍——上下文成本随轮数线性放大无压缩介入（未过 50% 阈值，compressor 未触发是符合设计的，但说明常规任务已顶着高基数 prompt 跑）。
+7. 观察：auxiliary client（openrouter/nous）每次 init 都探测并标 unhealthy（payment/credit error），无 aux LLM 调用实际服务流程；其外部端点流量不计入 :30000 口径（按「.env 唯一真源」界定）。
+
+**样本限度**：n=1，LLM 行为非确定（「读 skill 未跑脚本」失败率、重试次数逐次浮动），37 是一次完整样本而非稳定均值；结构结论（每子会话 7 次封顶、双层零漏计、trace 少计）为确定机制，数值结论（37、57% 浪费率）待多样本收窄。
+
 ## 5. L4 双路线裁决书
 
 <!-- 覆盖设计文档 §3 L4 检查项 4.1–4.4（4.4 终审三选一，不许和稀泥；含过渡步骤与被裁一方处置） -->
@@ -423,3 +464,26 @@ tests/ 共 28 个 .py（含 2 个 `__init__.py`）。关键词 `agent_service|st
 ## 附录 A. 触达/未触达文件清单
 
 ## 附录 B. 实证原始数据
+
+实证产物分两级：入库精简版（本附录 + `2026-09-14-hermes-audit-evidence/e1-*`），全量原始数据留 /tmp/hermes-audit/（探针 JSONL 124 事件、完整瀑布、查询响应、探针实例服务日志、四树 md5 快照与备份）。敏感值（API key 等）未入任何一级。
+
+### B.1 入库证据文件（evidence/）
+
+| 文件 | 内容 |
+|---|---|
+| e1-probe-protocol.txt | TDD 红绿记录、chokepoint 选点依据（代码行号）、存活探测三项结果、运行协议、护栏执行全记录（快照/drift/恢复/时限） |
+| e1-llm-waterfall.md | 完整瀑布（按会话）、时间线（master 轮次与子会话交错）、~12 次口径对照表 |
+| e1-llm-call-detail.txt | 37 次调用逐条精简明细（时间/pid/阶段/流式/消息数/prompt 字符/到头耗时/usage）+ 50 次非对话探测汇总 |
+
+### B.2 关键数字快照
+
+- LLM 对话调用：**37**（主 9 流式；子 4 会话×(6 流式+1 非流式)）；httpx 层对账 37/37 零漏计
+- 非对话端点请求：50（/api/v1/models、/api/tags、/v1/props、/props 各 10 次 404；/version 10 次 200）
+- 已知 usage（仅 4 次非流式）：prompt 78,025 / completion 2,475 tokens；累计 prompt 字符 1,839,842
+- 墙钟：查询 79.7s（服务启停含内 81.9s）；探针实例 :8643，活服务 :8642 全程未动（前后 health 200）
+- 结果校验：data_result.json status=completed、task_id 与第 4 子会话一致；最终回答 24 条进水 pH 统计（min 7.27 / max 7.57 / 均值 7.42，合格区间结论）——但数据时间戳为 2026-07-24（发现 2）
+- 护栏：四树 705 .py md5 跑前跑后 705/705 OK 零 drift；.env md5 前后 9bcc04ea0ea286b6795061465f47ffe2 一致；sessions/ 仅新增 session_20260914_142508_a60719/ 与当日 4 个 _subagent_traces 日志
+
+### B.3 原始数据索引（/tmp/hermes-audit/，本机）
+
+llm_calls.jsonl（124 事件原序）、waterfall.md / e1-summary.json（聚合）、e1-query-response.json（/query 完整回响应含 trace）、e1-agent-8643.log（探针实例服务日志，含 5 进程插桩自证行）、e1-guard-before.txt + e1-backup/py.tar（四树快照与备份）、test_llm_probe.py / llm_probe.py / sitecustomize.py / run_probe.py（探针全套，仅存 /tmp）。

@@ -1,0 +1,59 @@
+E1 LLM 调用明细（活链路实测 2026-09-14 14:25:12–14:26:25，探针 JSONL 精简版；原始 JSONL 留 /tmp/hermes-audit/llm_calls.jsonl）
+任务: 查询进水 pH 最近数据并给出一句话结论 | 服务: scripts/start_agent.py @ :8643（探针实例，活服务 :8642 未受影响）
+
+ # 时间           pid 阶段                               流   消息数  prompt字符    到头ms   ptok  ctok
+-------------------------------------------------------------------------------------------
+ 1 14:25:12 1774006 master                           Y     2     35785   131.2             
+ 2 14:25:13 1774006 master                           Y     4     40762    84.0             
+ 3 14:25:30 1774006 master                           Y     6     40923   112.0             
+ 4 14:25:30 1774006 master                           Y     8     41516   107.6             
+ 5 14:25:43 1774006 master                           Y    10     41828   121.2             
+ 6 14:26:03 1774006 master                           Y    13     56242   162.6             
+ 7 14:26:04 1774006 master                           Y    16     81381   179.1             
+ 8 14:26:05 1774006 master                           Y    18     84775   168.6             
+ 9 14:26:24 1774006 master                           Y    20     85861   175.6             
+10 14:25:19 1774023 multi-dimensional-data-perceptio Y     2     30338   104.3             
+11 14:25:20 1774023 multi-dimensional-data-perceptio Y     4     30726    94.5             
+12 14:25:20 1774023 multi-dimensional-data-perceptio Y     6     39761   110.7             
+13 14:25:21 1774023 multi-dimensional-data-perceptio Y     9     60004   130.8             
+14 14:25:23 1774023 multi-dimensional-data-perceptio Y    11     64278   135.9             
+15 14:25:25 1774023 multi-dimensional-data-perceptio Y    13     64780   141.5             
+16 14:25:29 1774023 multi-dimensional-data-perceptio N    16     65067  3147.3  20443   493
+17 14:25:36 1774069 multi-dimensional-data-perceptio Y     2     30338   110.6             
+18 14:25:36 1774069 multi-dimensional-data-perceptio Y     4     30726    91.6             
+19 14:25:37 1774069 multi-dimensional-data-perceptio Y     6     39761   114.8             
+20 14:25:37 1774069 multi-dimensional-data-perceptio Y     8     39988   115.8             
+21 14:25:38 1774069 multi-dimensional-data-perceptio Y    10     42052   134.6             
+22 14:25:38 1774069 multi-dimensional-data-perceptio Y    12     51254   123.9             
+23 14:25:42 1774069 multi-dimensional-data-perceptio N    15     51834  2735.0  17112   519
+24 14:25:49 1774116 data-perception                  Y     2     30320   112.2             
+25 14:25:49 1774116 data-perception                  Y     4     39355   103.9             
+26 14:25:50 1774116 data-perception                  Y     7     59598   141.2             
+27 14:25:52 1774116 data-perception                  Y     9     60190   154.7             
+28 14:25:53 1774116 data-perception                  Y    11     60319   139.7             
+29 14:25:56 1774116 data-perception                  Y    13     60775   151.8             
+30 14:26:02 1774116 data-perception                  N    16     62102  4205.3  20528   933
+31 14:26:11 1774230 multi-dimensional-data-perceptio Y     2     30291   107.9             
+32 14:26:12 1774230 multi-dimensional-data-perceptio Y     4     39326   116.2             
+33 14:26:14 1774230 multi-dimensional-data-perceptio Y     7     39933   118.7             
+34 14:26:15 1774230 multi-dimensional-data-perceptio Y     9     42424   131.4             
+35 14:26:16 1774230 multi-dimensional-data-perceptio Y    11     51783   128.9             
+36 14:26:19 1774230 multi-dimensional-data-perceptio Y    13     56198   137.1             
+37 14:26:24 1774230 multi-dimensional-data-perceptio N    16     57248  2839.9  19942   530
+
+== 阶段聚合 ==
+pid=1774006 [master] calls=9 stream=9 nonstream=0 msgs=[2, 4, 6, 8, 10, 13, 16, 18, 20]
+pid=1774023 [multi-dimensional-data-perception] calls=7 stream=6 nonstream=1 msgs=[2, 4, 6, 9, 11, 13, 16]
+pid=1774069 [multi-dimensional-data-perception] calls=7 stream=6 nonstream=1 msgs=[2, 4, 6, 8, 10, 12, 15]
+pid=1774116 [data-perception] calls=7 stream=6 nonstream=1 msgs=[2, 4, 7, 9, 11, 13, 16]
+pid=1774230 [multi-dimensional-data-perception] calls=7 stream=6 nonstream=1 msgs=[2, 4, 7, 9, 11, 13, 16]
+合计: 37 次 /chat/completions；累计 prompt 字符 1,839,842；已知 usage(仅4次非流式) pt=78025 ct=2475
+
+== httpx 层（:30000 全部请求，交叉验证） ==
+/chat/completions POST 200: 37 （与 openai.chat 计数一致 → 零漏计）
+/api/tags GET →404: 10 次
+/api/v1/models GET →404: 10 次
+/props GET →404: 10 次
+/v1/props GET →404: 10 次
+/version GET →200: 10 次
+（非对话探测：每个 AIAgent 进程 init 各 2 轮 × 5 个 Ollama 风格端点；共 5 进程 = 50 次）
