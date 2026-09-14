@@ -1,0 +1,61 @@
+# L2 上游基线取证
+## 1. 上游标签→pyproject 版本映射（curl raw.githubusercontent.com，2026-09-14）
+v2026.3.12 = 0.2.0
+v2026.3.17 = 0.3.0
+v2026.3.23 = 0.4.0
+v2026.3.28 = 0.5.0
+v2026.3.30 = 0.6.0
+v2026.4.3 = 0.7.0
+v2026.4.8 = 0.8.0
+v2026.4.13 = 0.9.0
+v2026.4.16 = 0.10.0
+v2026.4.23 = 0.11.0
+v2026.4.30 = 0.12.0
+v2026.5.7 = 0.13.0
+v2026.5.16 = 0.14.0
+v2026.5.28 = 0.15.0
+v2026.5.29 = 0.15.1
+v2026.5.29.2 = 0.15.2
+v2026.6.5 = 0.16.0
+v2026.6.19 = 0.17.0
+v2026.7.1 = 0.18.0
+v2026.7.7 = 
+v2026.7.7.2 = 0.18.2
+v2026.7.20 = 0.19.0
+v2026.7.30 = 0.19.1
+v2026.8.3 = 0.20.0
+v2026.8.13 = 0.20.1
+v2026.8.16 = 0.20.2
+v2026.8.16.2 = 0.20.3
+v2026.8.18 = 0.20.4
+v2026.8.19 = 0.20.5
+v2026.8.27 = 0.20.6
+v2026.8.31 = 0.21.0
+v2026.9.7 = 0.21.1
+v2026.9.11 = 0.21.2
+
+## 2. vendored 树（795 文件 blob-hash）对 v2026.6.5..v2026.6.19 全部 1748 commit 的匹配排序（前 15）
+764/795 match, 24 vendored-files-absent, 7df3aa34b17819c790098c391a88ea0ab0827f4d 2026-06-10 12:14:57 +1000 fix(dashboard-auth): warn when public_url override is silently rejected (#
+763/795 match, 24 vendored-files-absent, d33965396e5c8b80bc845b33fa4d8446f630f155 2026-06-10 11:24:01 +1000 feat(tui): include session name in the terminal titlebar (#43188)
+
+763/795 match, 24 vendored-files-absent, b96bd4808dab6d7216cf093eb9f8c95fef9977cf 2026-06-09 21:09:45 -0500 feat(desktop): open any chat in its own window (#43219)
+
+763/795 match, 24 vendored-files-absent, b4170f3ac2ec6a9391ab280970b7238b5446124a 2026-06-10 08:27:24 +0530 fix(cron): don't strict-scan script-injected output in no-skills jobs (#43
+763/795 match, 24 vendored-files-absent, ab5f1a1f1141310705450e374ac5c8de6925e348 2026-06-09 20:12:46 -0500 feat(desktop): Mac-style session switcher (^Tab / ^⇧Tab / ^1-9) (#43111)
+
+763/795 match, 24 vendored-files-absent, 8bb65295532c7d353f081e3aaf63ed6f06ca1bd0 2026-06-10 01:11:45 +0000 fix(desktop): sidebar sections never overlap — two-mode CSS scroll + colla
+763/795 match, 24 vendored-files-absent, 29036155ceb9e29d07f7b49eb073e6ec23802bf8 2026-06-10 11:04:27 +1000 fix(terminal): lazy-parse docker env config (#42733)
+
+763/795 match, 24 vendored-files-absent, 258d24039fe5edc7f90ff7580562f966c4702c22 2026-06-09 20:16:20 -0500 fix(desktop): scope thinking disclosure pending state (#43197)
+
+762/795 match, 24 vendored-files-absent, aecdacb11b37615ce5b98c48b1fd91e9c1937c0f 2026-06-09 19:22:11 -0500 Merge pull request #43109 from NousResearch/fix/desktop-remote-attach-drop
+762/795 match, 24 vendored-files-absent, 93340fa3c1b8548c92d4c92e5e9dfd3a201d89e6 2026-06-09 19:45:29 -0500 fix(tui_gateway): honor target profile's terminal.cwd on desktop profile s
+762/795 match, 24 vendored-files-absent, 8b84d82227a3b637a26ba5f4f41bb08281e2ab84 2026-06-10 00:51:23 +0000 fix(desktop): send on Enter from live editor text, not stale composer stat
+762/795 match, 24 vendored-files-absent, 59ea2f98e69134eb876040fe87c659cfd7a3a2e6 2026-06-09 19:32:25 -0500 fix(desktop): always show the Manage-profiles overflow (#42871)
+
+761/795 match, 24 vendored-files-absent, 5cf6e28a2f4ab02ec9d45f5eda97d9530e5e7bb6 2026-06-10 14:01:34 +1000 fix(gateway): auto-start after container restart via planned-stop marker (
+761/795 match, 24 vendored-files-absent, 27a3211579707245c1158be3cec62fc677b4a2fc 2026-06-09 23:06:44 -0500 feat(desktop): install any VS Code theme from the Marketplace
+
+761/795 match, 24 vendored-files-absent, 218452b05019e13812a25d1f7a17f798a4b0edf8 2026-06-09 18:49:08 -0500 fix(state.db): recover from malformed sqlite_master so hidden sessions rea
+
+## 3. 结论：基线 = 7df3aa34（2026-06-10），764/795 一致，31 个不一致全部有归属（见 l2-exact-diff-summary）

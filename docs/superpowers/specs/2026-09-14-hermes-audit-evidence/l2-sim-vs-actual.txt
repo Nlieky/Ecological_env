@@ -1,0 +1,10 @@
+Files sim-dst/agent/chat_completion_helpers.py and /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/chat_completion_helpers.py differ
+Files sim-dst/agent/__init__.py and /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/__init__.py differ
+Files sim-dst/agent/model_metadata.py and /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/model_metadata.py differ
+Files sim-dst/agent/system_prompt.py and /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/system_prompt.py differ
+Only in sim-dst: .env.example
+Only in /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/hermes_cli: web_dist
+Files sim-dst/hermes_constants.py and /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/hermes_constants.py differ
+Only in sim-dst: skills
+Only in /home/NYJ2025/Ecological_env/shared/framework/hermes-agent: start-api-server.bat
+Files sim-dst/tools/orchestrator_tool.py and /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/tools/orchestrator_tool.py differ

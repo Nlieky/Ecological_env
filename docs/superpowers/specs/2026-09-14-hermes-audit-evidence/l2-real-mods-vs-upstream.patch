@@ -1,0 +1,180 @@
+--- base-files/agent/__init__.py	2026-09-14 12:24:59.384547617 +0800
++++ /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/__init__.py	2026-08-03 10:56:42.507884798 +0800
+@@ -1,8 +1,3 @@
+-"""Agent internals -- extracted modules from run_agent.py.
+-
+-These modules contain pure utility functions and self-contained classes
+-that were previously embedded in the 3,600-line run_agent.py. Extracting
+-them makes run_agent.py focused on the AIAgent orchestrator class.
+ """
+-
+-from . import jiter_preload as _jiter_preload  # noqa: F401
++Hermes Agent 核心模块
++"""
+--- base-files/agent/agent_init.py	2026-09-14 12:24:59.400547710 +0800
++++ /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/agent_init.py	2026-08-03 10:56:42.507884798 +0800
+@@ -221,6 +221,7 @@
+     checkpoint_max_total_size_mb: int = 500,
+     checkpoint_max_file_size_mb: int = 10,
+     pass_session_id: bool = False,
++    identity_path: str | Path = None,
+ ):
+     """
+     Initialize the AI Agent.
+@@ -1736,6 +1737,27 @@
+             "is_anthropic_oauth": agent._is_anthropic_oauth,
+         })
+ 
++    # Process identity_path parameter for custom identity file loading
++    # This allows loading identity files from custom paths (e.g., workspace/, subagents/*/)
++    from pathlib import Path
++    try:
++        from agent.identity_loader import resolve_identity_path
++    except ImportError:
++        # Fallback for when running as a module
++        from shared.framework.hermes_agent.agent.identity_loader import resolve_identity_path
++
++    if identity_path:
++        # Determine project root
++        if hasattr(agent, '_project_root'):
++            project_root = Path(agent._project_root)
++        else:
++            # Default to current working directory's parent
++            project_root = Path.cwd()
++
++        agent._identity_path = resolve_identity_path(identity_path, project_root)
++    else:
++        agent._identity_path = None
++
+ 
+ 
+ __all__ = ["init_agent"]
+--- base-files/agent/chat_completion_helpers.py	2026-09-14 12:24:59.412547781 +0800
++++ /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/chat_completion_helpers.py	2026-08-03 10:56:42.511884834 +0800
+@@ -1740,7 +1740,8 @@
+         stream_kwargs = {
+             **api_kwargs,
+             "stream": True,
+-            "stream_options": {"include_usage": True},
++            # stream_options removed for vLLM compatibility
++            # "stream_options": {"include_usage": True},
+             "timeout": _httpx.Timeout(
+                 connect=_conn_cap,
+                 read=_stream_read_timeout,
+--- base-files/agent/model_metadata.py	2026-09-14 12:24:59.428547874 +0800
++++ /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/model_metadata.py	2026-08-03 10:56:42.523884941 +0800
+@@ -628,7 +628,7 @@
+         return _model_metadata_cache
+ 
+     try:
+-        response = requests.get(OPENROUTER_MODELS_URL, timeout=10, verify=_resolve_requests_verify())
++        response = requests.get(OPENROUTER_MODELS_URL, timeout=1, verify=_resolve_requests_verify())  # timeout 10→1: 内网不可达 openrouter.ai，避免启动阻塞 ~12s
+         response.raise_for_status()
+         data = response.json()
+ 
+--- base-files/agent/system_prompt.py	2026-09-14 12:24:59.440547945 +0800
++++ /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/agent/system_prompt.py	2026-08-03 10:56:42.523884941 +0800
+@@ -99,6 +99,23 @@
+         # Fallback to hardcoded identity
+         stable_parts.append(DEFAULT_AGENT_IDENTITY)
+ 
++    # ── 定制：加载自定义路径下的全部身份文件（原生仅读 SOUL.md）────────────
++    # 主智能体经 identity_path=workspace → agent._identity_path；子智能体经 HERMES_HOME
++    # 指向各自目录。加载器按目录里实际存在的文件读 → 主智能体 7 个、子智能体 3 个自然区分。
++    try:
++        import os as _os
++        from pathlib import Path as _Path
++        _id_path = getattr(agent, "_identity_path", None)
++        if not _id_path and _os.environ.get("HERMES_HOME"):
++            _id_path = _Path(_os.environ["HERMES_HOME"])
++        if _id_path:
++            from shared.framework.hermes_agent.agent.identity_loader import load_identity_files_from_path
++            _id_content = load_identity_files_from_path(_id_path)
++            if _id_content:
++                stable_parts.append(_id_content)
++    except Exception:
++        pass
++
+     # Pointer to the hermes-agent skill + docs for user questions about Hermes itself.
+     stable_parts.append(HERMES_AGENT_HELP_GUIDANCE)
+ 
+--- base-files/hermes_constants.py	2026-09-14 12:24:59.448547992 +0800
++++ /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/hermes_constants.py	2026-08-03 10:56:42.595885583 +0800
+@@ -9,6 +9,7 @@
+ import sysconfig
+ from contextvars import ContextVar, Token
+ from pathlib import Path
++from typing import List
+ 
+ 
+ _profile_fallback_warned: bool = False
+@@ -108,6 +109,30 @@
+     return _get_platform_default_hermes_home()
+ 
+ 
++# ─── Identity Files Constants ───────────────────────────────────────────────────
++
++# 扩展的身份文件列表（支持项目完整需求）
++IDENTITY_FILES = [
++    "IDENTITY.md",    # 身份卡片
++    "SOUL.md",        # 身份和个性
++    "AGENTS.md",      # 工作区规范
++    "MEMORY.md",      # 长期记忆
++    "USER.md",        # 用户信息
++    "TOOLS.md",       # 工具配置
++    "HEARTBEAT.md"    # 周期性任务
++]
++
++
++def get_identity_files() -> List[Path]:
++    """返回所有身份文件路径列表
++
++    Returns:
++        List[Path]: HERMES_HOME 下所有身份文件的路径
++    """
++    hermes_home = get_hermes_home()
++    return [hermes_home / f for f in IDENTITY_FILES]
++
++
+ def get_default_hermes_root() -> Path:
+     """Return the root Hermes directory for profile-level operations.
+ 
+--- base-files/run_agent.py	2026-09-14 12:24:59.468548109 +0800
++++ /home/NYJ2025/Ecological_env/shared/framework/hermes-agent/run_agent.py	2026-08-03 10:56:42.639885977 +0800
+@@ -410,9 +410,10 @@
+         checkpoint_max_total_size_mb: int = 500,
+         checkpoint_max_file_size_mb: int = 10,
+         pass_session_id: bool = False,
++        identity_path: str | Path = None,
+     ):
+         """Forwarder — see ``agent.agent_init.init_agent``."""
+-        from agent.agent_init import init_agent
++        from shared.framework.hermes_agent.agent.agent_init import init_agent
+         init_agent(
+             self,
+             base_url=base_url,
+@@ -483,6 +484,7 @@
+             checkpoint_max_total_size_mb=checkpoint_max_total_size_mb,
+             checkpoint_max_file_size_mb=checkpoint_max_file_size_mb,
+             pass_session_id=pass_session_id,
++            identity_path=identity_path,
+         )
+ 
+     def _get_session_db_for_recall(self):
+@@ -5100,7 +5102,15 @@
+     ) -> Dict[str, Any]:
+         """Forwarder — see ``agent.conversation_loop.run_conversation``."""
+         from agent.conversation_loop import run_conversation
+-        return run_conversation(self, user_message, system_message, conversation_history, task_id, stream_callback, persist_user_message)
++        return run_conversation(
++            self,
++            user_message,
++            system_message=system_message,
++            conversation_history=conversation_history,
++            task_id=task_id,
++            stream_callback=stream_callback,
++            persist_user_message=persist_user_message
++        )
+ 
+     def chat(self, message: str, stream_callback: Optional[callable] = None) -> str:
+         """

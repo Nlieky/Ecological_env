@@ -1,0 +1,17 @@
+# vendor 脚本语法取证（2026-09-14）
+## python3 -m py_compile scripts/vendor_hermes.py（工作区=HEAD 同内容）
+  File "/home/NYJ2025/Ecological_env/scripts/vendor_hermes.py", line 89
+    ),
+    ^
+SyntaxError: closing parenthesis ')' does not match opening parenthesis '[' on line 83
+
+## 各历史版本可解析性
+BROKEN  d494dd37 2026-07-23 10:59:00 +0800 chore: 清理 git 内运行时产物 + 修密
+BROKEN  e263fb67 2026-07-23 10:11:14 +0800 fix(agent): 清理框架层 + 让 pipeline �
+OK  311f23db 2026-07-21 15:53:59 +0800 fix: vendor exclude top-level only (was nukin
+OK  d170be53 2026-07-21 15:45:29 +0800 chore: gitignore vendored hermes tree + skip 
+OK  ae1b59b2 2026-07-21 15:41:11 +0800 feat: vendor_hermes.py (copy runtime + apply 
+
+## 修复语法(删 :89 多余括号)后按 PATCHES 对 pristine 基线复演的 AST 检查
+agent/model_metadata.py: SyntaxError: '(' was never closed
+agent/system_prompt.py: OK
