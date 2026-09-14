@@ -425,13 +425,13 @@ TDD 完成（计划唯一 TDD 任务）：先写失败测试（ModuleNotFoundErr
 | 阶段（会话） | 调用 | 流/非流 | 消息数增长 | 结局 |
 |---|---|---|---|---|
 | 主智能体 master | 9 | 9/0 | 2→20 | 完成编排+最终回答 |
-| 子会话1 mddp | 7 | 6/1 | 2→16 | failed：读 skill 未跑脚本 |
+| 子会话1 multi-dimensional-data-perception（下称 mddp） | 7 | 6/1 | 2→16 | failed：读 skill 未跑脚本 |
 | 子会话2 mddp | 7 | 6/1 | 2→15 | failed：同上 |
 | 子会话3 "data-perception"（名称变体） | 7 | 6/1 | 2→16 | **误判 failed**（脚本已产出，文件名错配） |
 | 子会话4 mddp | 7 | 6/1 | 2→16 | success |
 | **合计** | **37** | 33/4 | — | 3/4 子会话浪费 |
 
-结构规律：**每个子智能体会话固定 7 次** = 6 轮流式（全部打满 subagent_entry 的 max_iterations=6）+ 1 次非流式收尾摘要（仅此 4 次有 usage：pt 78,025 / ct 2,475）；33 次流式全部无 usage——§3 既有发现 #7（stream_options 删除⇒流式计量退化）在活链路原样复现。累计重发 prompt 1.84M 字符（主智能体首轮 35,785 字符，第 7 轮 81,381）。另有 **50 次非对话探测请求**（每 AIAgent init 2 轮×5 个 Ollama 风格端点×5 进程，/version 200 余 404）。
+结构规律：**每个子智能体会话固定 7 次** = 6 轮流式（全部打满 subagent_entry 的 max_iterations=6）+ 1 次非流式收尾摘要（仅此 4 次有 usage：pt 78,025 / ct 2,475）；33 次流式全部无 usage——§2.1 改动分类表 #7（stream_options 删除⇒流式计量退化）在活链路原样复现（该推断由本次实证坐实）。累计重发 prompt 1.84M 字符（主智能体首轮 35,785 → 末轮（第 9 轮，20 条消息）85,861 字符，2.4×）。另有 **50 次非对话探测请求**（每 AIAgent init 2 轮×5 个 Ollama 风格端点×5 进程，/version 200 余 404）。
 
 ### E3 对照「~12 次调用/流程」口径
 
@@ -441,14 +441,14 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 **未降级**：端点/服务/数据库三项存活，活链路一次跑通并成功返回结论；mock LLM 与静态推演两级降级路径备而未用，本节数字均为实测，无「未实证」标注项。唯一妥协：为与活服务 :8642 并行，探针实例以临时 .env 改动落位 :8643（跑后已恢复并 md5 验证），端口差异不影响调用结构。
 
-### 实证新增发现（§3 未及，移交 §6）
+### 实证新增发现（§3 未及/升级，移交 §6）
 
-1. 🔴 **子智能体名称变体→结果文件错配→成功被误判失败**：主智能体第 3 次重试用了非规范名 "data-perception"，call_subagent 目录解析成功、脚本真跑出了结果（该会话 final_response 自证），但 subagent_entry 的 RESULT_FILE_NAMES 无此键 → 读 result.json 而脚本写 data_result.json → 误标 failed → 又多烧一整轮会话（7 次）。主智能体自由文本起的工具参数能击穿文件名契约，无任何校验层。
-2. 🔴 **「最近」数据静默返陈**：任务问"最近数据"，脚本实际返回 2026-07-24（约 7 周前）数据，最终回答仍称"最近 24 小时"——L3 预警 b（InfluxDB 停更于 07-25）在活链路原样兑现，且**用户侧无从察觉**。
+1. 🔴 **别名键在两份重复映射间漂移→成功被误判失败**【触发即必错·数据正确性】：主智能体第 3 次重试用了非规范名 "data-perception"——它是 call_subagent.py:32-33 SUBAGENT_PATHS 白名单里合法的向后兼容别名（8 键 = 4 规范名 + 4 简化别名），call_subagent 自带的 RESULT_FILE_NAMES（:40-48）同样 8 键并正确把该别名映射到 data_result.json，名称校验层**存在**（:167-172 按 8 键表校验，表外名直接拒）；真缺陷在 subagent_entry.py:52-57 维护了**第二份同语义映射却只收 4 个规范名**，且 `.get(name, "result.json")`（:182 取结果、:209/:216 写结果同用）静默兜底——脚本按规范名写 data_result.json、entry 却读 result.json → 误标 failed → 又多烧一整轮会话（7 次）。另注：tool_registration.py:242 的 call_subagent 参数 enum 只列 4 个规范名，但 dispatch 侧未按 enum 强制（LLM 传枚举外的别名仍被别名表放行）。修法应指向「两表合一/给 subagent_entry 补别名键」，而非「加校验层」（校验已在，错在映射漂移）。本例同时是 L3 预警 c 的活体例证：会话 3 的 result.json 把「脚本已跑成」标为 failed——结果文件只作旁证、以 trace 日志+探针计数为准的取证规则再次成立。
+2. 🔴 **「最近」数据静默返陈（升级 §3.3① 🟡→🔴）**【触发即必错·数据正确性】：任务问"最近数据"，脚本实际返回 2026-07-24（约 7 周前）数据，最终回答仍称"最近 24 小时"——L3 预警 b（InfluxDB 停更于 07-25）在活链路原样兑现。定级对账：与 §3.3① 同一根因（数据停更），但实证新增证据——**用户侧实际拿到顶着「最近 24 小时」话术的 7 周陈数据且无任何提示**，已从「数据新鲜度保留意见」升为用户侧静默数据错误，故 🟡→🔴。
 3. 🟡 **服务层 trace 显著少计**：/query 回传 trace 的 decision_path=2、subagent_calls=1（仅成功项），实际子进程启动 4 次（探针+落盘日志双证）——失败重试对后端审计不可见，「trace 供审计」的承诺打折。
 4. 🟡 **AGENT_PORT 环境覆盖已死**：hermes_cli/env_loader.py:238 以 override=True 加载 HERMES_HOME/.env，import 时碾压一切进程环境变量——start_agent.py 头注「可通过环境变量 AGENT_PORT 配置」失效，.env 永远赢（并行实例被迫临时改 .env）。
 5. 🟡 **每 AIAgent init 10 次盲探**：5 进程×10 次 Ollama 风格端点探测（404 为主）打向 vLLM；子智能体是短命进程，探测无缓存复用，纯噪音请求。
-6. 🟡 **重复读同一 SKILL.md**：成功会话内 skill_view 同一技能 3 次（trace skill_calls 自证）；主智能体 prompt 9 轮膨胀 2.2 倍——上下文成本随轮数线性放大无压缩介入（未过 50% 阈值，compressor 未触发是符合设计的，但说明常规任务已顶着高基数 prompt 跑）。
+6. 🟡 **重复读同一 SKILL.md**：成功会话内 skill_view 同一技能 3 次（trace skill_calls 自证）；主智能体 prompt 自首轮 35,785 → 末轮（第 9 轮，20 条消息）85,861 字符，约 2.4×——上下文成本随轮数线性放大无压缩介入（未过 50% 阈值，compressor 未触发是符合设计的，但说明常规任务已顶着高基数 prompt 跑）。
 7. 观察：auxiliary client（openrouter/nous）每次 init 都探测并标 unhealthy（payment/credit error），无 aux LLM 调用实际服务流程；其外部端点流量不计入 :30000 口径（按「.env 唯一真源」界定）。
 
 **样本限度**：n=1，LLM 行为非确定（「读 skill 未跑脚本」失败率、重试次数逐次浮动），37 是一次完整样本而非稳定均值；结构结论（每子会话 7 次封顶、双层零漏计、trace 少计）为确定机制，数值结论（37、57% 浪费率）待多样本收窄。
@@ -473,7 +473,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 |---|---|
 | e1-probe-protocol.txt | TDD 红绿记录、chokepoint 选点依据（代码行号）、存活探测三项结果、运行协议、护栏执行全记录（快照/drift/恢复/时限） |
 | e1-llm-waterfall.md | 完整瀑布（按会话）、时间线（master 轮次与子会话交错）、~12 次口径对照表 |
-| e1-llm-call-detail.txt | 37 次调用逐条精简明细（时间/pid/阶段/流式/消息数/prompt 字符/到头耗时/usage）+ 50 次非对话探测汇总 |
+| e1-llm-call-detail.txt | 37 次调用逐条精简明细（时间/pid/阶段/流式/消息数/prompt 字符/到响应头耗时/usage）+ 50 次非对话探测汇总 |
 
 ### B.2 关键数字快照
 

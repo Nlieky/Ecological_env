@@ -11,7 +11,7 @@
 | 主智能体 master（pid 1774006） | 9 | 9/0 | 2→20 | 0/0（全流式无 usage） | 完成编排+最终回答 |
 | 子会话1 multi-dimensional-data-perception（14:25:14） | 7 | 6/1 | 2→16 | 20443/493 | failed：读 skill 未跑脚本 |
 | 子会话2 multi-dimensional-data-perception（14:25:30） | 7 | 6/1 | 2→15 | 17112/519 | failed：同上 |
-| 子会话3 "data-perception"（名称变体，14:25:43） | 7 | 6/1 | 2→16 | 20528/933 | **误判 failed**（脚本已产出，文件名错配） |
+| 子会话3 "data-perception"（合法别名，14:25:43） | 7 | 6/1 | 2→16 | 20528/933 | **误判 failed**（别名键在 call_subagent 8 键表有、subagent_entry 4 键表无→文件名错配，脚本实际已产出） |
 | 子会话4 multi-dimensional-data-perception（14:26:06） | 7 | 6/1 | 2→16 | 19942/530 | success |
 | **合计** | **37** | 33/4 | — | 78025/2475（仅 4 次非流式有 usage） | 3/4 子会话浪费 |
 
@@ -42,5 +42,5 @@
   完整 hermes AIAgent 会话（≥7 次：迭代上限 6 + 非流式摘要）；② 失败放大——3/4 子会话
   浪费（21 次，占总量 57%）：2 次"读 skill 未跑脚本"+ 1 次名称变体误判；③ 主智能体多轮
   决策循环本身 9 次（含消化每次失败的工具结果轮）
-- token 侧：流式 33 次全部无 usage（stream_options 已删的既有发现 #7 在活链路复现），
+- token 侧：流式 33 次全部无 usage（主报告 §2.1 改动分类表 #7「stream_options 删除⇒流式计量退化」在活链路复现），
   已知 4 次非流式合计 pt=78,025 / ct=2,475；真实消耗以累计 prompt 字符 1.84M 为量级参考
