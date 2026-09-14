@@ -482,7 +482,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 |---|---|---|---|
 | 任务解析 | 主智能体 LLM 多轮即兴（vendored conversation_loop）；引导文 workspace/AGENTS.md:99-135（§3.4——引导文自身还指向退役路径） | task_structuring.py:115 TaskStructuringModule.structure_task（:142）→ StructuredTask（:70）；CLAUDE.md 叙事的 task_receiving_and_parsing.py 在残存树中**已不存在**（CLAUDE.md 漂移再加一例，归 P1 重写） | 重复（机制不同：LLM 即兴 vs 规则结构化） |
 | 子代理调度 | tool_registration.py:242 enum → call_subagent.py:291-296 subprocess（§1.5） | execution_control.py:315 coordinate_agent_execution、:1469 _llm_plan_subagent_execution、:1578 _llm_process_agent_output；resource_matching.py:85 SchedulingDecisionModule | **完整重复**（CLAUDE.md「Two-Layer LLM-Driven Coordination」的两层协调器职责同构——新链路由主智能体循环+子智能体会话分别承担） |
-| 结果解释 | read_result + _compact_result_for_master（call_subagent.py:138-141 铁律）+ 主智能体末轮汇总（§1.5） | execution_control.py:1092 _llm_analyze_result、:2015 ExecutionReport | 重复 |
+| 结果解释 | read_result（orchestrator_core_bridge.py:68）+ _compact_result_for_master（tool_registration.py:134，「LLM 绝不读原始数据」铁律 docstring :138）+ 主智能体末轮汇总（§1.5） | execution_control.py:1092 _llm_analyze_result、:2015 实例化 ExecutionReport（类定义 :117） | 重复 |
 | 身份文件 | identity_loader.py:13-21 七文件 → system_prompt.py:102-118 注入（§2.3/§3.4） | execution_control.py:223 load_agent_identity（:246-249 读 SKILL/AGENTS/SOUL/MEMORY，:221 缓存） | 重复（文件集合设计被完整沿用——§1.7 层 3「载体换、文件集合不变」的实证） |
 | 工具脚本调用 | 子智能体 skill_view 选脚本 → terminal 跑 canonical 脚本（subagent_entry.py:174-177，§1.5） | execution_control.py:554 _get_available_scripts、:647 _execute_script_by_decision（LLM 单发选脚本直执行） | 重复（调用经济学不同：单发函数 vs 整会话——§4 E3 偏差①的史源） |
 
@@ -490,7 +490,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 ### 5.2 外部参照一：pi-subagents（检查项 4.2）
 
-机制依据：~/pi-subagent-tutorial.md（本机，2026-09-10 实测版）。核心模式：**角色文件制**（子智能体=一个 .md：frontmatter name/description/tools/model + 正文系统提示，教程 §4.1）、**技能三供给**（全继承/点名/skillPath 私有库，教程 §10 实测表）、**编排交自然语言+固化模板**（链式 {previous}/并行≤8，教程 §5）、FleetView 观测（§3.5）、maxSubagentSpawnsPerRun=64 递归上限（§6.3）。
+机制依据：~/pi-subagent-tutorial.md（本机，2026-09-10 实测版）。核心模式：**角色文件制**（子智能体=一个 .md：frontmatter name/description/tools/model + 正文系统提示，教程 §4.1）、**技能三供给**（全继承/点名/skillPath 私有库，教程 §10 实测表）、**编排交自然语言+固化模板**（链式 {previous}/并行≤8，教程 §5 模式、§9.2 数字出处）、FleetView 观测（§3.5）、maxSubagentSpawnsPerRun=64 递归上限（§6.3）。
 
 **若采用其模式，本系统哪些痛点消失**：
 
@@ -533,7 +533,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 **论据一（架构收益）——三条路线中唯一有活实证的。** E1 端到端跑通（§4：最小任务 79.7s 成功返回、未降级）与业务闭环①②③代码+运行时双证（§3.3）都发生在框架链路上；旧套件无任何一次完整五环节运行记录（「~12 次」是设计口径，§4 E3），替换=用一个从未被实证的实现换掉一个刚被实证的实现。框架扩展点使用正确（registry override=True 系上游官方插件机制，§2.4；身份注入锚定于 PATCHES，§2.1 #4），最重耦合面（run_agent/agent_init 整文件 overlay，§2.5）有已列明的松耦合降级路径。专利六层的 3/5 两层以 hermes 为载体成立（§1.7 ✅）——保框架=保专利叙事的载体连续性（该架构是「可演进的初始构想」，载体不变时演进成本最低）。框架承担的会话循环/流式/工具注册/技能发现/上下文压缩若自建，量级不少于旧套件 3772 行，且旧套件只覆盖其中「调度」一职（5.1 矩阵）。
 
-**论据二（实证数据）——8 个红项无一落在 vendored 框架本体上。** 红项归属盘点（§3 共 6 红：死旋钮、续传重标、④⑤断链、活链路零测试、退役测试必炸；§4 新增 2 红：两表别名漂移、陈数据当「最近 24 小时」）：**项目接缝代码/文档/环境 6 处**——死旋钮（start_agent.py:34-36 假声明）、续传重标（start_agent.py:187-223 + subagent_entry.py:182-216）、④⑤断链（编排顺序无强制 + 知识库假接缝 regulation_matcher.py:35 E:/ 死路径，§3.3）、两表漂移（call_subagent.py:26-48 + subagent_entry.py:52-57）、陈数据（InfluxDB 停更——环境侧，§3.3①/§4 发现 2；SKILL.md 漂移的影响计入浪费侧，见反论②）；**被裁方 1 处**——退役测试必炸（恰由过渡步骤 1 拆除）；**路线无关工程债 1 处**——零测试（§3.5）；**vendored 框架本体 0 处**。框架侧活改动全景=身份扩展链 #1-#4（四处声明齐、§2.5 评分正确性 🟢 低）+ 特化 #7/#8/#9（#7 未声明且已致流式 usage 退化——§4 实证 33/37 次无 usage；#8 声明文本漂移；#9 无注释），合计 11 文件 ≈1.8%（§2.6 表）。框架本体 88.5% 非死重量（§1.3）——它是引擎不是行李。
+**论据二（实证数据）——8 个红项无一落在 vendored 框架本体上。** 红项归属盘点（§3 共 6 红：死旋钮、续传重标、④⑤断链、活链路零测试、退役测试必炸；§4 新增 2 红：两表别名漂移、陈数据当「最近 24 小时」）：**项目接缝代码/文档/环境 6 处**——死旋钮（start_agent.py:34-36 假声明）、续传重标（start_agent.py:187-223 + subagent_entry.py:182-216）、④⑤断链（编排顺序无强制 + 知识库假接缝 regulation_matcher.py:35 E:/ 死路径，§3.3）、两表漂移（call_subagent.py:26-48 + subagent_entry.py:52-57）、陈数据（InfluxDB 停更——环境侧，§3.3①/§4 发现 2；SKILL.md 漂移的影响计入浪费侧，见反论②）；**被裁方 1 处**——退役测试必炸（恰由过渡步骤 1 拆除）；**路线无关工程债 1 处**——零测试（§3.5）；**vendored 框架本体 0 处**。框架侧活改动全景=身份扩展链 #1-#4（四处声明齐、§2.5 评分正确性 🟢 低）+ 特化 #7/#8/#9（#7 未声明且已致流式 usage 退化——§4 实证 33/37 次无 usage；#8 声明文本漂移；#9 无注释），合计 11 文件 ≈1.8%（§2.6 表）。框架本体 88.5% 非死重量（执行覆盖口径下界 62.0%，两口径见 §1.3）——它是引擎不是行李。
 
 **论据三（维护成本）——1 人团队、作者不懂框架内部的算术。** 路线 A：修 §2.6 六项清单 + §3 红 4 项 + 两表合一 + 补 3 条接缝测试，量级以天计，且每项验收标准都是业务可观察的（复现管道重放一致、结果不再误标、追问轮不再返陈数据）。路线 B（收缩为库，只取身份与工具系统）：§1.2 已证运行时=「精简包 + vendored 全家桶」混合体（448 静态可达 + 79 动态加载插件）且存在 vendored→精简包反向依赖（system_prompt.py:112）——收缩即自维护一个无上游映射的私有子集，§2.6 四断点原样保留且失去 overlays 管道这一（可修复的）重建机制，上游 PyPI 又无包可装（§2.0），同步成本不降反升，且「懂业务不懂内部」的作者从此独自面对全部框架内部。路线 C（替换）：回旧套件=复活退役代码并丢掉唯一实证基线；引 pi/OpenClaw=形态/体量不符（5.2/5.3 决定性代价）；自建=旧套件 8 周 52 提交的历史已证明 1 人写不全，且其自身也从未跑通五环节（5.0）。另一事实：07-30 后框架零提交仍通过 09-14 活实证（5.0）——框架处于**稳态低维护**，不在持续失血。
 
