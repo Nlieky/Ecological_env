@@ -71,7 +71,8 @@
       </aside>
 
       <div class="kg-chart-wrap">
-        <!-- 推演摘要条：起点 → 波及 N（前3）· 根因候选 M，✕ 退出推演着色 -->
+        <!-- 推演摘要条：起点 → 波及 N（前3）· 根因候选 M，✕ 退出推演着色；
+             案例链路摘要（入口A）与推演互斥共用此容器位 -->
         <div v-if="store.impactResult" class="kg-impact-bar">
           <span>⚡</span>
           <span class="kg-impact-text">
@@ -80,6 +81,14 @@
             · 根因候选 {{ store.impactResult.upstream.length }}
           </span>
           <button type="button" class="kg-impact-close" title="退出推演" @click="store.clearImpact">✕</button>
+        </div>
+        <div v-else-if="store.caseLinkNodes" class="kg-impact-bar kg-case-bar">
+          <span>🔗</span>
+          <span class="kg-impact-text">
+            案例链路：<b>{{ store.caseLinkLabel }}</b>
+            （{{ store.caseLinkNodes.size }} 节点：厂→模式→法条）
+          </span>
+          <button type="button" class="kg-impact-close" title="退出链路高亮" @click="store.clearCaseLink">✕</button>
         </div>
         <el-alert v-if="renderError" type="warning" :closable="false"
                   title="图形渲染失败，已降级为列表视图" />
@@ -97,6 +106,11 @@
           <span class="kg-dot" :style="{ background: NODE_META[store.selectedNode?.type ?? '']?.color }" />
           <h3>{{ store.selectedNode?.label }}</h3>
           <span class="kg-detail-type">{{ typeLabel(store.selectedNode?.type ?? '') }}</span>
+          <!-- 案例链路入口A：case 节点专属——厂→模式→法条全链蓝色高亮，其余淡出 -->
+          <el-button v-if="store.selectedNode?.type === 'case'" text size="small" class="kg-link-btn"
+                     @click="toggleCaseLink">
+            {{ selectedCaseLinked ? '取消链路' : '🔗 高亮链路' }}
+          </el-button>
           <el-button text size="small" @click="store.clearSelection">关闭</el-button>
         </div>
         <el-descriptions v-if="store.selectedNode" :column="1" size="small" border>
@@ -159,6 +173,17 @@ async function openNode(id: string) {
   }
 }
 
+// 案例链路入口A按钮：当前选中的 case 是否正是高亮链路的起点
+// （set 里含厂/模式/法条但不含其他 case——case 节点互不为对方链路成员）
+const selectedCaseLinked = computed(() =>
+  !!store.selectedNode && !!store.caseLinkNodes?.has(store.selectedNode.id))
+function toggleCaseLink() {
+  const id = store.selectedNode?.id
+  if (!id) return
+  if (selectedCaseLinked.value) store.clearCaseLink()
+  else store.highlightCase(id)
+}
+
 // 统计区：大数字 + 灰标签（计数跟当前 tab 走——全图数字与所见不符会造成"68 vs 57"困惑）
 const statTiles = computed(() => {
   if (store.activeTab === 'topology') {
@@ -208,15 +233,23 @@ function renderChart() {
     if (!chart) chart = echarts.init(chartEl.value)
     const series = toEChartsSeries(store.allNodes, store.allEdges, store.visibleTypes)
 
-    // ── 推演/健康着色叠加（视图层，不进 store 纯映射）──
+    // ── 推演/链路/健康着色叠加（视图层，不进 store 纯映射）──
+    // 案例链路（入口A）与推演在 store 层互斥（后者存在时前者必空）——同级分支。
     // fault 红（放大+描边）/ affected 橙 / candidate 紫 覆盖类型色；unrelated 整体退场。
     // service health=down 常态红（#b91c1c 暗红描边区分 fault——无推演时也显示）
     const nodesById = new Map(store.allNodes.map(n => [n.id, n]))
+    const linkSet = store.caseLinkNodes // 链内节点集（null=未激活）
     const dataWithImpact: Record<string, unknown>[] = series.data.map(d => {
-      const st = impactNodeStyle(d.id, store.impactResult)
-      const raw = nodesById.get(d.id)
       const out: Record<string, unknown> = { ...d, itemStyle: { ...d.itemStyle } }
       const itemStyle = out.itemStyle as Record<string, unknown>
+      if (linkSet) {
+        // 案例链路：链内蓝+深蓝描边，链外淡出
+        if (linkSet.has(d.id)) out.itemStyle = { color: '#3b82f6', borderColor: '#1d4ed8', borderWidth: 2 }
+        else itemStyle.opacity = 0.15
+        return out
+      }
+      const st = impactNodeStyle(d.id, store.impactResult)
+      const raw = nodesById.get(d.id)
       if (st.state === 'fault') {
         out.itemStyle = { color: st.color, borderColor: st.color, borderWidth: 4 }
         out.symbolSize = Math.round(d.symbolSize * 1.3)
@@ -228,9 +261,15 @@ function renderChart() {
       if (st.state === 'unrelated') itemStyle.opacity = 0.15
       return out
     })
-    // 边：推演时影响集（fault∪downstream∪upstream）内部边橙色加粗，其余退到 0.08
+    // 边：链路时链内边蓝加粗；推演时影响集（fault∪downstream∪upstream）内部边
+    // 橙色加粗；其余场景退到 0.08
     let linksWithImpact: (GraphLinkDatum & { lineStyle?: Record<string, unknown> })[] = series.links
-    if (store.impactResult) {
+    if (linkSet) {
+      linksWithImpact = series.links.map(l =>
+        linkSet.has(l.source) && linkSet.has(l.target)
+          ? { ...l, lineStyle: { color: '#3b82f6', width: 2, opacity: 0.9 } }
+          : { ...l, lineStyle: { opacity: 0.08 } })
+    } else if (store.impactResult) {
       const r = store.impactResult
       const inSet = new Set<string>(
         [r.nodeId, ...r.downstream.map(e => e.id), ...r.upstream.map(e => e.id)])
@@ -347,10 +386,10 @@ onBeforeUnmount(() => {
   chart = null
 })
 
-// tab/图例/数据/推演结果变化 → 重渲染（visibleTypes 是 computed 新数组、allNodes 整体替换，
-// 引用比较即触发，无需 deep；impactResult 置换触发推演着色进/退场；nextTick 兜底，
+// tab/图例/数据/推演结果/案例链路变化 → 重渲染（visibleTypes 是 computed 新数组、allNodes 整体
+// 替换，引用比较即触发，无需 deep；impactResult/caseLinkNodes 置换触发着色进/退场；nextTick 兜底，
 // 项目历史坑：echarts.init 必须在 DOM 就绪后）
-watch([() => store.visibleTypes, () => store.allNodes, () => store.impactResult],
+watch([() => store.visibleTypes, () => store.allNodes, () => store.impactResult, () => store.caseLinkNodes],
   () => nextTick(renderChart))
 
 // 详情侧栏出现/消失使图区宽度变化 → resize，否则 canvas 按旧宽度溢出、盖住侧栏拦截点击
@@ -450,6 +489,16 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
   color: #b45309; font-size: 13px; line-height: 1; padding: 3px 6px; border-radius: 6px;
 }
 .kg-impact-close:hover { background: rgba(180,83,9,.1); }
+/* 案例链路摘要条（蓝=链路语境，与推演琥珀底区分；结构复用 .kg-impact-bar） */
+.kg-case-bar {
+  background: rgba(239,246,255,.97); border-color: #3b82f6;
+  box-shadow: 0 4px 16px rgba(30,64,175,.15); color: #1e40af;
+}
+.kg-case-bar .kg-impact-text b { color: #1d4ed8; }
+.kg-case-bar .kg-impact-close { color: #1d4ed8; }
+.kg-case-bar .kg-impact-close:hover { background: rgba(29,78,216,.1); }
+.kg-link-btn { color: #1d4ed8; }
+.kg-link-btn:hover { color: #1d4ed8; background: rgba(29,78,216,.06); }
 
 /* 详情侧栏 */
 .kg-detail {

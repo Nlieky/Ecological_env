@@ -109,15 +109,38 @@
           </div>
           <div class="li" v-for="a in recommendedActions(current.workOrder)" :key="a">· {{ a }}</div>
         </div>
+
+        <!-- 关联链路（入口B）：研判写回图谱的 case 节点一跳邻居（厂→模式），一键跳图谱 -->
+        <div class="d-sec">
+          <div class="d-ttl">关联链路</div>
+          <div v-if="caseLinkLoading" class="li muted">加载中…</div>
+          <template v-else-if="caseLink">
+            <div class="case-chain">
+              <template v-for="(el, i) in caseLink" :key="el.id">
+                <span v-if="i > 0" class="case-arrow">→</span>
+                <span class="case-chip">
+                  <span class="dot" :style="{ background: typeColor(el.type) }" />
+                  {{ el.label }}
+                  <span class="muted">{{ typeCn(el.type) }}</span>
+                </span>
+              </template>
+            </div>
+            <el-button size="small" @click="goGraph">在图谱中查看</el-button>
+          </template>
+          <div v-else class="li muted">该事件无图谱关联（研判沉淀缺失或无违规）</div>
+        </div>
       </template>
     </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { eventsService } from '@/api/modules/events'
+import { knowledgeService } from '@/api/modules/knowledge'
+import { NODE_META } from '@/stores/knowledge'
 import { splitEvidence, OTHER_CATEGORY_LABELS } from '@/views/eventEvidence'
 import type { AlertEvent } from '@/api/types/api.types'
 
@@ -153,6 +176,45 @@ function openDetail(row: AlertEvent) {
   current.value = row
   drawerVisible.value = true
 }
+
+// ── 关联链路（子项目4 T3 入口B）──
+// 查 case:{event_id} 的一跳邻居，取 厂(involves)+模式(cites) 拼链路；
+// 节点 404 = 研判未写回图谱 → 静默降级为"无关联"提示（不打扰主流程）
+interface CaseLinkEl { id: string; label: string; type: string }
+const caseLink = ref<CaseLinkEl[] | null>(null)
+const caseLinkLoading = ref(false)
+watch(current, async (ev) => {
+  caseLink.value = null
+  if (!ev) return
+  caseLinkLoading.value = true
+  try {
+    const resp = await knowledgeService.node(`case:${ev.id}`)
+    const ORDER: Record<string, number> = { plant: 0, violation_pattern: 1 } // 厂→模式
+    const out: CaseLinkEl[] = []
+    for (const [type, list] of Object.entries(resp.neighbors || {})) {
+      if (type === 'plant' || type === 'violation_pattern') {
+        for (const n of list as { id: string; label: string }[]) {
+          out.push({ id: n.id, label: n.label, type })
+        }
+      }
+    }
+    out.sort((a, b) => (ORDER[a.type] ?? 9) - (ORDER[b.type] ?? 9))
+    caseLink.value = out.length ? out : null
+  } catch {
+    caseLink.value = null // 404（无写回）静默
+  } finally {
+    caseLinkLoading.value = false
+  }
+})
+const router = useRouter()
+function goGraph() {
+  if (!current.value) return
+  // focus query：图谱页 onMounted 直开详情侧栏（T2 已支持）
+  router.push({ path: '/agents/knowledge', query: { focus: `case:${current.value.id}` } })
+}
+// 色点/类型名与图谱页同源（NODE_META）
+function typeColor(t: string): string { return NODE_META[t]?.color ?? '#94a3b8' }
+function typeCn(t: string): string { return NODE_META[t]?.label ?? t }
 async function saveStatus(s: string) {
   if (!current.value) return
   try {
@@ -201,4 +263,13 @@ onMounted(load)
 .o-evi { background: var(--surface-1); border: 1px solid var(--brd); border-radius: 8px;
   padding: 8px 10px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 3px }
 .o-evi .k2 { display: inline-block; min-width: 92px; color: var(--text-muted); font-size: 11px }
+/* 关联链路：色点药丸串（厂→模式），箭头衔接 */
+.case-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px }
+.case-arrow { color: var(--text-muted); font-size: 12px }
+.case-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+  border: 1px solid var(--brd); border-radius: 999px; background: var(--surface-1);
+  font-size: 12px; color: var(--text-primary);
+}
+.case-chip .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0 }
 </style>
