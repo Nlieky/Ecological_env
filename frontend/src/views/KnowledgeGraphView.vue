@@ -13,6 +13,13 @@
         </el-radio-group>
       </div>
       <div class="kg-navbar-right">
+        <!-- 影响推演开关（仅服务拓扑 tab：推演在拓扑边集上流动，领域 tab 无意义） -->
+        <button v-if="store.activeTab === 'topology'" type="button" class="kg-tool"
+                :class="{ on: store.impactMode }"
+                title="开启后点击节点推演故障影响面：波及谁 / 可能由谁引起"
+                @click="store.toggleImpactMode">
+          <span class="kg-bolt">⚡</span> 影响推演
+        </button>
         <el-select v-model="searchId" filterable clearable placeholder="搜索节点…"
                    size="small" class="kg-search" :teleported="false"
                    @change="onSearch">
@@ -64,6 +71,16 @@
       </aside>
 
       <div class="kg-chart-wrap">
+        <!-- 推演摘要条：起点 → 波及 N（前3）· 根因候选 M，✕ 退出推演着色 -->
+        <div v-if="store.impactResult" class="kg-impact-bar">
+          <span>⚡</span>
+          <span class="kg-impact-text">
+            <b>{{ store.impactResult.node?.label ?? store.impactResult.nodeId }}</b>
+            → 波及 {{ store.impactResult.downstream.length }}<template v-if="impactDownLabels">（{{ impactDownLabels }}）</template>
+            · 根因候选 {{ store.impactResult.upstream.length }}
+          </span>
+          <button type="button" class="kg-impact-close" title="退出推演" @click="store.clearImpact">✕</button>
+        </div>
         <el-alert v-if="renderError" type="warning" :closable="false"
                   title="图形渲染失败，已降级为列表视图" />
         <div v-show="!renderError" ref="chartEl" class="kg-chart" />
@@ -110,9 +127,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Connection, Operation, RefreshRight } from '@element-plus/icons-vue'
 import echarts from '@/lib/echarts'
-import { useKnowledgeStore, NODE_META, toEChartsSeries } from '@/stores/knowledge'
+import {
+  useKnowledgeStore, NODE_META, toEChartsSeries, impactNodeStyle,
+} from '@/stores/knowledge'
+import type { GraphLinkDatum } from '@/stores/knowledge'
 
 const store = useKnowledgeStore()
 const chartEl = ref<HTMLDivElement>()
@@ -186,6 +207,38 @@ function renderChart() {
   try {
     if (!chart) chart = echarts.init(chartEl.value)
     const series = toEChartsSeries(store.allNodes, store.allEdges, store.visibleTypes)
+
+    // ── 推演/健康着色叠加（视图层，不进 store 纯映射）──
+    // fault 红（放大+描边）/ affected 橙 / candidate 紫 覆盖类型色；unrelated 整体退场。
+    // service health=down 常态红（#b91c1c 暗红描边区分 fault——无推演时也显示）
+    const nodesById = new Map(store.allNodes.map(n => [n.id, n]))
+    const dataWithImpact: Record<string, unknown>[] = series.data.map(d => {
+      const st = impactNodeStyle(d.id, store.impactResult)
+      const raw = nodesById.get(d.id)
+      const out: Record<string, unknown> = { ...d, itemStyle: { ...d.itemStyle } }
+      const itemStyle = out.itemStyle as Record<string, unknown>
+      if (st.state === 'fault') {
+        out.itemStyle = { color: st.color, borderColor: st.color, borderWidth: 4 }
+        out.symbolSize = Math.round(d.symbolSize * 1.3)
+      } else if (raw?.type === 'service' && raw.props?.health === 'down') {
+        out.itemStyle = { color: '#ef4444', borderColor: '#b91c1c', borderWidth: 2.5 }
+      } else if (st.color) {
+        itemStyle.color = st.color
+      }
+      if (st.state === 'unrelated') itemStyle.opacity = 0.15
+      return out
+    })
+    // 边：推演时影响集（fault∪downstream∪upstream）内部边橙色加粗，其余退到 0.08
+    let linksWithImpact: (GraphLinkDatum & { lineStyle?: Record<string, unknown> })[] = series.links
+    if (store.impactResult) {
+      const r = store.impactResult
+      const inSet = new Set<string>(
+        [r.nodeId, ...r.downstream.map(e => e.id), ...r.upstream.map(e => e.id)])
+      linksWithImpact = series.links.map(l =>
+        inSet.has(l.source) && inSet.has(l.target)
+          ? { ...l, lineStyle: { color: '#f97316', width: 2, opacity: 0.9 } }
+          : { ...l, lineStyle: { opacity: 0.08 } })
+    }
     chart.setOption({
       tooltip: {
         backgroundColor: 'rgba(255,255,255,.96)',
@@ -232,8 +285,8 @@ function renderChart() {
         blur: { itemStyle: { opacity: 0.25 }, lineStyle: { opacity: 0.08 } },
         itemStyle: { borderColor: '#fff', borderWidth: 1.5 },
         categories: series.categories,
-        data: series.data,
-        links: series.links,
+        data: dataWithImpact,
+        links: linksWithImpact,
       }],
     }, { notMerge: true })
     renderError.value = false
@@ -257,9 +310,23 @@ function centerAfterLayout() {
 }
 
 function onNodeClick(params: any) {
-  if (params.dataType === 'node' && params.data?.id) openNode(params.data.id)
+  if (params.dataType !== 'node' || !params.data?.id) return
+  // 推演模式分流：点节点=跑影响推演（不开详情侧栏），普通模式=打开详情
+  if (store.impactMode) store.runImpact(params.data.id)
+  else openNode(params.data.id)
 }
 function onResize() { chart?.resize() }
+
+// 推演摘要条：波及名单前 3（多则省略号）
+const impactDownLabels = computed(() => {
+  const ds = store.impactResult?.downstream ?? []
+  const names = ds.slice(0, 3).map(e => e.label || e.id).join('、')
+  return ds.length > 3 ? `${names}…` : names
+})
+
+// 服务健康 60s 慢轮询句柄（后端探测自带 10s 缓存，页面分钟级足够）
+let healthTimer: ReturnType<typeof setInterval> | null = null
+const route = useRoute()
 
 onMounted(async () => {
   await store.loadGraph()
@@ -267,17 +334,23 @@ onMounted(async () => {
   renderChart()
   chart?.on('click', onNodeClick)
   window.addEventListener('resize', onResize)
+  healthTimer = setInterval(() => { store.refreshHealth().catch(() => {}) }, 60_000)
+  // focus query：?focus=<node_id> 直开详情侧栏（事件中心等外链深入口）
+  const focus = typeof route.query.focus === 'string' ? route.query.focus : ''
+  if (focus) openNode(focus)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
+  if (healthTimer) clearInterval(healthTimer)
   if (centerTimer) clearTimeout(centerTimer)
   chart?.dispose()
   chart = null
 })
 
-// tab/图例/数据变化 → 重渲染（visibleTypes 是 computed 新数组、allNodes 整体替换，
-// 引用比较即触发，无需 deep；nextTick 兜底，项目历史坑：echarts.init 必须在 DOM 就绪后）
-watch([() => store.visibleTypes, () => store.allNodes],
+// tab/图例/数据/推演结果变化 → 重渲染（visibleTypes 是 computed 新数组、allNodes 整体替换，
+// 引用比较即触发，无需 deep；impactResult 置换触发推演着色进/退场；nextTick 兜底，
+// 项目历史坑：echarts.init 必须在 DOM 就绪后）
+watch([() => store.visibleTypes, () => store.allNodes, () => store.impactResult],
   () => nextTick(renderChart))
 
 // 详情侧栏出现/消失使图区宽度变化 → resize，否则 canvas 按旧宽度溢出、盖住侧栏拦截点击
@@ -356,6 +429,27 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
 }
 .kg-chart { flex: 1; min-height: 0; }
 .kg-table :deep(.el-table__row) { cursor: pointer; }
+
+/* ── 影响推演 ── */
+.kg-bolt { font-size: 13px; line-height: 1; } /* ⚡ 字符随按钮色走，激活态与文字同变紫 */
+/* 摘要条：图区顶部居中浮层（琥珀底=推演语境，与故障红/波及橙区分） */
+.kg-impact-bar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 10; display: flex; align-items: center; gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 7px 8px 7px 14px;
+  background: rgba(255,251,235,.97);
+  border: 1px solid #f59e0b; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(180,83,9,.15);
+  font-size: 12px; color: #92400e;
+}
+.kg-impact-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.kg-impact-text b { color: #b45309; }
+.kg-impact-close {
+  border: 0; background: transparent; cursor: pointer; flex-shrink: 0;
+  color: #b45309; font-size: 13px; line-height: 1; padding: 3px 6px; border-radius: 6px;
+}
+.kg-impact-close:hover { background: rgba(180,83,9,.1); }
 
 /* 详情侧栏 */
 .kg-detail {

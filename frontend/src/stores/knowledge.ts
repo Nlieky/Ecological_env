@@ -1,8 +1,9 @@
 // frontend/src/stores/knowledge.ts
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { knowledgeService } from '@/api/modules/knowledge'
-import type { KGNode, KGEdge, KGStats } from '@/api/modules/knowledge'
+import type { KGNode, KGEdge, KGStats, ImpactEntry, ImpactResp } from '@/api/modules/knowledge'
 
 // 节点类型元数据：中文标签/颜色/tab 归属（domain=领域知识 / topology=服务拓扑）。
 // tab 是数组：operator 双归属（spec L66）——domain 里是检测器，topology 里是 shared 算子库成员（使 employs 边可见）
@@ -35,6 +36,32 @@ export const NODE_META: Record<string, { label: string; color: string; tab: ('do
 export function computeVisibleTypes(tab: 'domain' | 'topology', hidden: string[]): string[] {
   return Object.keys(NODE_META)
     .filter(k => NODE_META[k].tab.includes(tab) && !hidden.includes(k))
+}
+
+/** 影响推演结果（子项目4 根因分析）：fault=起点，downstream=波及，upstream=根因候选 */
+export interface ImpactResult {
+  nodeId: string
+  node: KGNode | null
+  downstream: ImpactEntry[]
+  upstream: ImpactEntry[]
+}
+
+export type ImpactState = 'fault' | 'affected' | 'candidate' | 'unrelated' | 'normal'
+
+/** 推演着色三色：fault 红 / affected 橙（波及）/ candidate 紫（根因候选） */
+export const IMPACT_COLORS: Record<'fault' | 'affected' | 'candidate', string> = {
+  fault: '#ef4444', affected: '#f97316', candidate: '#8b5cf6',
+}
+
+/** 节点在推演结果中的角色（纯函数，视图据此叠加着色/透明度） */
+export function impactNodeStyle(
+  id: string, result: ImpactResult | null,
+): { state: ImpactState; color?: string } {
+  if (!result) return { state: 'normal' }
+  if (id === result.nodeId) return { state: 'fault', color: IMPACT_COLORS.fault }
+  if (result.downstream.some(e => e.id === id)) return { state: 'affected', color: IMPACT_COLORS.affected }
+  if (result.upstream.some(e => e.id === id)) return { state: 'candidate', color: IMPACT_COLORS.candidate }
+  return { state: 'unrelated' }
 }
 
 export const useKnowledgeStore = defineStore('knowledge', () => {
@@ -73,10 +100,63 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
 
   const visibleTypes = computed(() => computeVisibleTypes(activeTab.value, hiddenTypes.value))
 
-  /** 切 tab 时重置图例勾选 */
+  /** 切 tab 时重置图例勾选 + 退出推演（领域 tab 无服务拓扑，推演无意义） */
   function setTab(tab: 'domain' | 'topology') {
     activeTab.value = tab
     hiddenTypes.value = []
+    impactMode.value = false
+    impactResult.value = null
+  }
+
+  // ── 影响推演状态机（子项目4）──
+  const impactMode = ref(false) // 开关：开=点节点做推演而非打开详情
+  const impactResult = ref<ImpactResult | null>(null)
+  // API 注入口（ref 才能让 store._impactApi = mock 经 pinia 代理写进闭包可见的引用）
+  const _impactApi = ref<(id: string) => Promise<ImpactResp>>(
+    (id: string) => knowledgeService.impact(id))
+
+  async function runImpact(id: string) {
+    try {
+      const resp = await _impactApi.value(id)
+      impactResult.value = {
+        nodeId: id, node: resp.node, downstream: resp.downstream, upstream: resp.upstream,
+      }
+      impactMode.value = true
+    } catch {
+      // 失败置空结果但不退模式——用户可直接再点（不强制回详情交互）
+      impactResult.value = null
+      ElMessage.error('推演失败')
+    }
+  }
+  function clearImpact() {
+    impactMode.value = false
+    impactResult.value = null
+  }
+  function toggleImpactMode() {
+    impactMode.value = !impactMode.value
+    // 任何模式切换都清残留结果：关时清着色/摘要条；开时清上次会话残留（真实流程
+    // 里 result 只在开模式下存在，开向清除是无害兜底——直接改状态后切换也不留旧色）
+    impactResult.value = null
+  }
+
+  /** 60s 慢轮询：重拉全图但只把 service 节点的 health 合并回 allNodes（其余原对象不动） */
+  async function refreshHealth() {
+    const resp = await knowledgeService.graph(undefined, true)
+    const healthById = new Map<string, { health: unknown; checked_at: unknown }>()
+    for (const n of resp.nodes) {
+      if (n.type === 'service' && n.props && 'health' in n.props) {
+        healthById.set(n.id, {
+          health: n.props.health,
+          checked_at: n.props.health_checked_at ?? '',
+        })
+      }
+    }
+    if (!healthById.size) return
+    // 局部替换 map（新数组引用触发视图重渲染 watch；非 service 节点对象原样保留）
+    allNodes.value = allNodes.value.map(n => {
+      const h = healthById.get(n.id)
+      return h ? { ...n, props: { ...n.props, health: h.health, health_checked_at: h.checked_at } } : n
+    })
   }
 
   const selectedNode = ref<KGNode | null>(null)
@@ -99,7 +179,9 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
 
   return { allNodes, allEdges, stats, seeded, loading, error,
            activeTab, hiddenTypes, visibleTypes, toggleType, setTab,
-           selectedNode, selectedNeighbors, selectNode, clearSelection, loadGraph }
+           selectedNode, selectedNeighbors, selectNode, clearSelection, loadGraph,
+           impactMode, impactResult, _impactApi, runImpact, clearImpact,
+           toggleImpactMode, refreshHealth }
 })
 
 /** ECharts graph series 节点/边数据形状 */

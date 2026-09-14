@@ -43,6 +43,22 @@ export interface StatsResp extends KGStats {
   seeded: boolean
 }
 
+/** impact 推演条目（/knowledge/impact 返回；via=首跳边类型，多跳留空） */
+export interface ImpactEntry {
+  id: string
+  type?: string
+  label?: string
+  depth?: number
+  via?: string
+}
+
+export interface ImpactResp {
+  success: boolean
+  node: KGNode
+  downstream: ImpactEntry[]
+  upstream: ImpactEntry[]
+}
+
 export const knowledgeService = {
   graph: (nodeTypes?: string[], live = true) =>
     api.get<unknown, GraphResp>('/v1/knowledge/graph', {
@@ -53,5 +69,8 @@ export const knowledgeService = {
     }),
   node: (id: string) =>
     api.get<unknown, NodeResp>(`/v1/knowledge/node/${encodeURIComponent(id)}`),
+  impact: (id: string, direction = 'both') =>
+    api.get<unknown, ImpactResp>(
+      `/v1/knowledge/impact/${encodeURIComponent(id)}`, { params: { direction } }),
   stats: () => api.get<unknown, StatsResp>('/v1/knowledge/stats'),
 }
