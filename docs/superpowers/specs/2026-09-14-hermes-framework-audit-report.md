@@ -64,7 +64,7 @@
      → start_agent.py:38  from shared.framework.hermes_agent.run_agent import AIAgent
 ```
 
-- query.py:1-5 docstring 自述「重构后：通过HTTP请求转发到Agent服务(localhost:8642)，不再直接创建AIAgent实例」；:46 给出架构「FastAPI → HTTP转发 → Agent服务 → AIAgent(主智能体)」。服务不可用时直接 503（:67-74）。流式端点 /query/stream 走 httpx（:444 起）。
+- query.py:1-5 docstring 自述「重构后：通过HTTP请求转发到Agent服务(localhost:8642)，不再直接创建AIAgent实例」；:46 给出架构「FastAPI → HTTP转发 → Agent服务 → AIAgent(主智能体)」。服务不可用时直接 503（:67-74）。流式端点 /query/stream（路由 :236）经 httpx.AsyncClient 流式转发（import :11，调用 :258-262）。
 - scripts/start_agent.py（523 行）自带独立的 `AgentService` 类（:64，**与 backend/services/agent_service.py 同名不同类**）：master_agent 单例 + threading.Lock 串行化（:87-91），initialize() 创建 AIAgent（:97-103，identity_path="workspace"，max_iterations=15 :106-108），会话缓存/查询缓存/跨轮 session 目录续传（:72-84）。
 
 **并行入口（进程内，当前非主路径）**：backend/services/agent_service.py（207 行，全读，/tmp/hermes-audit/agent_service.numbered）：
@@ -105,7 +105,7 @@
 
 ### 1.3 触达清单数据（静态 import 闭包 + pyc 运行时证据）
 
-方法：从 4 个活入口 import 语句作种子（start_agent.py:38、subagent_entry.py:38、agent_service.py:13、tool_registration.py:287），按与运行时一致的解析规则（1.2 三件套；顶层名清单取自 vendored `hermes_agent.egg-info/top_level.txt`；含缩进的懒加载 import）BFS 求传递闭包；运行时证据取 `find shared/framework -name "*.pyc"`（cpython-312，与 venv 3.12.12 一致）。
+方法：从 4 个活入口 import 语句作种子（start_agent.py:38、subagent_entry.py:38、agent_service.py:13、tool_registration.py:283），按与运行时一致的解析规则（1.2 三件套；顶层名清单取自 vendored `hermes_agent.egg-info/top_level.txt`；含缩进的懒加载 import）BFS 求传递闭包；运行时证据取 `find shared/framework -name "*.pyc"`（cpython-312，与 venv 3.12.12 一致）。
 
 | 口径 | hermes-agent/（615） | hermes_agent/（7） | hermes-overlays/（3） | 合计（626） |
 |---|---|---|---|---|
@@ -138,7 +138,7 @@
 注册主体 = `skills/orchestrator-core/scripts/tool_registration.py`（446 行），由 start_agent.py:113-119 在 master_agent 初始化后经 `importlib.util.spec_from_file_location` 按文件路径加载并调用 `register_orchestrator_tools(agent)`（失败仅告警不阻断，:121-127）。两层注册（:214-283，注释自证 2026-07-21 端到端验证）：
 
 1. **schema 层**：把 4 个工具 schema（call_subagent / list_subagents / create_session / read_result，:231-258）灌进 `agent.tools`——conversation_loop 只读 agent.tools 喂给 LLM；同时裁剪工具表，仅保留编排 4 件套 + skill_view/skills_list（:265-272），砍掉 terminal/browser 等分心工具。
-2. **registry 层**：handler 以 `override=True` 注册进 hermes 全局 `tools.registry`（:287 `from tools.registry import registry` → vendored 树），取代 vendored 自带且被判定损坏的 tools/orchestrator_tool.py（:279-283）。dispatch 走全局 registry，故覆盖必须发生在这里。
+2. **registry 层**：handler 以 `override=True` 注册进 hermes 全局 `tools.registry`（:283 `from tools.registry import registry` → vendored 树），取代 vendored 自带且被判定损坏的 tools/orchestrator_tool.py（:279-283）。dispatch 走全局 registry，故覆盖必须发生在这里。
 
 调用链（LLM 决策 → 子智能体结果回传）：
 
@@ -152,7 +152,7 @@
 ```
 
 - 4 个子智能体映射：`SUBAGENT_PATHS`（call_subagent.py:26-36）：multi-dimensional-data-perception / anomaly-detection / rule-reasoning / disposition-execution → `subagents/<名>-agent/`（目录实存，各含 SOUL.md/AGENTS.md/MEMORY.md/skills/，ls 实证）。
-- 进度流：tool_registration 模块级 `_current_progress_queue`（:52-58）由 start_agent 的 /query/stream 注入（:117-118 保留模块引用），子智能体各阶段事件（evidence/chartData）实时推给前端。
+- 进度流：tool_registration 模块级 `_current_progress_queue`（:46，`_emit_progress` :49 起）由 start_agent 的 /query/stream 注入（:117-118 保留模块引用），子智能体各阶段事件（evidence/chartData）实时推给前端。
 - 观测性：子智能体 subprocess 全量 stdout/stderr 落盘 `sessions/_subagent_traces/`（call_subagent.py:304-310）。
 
 ### 1.6 真实运行时架构图
@@ -167,7 +167,7 @@ flowchart TD
     RA -->|"裸 import :65-183<br/>agent.* / tools.* / model_tools /<br/>hermes_constants / hermes_cli.* / utils"| VEND["shared/framework/hermes-agent/ (vendored 0.16.0, 615 py)<br/>经 venv __editable__.hermes_agent-0.16.0.pth 生效"]
     VEND -->|"system_prompt.py:112<br/>vendor-patch 反向引用"| IDL
     SA -->|"importlib 加载 :114-119"| TR["skills/orchestrator-core/scripts/tool_registration.py<br/>两层注册: agent.tools + registry.override"]
-    TR -->|"from tools.registry :287"| VEND
+    TR -->|"from tools.registry :283"| VEND
     TR --> BR["orchestrator_core_bridge.py → call_subagent.py"]
     BR -->|"subprocess :291-296<br/>env LLM_*/OPENAI_* 透传"| SUB["subagents/×4-agent<br/>(HERMES_HOME=各自目录)"]
     SUB -->|"subagent_entry.py:38 同款全限定 import"| RA
