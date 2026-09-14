@@ -7,16 +7,18 @@
 六服务健康探测（子项目4 根因分析）：backend/agent/influxdb/frontend/llm/
 sqlite_logs——name 与图谱 service 节点 id 后缀对齐（service:llm ↔ llm），
 /knowledge/graph 的 service 健康叠加直接消费本结果。各探测独立 try/except
-隔离（单探失败只标 down 不拖垮其余）。结果模块级缓存 _STATUS_TTL=10s
-（图谱叠加与大屏轮询共用，防重复探测）；探测体是同步网络 IO，统一收进
-_build_status_data 由 asyncio.to_thread 执行，防 InfluxDB/LLM 慢时冻结
-事件循环（同 knowledge 路由 discover_plants 的处理方式）。
+隔离（单探失败只标 down 不拖垮其余），五项独立探测在 _probe_services 里
+ThreadPoolExecutor 并行（单探超时 ≤3s → 冷启总耗时 ≈最慢一探，非串行和）。
+结果模块级缓存 _STATUS_TTL=10s（图谱叠加与大屏轮询共用，防重复探测）；
+探测体是同步网络 IO，统一收进 _build_status_data 由 asyncio.to_thread
+执行，防 InfluxDB/LLM 慢时冻结事件循环（同 knowledge 路由 discover_plants
+的处理方式）。
 """
 import asyncio
 import copy
-import os
 import sqlite3
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -40,17 +42,32 @@ def _probe_agent() -> str:
     try:
         from backend.core.config import settings
         import httpx
-        r = httpx.get(f"{settings.AGENT_SERVICE_URL}/health", timeout=3)
+        # connect=1s：localhost 双栈(::1+127.0.0.1)各一次尝试，服务挂了 ~2s 判 down
+        r = httpx.get(f"{settings.AGENT_SERVICE_URL}/health",
+                      timeout=httpx.Timeout(3.0, connect=1.0))
         return "up" if r.status_code == 200 else "down"
     except Exception:
         return "down"
 
 
 def _probe_influxdb() -> str:
+    """真连探测：GET /health 且 status=="pass" 才算 up。
+
+    InfluxDBClient 构造是惰性的（无网络 IO）、close() 是空操作——只验 token
+    存在不算探测（InfluxDB 挂了也会误报 up）。health() 对网络失败/非 pass
+    都返回 status="fail" → down。默认 timeout 30_000ms 太长，调 health() 前
+    收紧为 (connect=1s, read=3s)（rest 层毫秒单位，支持二元组）——connect
+    按 socket.create_connection 逐地址生效：localhost 双栈(IPv6+IPv4)各 ≤1s
+    → 挂掉时 down ≤2s；健康时读 /health 响应仍有 3s 余量。
+    """
     try:
         from shared.data.influxdb_query import get_client_and_bucket
-        get_client_and_bucket()[0].close()
-        return "up"
+        client, _bucket = get_client_and_bucket()
+        try:
+            client.api_client.configuration.timeout = (1_000, 3_000)  # ms
+            return "up" if client.health().status == "pass" else "down"
+        finally:
+            client.close()
     except Exception:
         return "down"
 
@@ -59,7 +76,9 @@ def _probe_frontend() -> str:
     try:
         from backend.core.config import settings
         import httpx
-        r = httpx.head(settings.FRONTEND_URL, timeout=2.0)
+        # connect=1s 同 _probe_agent：挂了 ~2s 判 down（总预算 2s）
+        r = httpx.head(settings.FRONTEND_URL,
+                       timeout=httpx.Timeout(2.0, connect=1.0))
         # 有响应即服务在（dev server 200；<500 都算活，500+ 视为故障）
         return "up" if r.status_code < 500 else "down"
     except Exception:
@@ -69,11 +88,15 @@ def _probe_frontend() -> str:
 def _probe_llm() -> str:
     try:
         from backend.core.config import settings  # noqa: F401 触发 load_dotenv
+        from backend.services.agent_params import get_param
         import httpx
-        base = os.environ.get("LLM_BASE_URL", "").rstrip("/")
+        # URL 解析与真实 LLM 流量同一条 get_param 链（start_agent.py 同款调用：
+        # DB 优先→env→注册表默认；其上还有 llm_providers 供应商表覆盖层，探测不感知）
+        base = str(get_param("llm_base_url") or "").rstrip("/")
         if not base:
             return "down"
-        r = httpx.get(f"{base}/models", timeout=3.0)
+        # 远端主机 connect 略宽（1.5s），读预算 3s
+        r = httpx.get(f"{base}/models", timeout=httpx.Timeout(3.0, connect=1.5))
         return "up" if r.status_code < 500 else "down"
     except Exception:
         return "down"
@@ -93,6 +116,27 @@ def _probe_sqlite_logs() -> str:
         return "down"
 
 
+def _probe_services() -> list:
+    """五项独立探测并行跑（backend 能响应本请求即 up，不用探）。
+
+    各探单超时 ≤3s，ThreadPoolExecutor 并行使冷启总耗时 ≈最慢一探而非串行
+    和（~3s 而非 ~9s）。探测函数按模块全局名取（tests monkeypatch 生效）。
+    """
+    probes = [
+        ("agent", "智能体服务", _probe_agent),
+        ("influxdb", "时序数据库", _probe_influxdb),
+        ("frontend", "前端界面", _probe_frontend),
+        ("llm", "LLM 服务", _probe_llm),
+        ("sqlite_logs", "日志数据库", _probe_sqlite_logs),
+    ]
+    with ThreadPoolExecutor(max_workers=len(probes)) as ex:
+        statuses = list(ex.map(lambda p: p[2](), probes))
+    services = [{"name": "backend", "title": "后端 API", "status": "up"}]
+    services.extend({"name": name, "title": title, "status": status}
+                    for (name, title, _), status in zip(probes, statuses))
+    return services
+
+
 def _build_status_data() -> dict:
     """同步探测体（asyncio.to_thread 里跑，可放心阻塞）。"""
     plants = []
@@ -108,15 +152,8 @@ def _build_status_data() -> dict:
     except Exception:
         pass  # InfluxDB 不可达时仍返回服务态势部分
 
-    # 服务健康（backend 能响应本请求即 up，其余五项实测探测）
-    services = [
-        {"name": "backend", "title": "后端 API", "status": "up"},
-        {"name": "agent", "title": "智能体服务", "status": _probe_agent()},
-        {"name": "influxdb", "title": "时序数据库", "status": _probe_influxdb()},
-        {"name": "frontend", "title": "前端界面", "status": _probe_frontend()},
-        {"name": "llm", "title": "LLM 服务", "status": _probe_llm()},
-        {"name": "sqlite_logs", "title": "日志数据库", "status": _probe_sqlite_logs()},
-    ]
+    # 服务健康（并行探测，见 _probe_services）
+    services = _probe_services()
 
     # 累计处理量/异常量（prometheus 计数器快照，进程生命周期内累计）
     counters = {}

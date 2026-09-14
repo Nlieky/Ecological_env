@@ -70,6 +70,29 @@ def test_stats_endpoint(client):
     assert "case_count" in body
 
 
+def test_impact_happy_path(client):
+    r = client.get("/api/v1/knowledge/impact/service:influxdb",
+                   params={"direction": "downstream"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert body["node"]["id"] == "service:influxdb"
+    assert body["downstream"]            # 感知→主智能体→…整条链都在
+    assert body["upstream"] == []        # 单向模式另一侧为空
+    assert all("depth" in n and "via" in n for n in body["downstream"])
+
+
+def test_impact_unknown_node_404(client):
+    r = client.get("/api/v1/knowledge/impact/nonexistent:node")
+    assert r.status_code == 404
+
+
+def test_impact_bad_direction_400(client):
+    r = client.get("/api/v1/knowledge/impact/service:influxdb",
+                   params={"direction": "sideways"})
+    assert r.status_code == 400
+
+
 def test_empty_db_guidance(tmp_path):
     """库不存在：三端点都走引导态（不建库、不 5xx）。"""
     import backend.api.v1.knowledge.routes as kr
@@ -94,5 +117,8 @@ def test_empty_db_guidance(tmp_path):
         body = r.json()
         assert body["seeded"] is False and body["nodes"] == 0
         assert body["node_types"] == {} and body["case_count"] == 0
+
+        r = c.get("/api/v1/knowledge/impact/plant:any")
+        assert r.status_code == 404  # 空库 impact 走 404 引导
     finally:
         kr._DB_PATH, kr._store_cache = saved_path, saved_cache
