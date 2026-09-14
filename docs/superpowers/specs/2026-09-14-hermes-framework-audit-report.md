@@ -99,7 +99,7 @@
 | `agent/process_bootstrap.py` | 精简包≠vendored（fallback import，0.5.2） | **vendored 副本**（裸 `agent.process_bootstrap` → hermes-agent/） | 🔴 精简包的 fallback 改动同样死代码（vendored 版 :31 只有裸 `from utils import…`，且裸 utils 永远可导入成功，fallback 永不触发） |
 | `hermes-overlays/`（3 文件） | — | 无人 import、无 pyc | 构建期源，运行时零参与 |
 
-**对 0.5.4 结论的再修正**：0.5.4 把 L2 审计对象重聚焦到 `hermes_agent/` 副本的三个本地改动；本节实证其中 **只有 identity_loader.py 在活链路上**，utils.py 与 process_bootstrap.py 两处改动运行时不可达（修复它们的正确姿势是重跑 vendor 或改 overlays+patch，而不是改精简包——L2/L4 采纳）。
+**对 0.5.4 结论的再修正**：0.5.4 把 L2 审计对象重聚焦到 `hermes_agent/` 副本的三个本地改动；本节实证其中 **只有 identity_loader.py 在活链路上**，utils.py 与 process_bootstrap.py 两处改动运行时不可达（修复它们的正确姿势是重跑 vendor 或改 overlays+patch，而不是改精简包——L2/L4 采纳；§2.6 修正：vendor 管道现状不可复现，见 4 断点，重跑前须先修管道）。
 
 **已发生的构建期漂移（无运行时影响但须记录）**：`overlays/tools/orchestrator_tool.py` 的 PROJECT_ROOT 用 `parents[4]` 相对推导（:13），vendored 副本仍硬编码 `Path("E:/project/Ecological_env")`（Windows 路径，diff 唯一差异行）⇒ overlays 修正后**未重跑 vendor_hermes.py**。漂移之所以无害：tool_registration.py:279-283 判定 vendored 自带 orchestrator_tool 为「多处损坏的桥接」，用 override=True 以本项目 handler 覆盖（见 1.5），两份 orchestrator_tool 均不在调度路径上。
 
@@ -163,7 +163,7 @@ flowchart TD
     Q -->|"HTTP requests.post query.py:77-84<br/>AGENT_SERVICE_URL=localhost:8642 (config.py:28)"| SA["scripts/start_agent.py :8642<br/>AgentService 单例+线程锁 (:64,:355)"]
     SA -->|"全限定 import :38"| RA["shared/framework/hermes_agent/run_agent.py<br/>(AIAgent 入口, 精简包)"]
     RA -->|"懒加载 :416 全限定"| AI["hermes_agent/agent/agent_init.py"]
-    AI --> IDL["hermes_agent/agent/identity_loader.py<br/>(本地新增, 精简包唯一活改动)"]
+    AI --> IDL["hermes_agent/agent/identity_loader.py<br/>(本地新增, 精简包唯一活改动)<br/>(§2.0 修正: 另有 run_agent/agent_init 两处活改装)"]
     RA -->|"裸 import :65-183<br/>agent.* / tools.* / model_tools /<br/>hermes_constants / hermes_cli.* / utils"| VEND["shared/framework/hermes-agent/ (vendored 0.16.0, 615 py)<br/>经 venv __editable__.hermes_agent-0.16.0.pth 生效"]
     VEND -->|"system_prompt.py:112<br/>vendor-patch 反向引用"| IDL
     SA -->|"importlib 加载 :114-119"| TR["skills/orchestrator-core/scripts/tool_registration.py<br/>两层注册: agent.tools + registry.override"]
@@ -200,6 +200,8 @@ flowchart TD
 
 核心证据随报告入库：`docs/superpowers/specs/2026-09-14-hermes-audit-evidence/`（l2-upstream-base-id.txt 上游基线取证、l2-real-mods-vs-upstream.patch 真实改动全集 180 行、l2-exact-diff-summary.txt 文件级差异清单、l2-sim-vs-actual.txt 复现性缺口）。大体积产物（上游 git 浅克隆、sim-dst 模拟树、vendored-vs-upstream-full.txt 初版全量 diff）在本机 `/tmp/hermes-audit/`。
 
+严重度约定（本节）：🔴 = **触发即必炸/必然损坏的潜伏风险**——「红 + 无现行风险」不矛盾（红定的是一旦触发的后果，现行触发路径另注明，如「已判死隔离」「运行时死代码」），供 §6/Task 7 定级；🟡/🟢 沿用报告总图例。
+
 ### 2.0 方法升级与基线修正：取得上游 pristine 参考，推翻「上游 commit 无法核对」
 
 0.5.3 声明的局限（「无 .git 元数据，上游 commit 无法核对」）在 L2 被消除：PyPI 无该包（未入库证据，GitHub 为准），GitHub 上游可达。取证过程（l2-upstream-base-id.txt）：
@@ -211,12 +213,12 @@ flowchart TD
 
 **对 0.5.2/§1.2 的两处实证修正**（0.5.2 的比对基准是 vendored 树本身，属循环论证——三份本地拷贝互证一致 ≠ 与上游一致）：
 
-- **修正 1**：`run_agent.py` 与 `agent/agent_init.py` **不是上游原样拷贝**。对真上游 7df3aa3：run_agent.py **+12/−2**（:413 新增 `identity_path` 构造参数、:416 `from agent.agent_init import` 改为 `from shared.framework.hermes_agent.agent.agent_init import`（跨树引用）、:487 传参、:5105-5113 run_conversation 调用改关键字参数）；agent_init.py **+22**（:224 新增参数、:1740-1760 identity_path 解析块，含 3 空行）。§1.2 表格「三份逐字节一致⇒原样拷贝」的结论作废（三份一致仍真，但一致的是**改装后**版本）；§1.6 架构图中 VEND 与 RA 的边界不变，仅「run_agent/agent_init = 上游原样」这一定性需更正。
+- **修正 1**：`run_agent.py` 与 `agent/agent_init.py` **不是上游原样拷贝**。对真上游 7df3aa34：run_agent.py **+12/−2**（:413 新增 `identity_path` 构造参数、:416 `from agent.agent_init import` 改为 `from shared.framework.hermes_agent.agent.agent_init import`（跨树引用）、:487 传参、:5105-5113 run_conversation 调用改关键字参数）；agent_init.py **+22**（:224 新增参数、:1740-1760 identity_path 解析块，含 3 空行）。§1.2 表格「三份逐字节一致⇒原样拷贝」的结论作废（三份一致仍真，但一致的是**改装后**版本）；§1.6 架构图中 VEND 与 RA 的边界不变，仅「run_agent/agent_init = 上游原样」这一定性需更正。
 - **修正 2**：vendored 树内另有 **3 处 vendor 脚本未声明的源码改动**（agent/\_\_init\_\_.py、agent/chat_completion_helpers.py、hermes_constants.py，见 2.1 表 #5/#7/#9），其中 2 处（hermes_constants、agent/\_\_init\_\_）曾在 overlays 中声明（31345964，2026-07-21，共 5 文件）后被 e263fb67（07-23「清理框架层」）从 overlays 删除，改动本体只在 vendored 树里存活。
 
 ### 2.1 改动全集分类表（检查项 2.1：每处改动归四类 + 生死 + 声明状态）
 
-「全集」口径 = vendored 树 ∪ hermes_agent/ 精简包 ∪ hermes-overlays/ 对真上游 7df3aa3 的全部差异（±行 = 标准 diffstat 口径含空行；合计双口径见 2.6）（l2-real-mods-vs-upstream.patch + l2-exact-diff-summary.txt）。**vendor 脚本声明面与实际 diff 对不上**（Before You Begin 预警的情形，实证成立）：声明的 = overlays 3 文件 + PATCHES 2 条；实际的 = 下表 11 处代码改动 + 3 项内容差异。
+「全集」口径 = vendored 树 ∪ hermes_agent/ 精简包 ∪ hermes-overlays/ 对真上游 7df3aa34 的全部差异（±行 = 标准 diffstat 口径含空行；合计双口径见 2.6）。证据覆盖面：l2-real-mods-vs-upstream.patch 仅含 vendored 侧 7 文件；#1/#10/#11（hermes_agent/ 独有）以 0.5.2/dir-relation.txt 的副本-vs-vendored 比对佐证（上游无对应文件或差异仅存在于精简包侧）；#9 同样存在于会执行的精简包 agent/__init__.py（hermes_agent/agent/__init__.py 同内容，随包加载生效）。**vendor 脚本声明面与实际 diff 对不上**（Before You Begin 预警的情形，实证成立）：声明的 = overlays 3 文件 + PATCHES 2 条；实际的 = 下表 11 处代码改动 + 3 项内容差异。
 
 | # | 改动 | 位置（生效副本） | ±行 | 四类归属 | 运行时生死（引 §1） | 声明状态 |
 |---|---|---|---|---|---|---|
@@ -244,7 +246,7 @@ flowchart TD
 
 ### 2.3 identity_loader.py：新增文件而非改写（检查项 2.3）
 
-**定性：全新增**（上游 7df3aa3 无此文件，hermes_agent/\_\_init\_\_.py 自述「扩展身份文件读取支持」与实证一致；不是对上游某文件的改写或移植）。
+**定性：全新增**（上游 7df3aa34 无此文件，hermes_agent/\_\_init\_\_.py 自述「扩展身份文件读取支持」与实证一致；不是对上游某文件的改写或移植）。
 
 **职责**（102 行，3 个公开函数，identity_loader.py）：
 
@@ -261,13 +263,13 @@ flowchart TD
 
 **如何被加载**：vendored tools/registry.py:57-79 `discover_builtin_tools()` 扫描 tools/*.py 中含顶层 `registry.register` 调用者并自动 import ⇒ vendored 副本随模型工具初始化自动注册（这正是它必须被 override 而不能无视的原因）。
 
-**判死三重实证**（tool_registration.py:279-281 判词「多处损坏的桥接」逐条核实）：
+**判死实证 = 现状静态核证 3 条 + 历史 e2e 佐证**。注意：tool_registration.py:279-281 判词（「handler 签名错、schema 双层包裹致 LLM 400」）系 07-29 的历史转述，与下列各条**不一一对应**（判词中的「签名错」对应的是诞生版问题，见时间线），分立列证：
 
 1. **import 目标不存在**：`workspace/skills/orchestrator_core_bridge.py` 全仓不存在（workspace/skills/ 下仅 orchestrator-core 目录）。git 考古：该桥接 02bc229e（2026-07-29「迁移orchestrator-core到skills/」）由 workspace/skills/ 迁至根 skills/ 后，此 import 恒 ImportError ⇒ 4 个 handler 全部落入 :38-43 `_not_available` 桩，调用即返回 `{"error": "Subagent tools not available: ..."}`。**overlays 修正版同样死**——它只修了 PROJECT_ROOT（E:/→parents[4]），import 目标缺失是两份共同死因。
-2. **schema 双层包裹**：registry 约定存**裸 function dict**、由 get_definitions 统一包 `{"type":"function",…}` 外壳（registry.py:99-106 `__init__` 内联注释），本文件却传预包裹形式（:59-91）⇒ 双层包裹，LLM 侧 400（判词实证）。对照：tool_registration.py:285-288 override 时传的就是裸 function dict。
+2. **schema 双层包裹**（本次静态核证）：registry 约定存**裸 function dict**、由 get_definitions 统一包 `{"type":"function",…}` 外壳（registry.py:99-106 `__init__` 内联注释），本文件却传预包裹形式（:59-91）⇒ 双层包裹。**历史 e2e 佐证（2b532b00，07-21 16:11，orchestrator_tool 诞生 38 分钟后）**：commit 自述实测 "triply broken: (1) handler **kwargs signature, (2) _get_subagent_tools pointed at subagent_tools which lacks create_session, (3) double-wrapped schema -> LLM HTTP 400"，恢复 override 后 "call_subagent completed 74s, real COD answer, no errors"。对照：tool_registration.py:285-288 override 时传的就是裸 function dict。
 3. **vendored 副本 E:/ 硬编码漂移**（§1.2 已钉；diff-C-orchestrator.patch 唯一差异行）。
 
-**存在却被判死的原因 = 历史演进残留**，时间线（git 考古）：07-21（31345964）它作为**初代集成载体**诞生（commit 自述「fixed orchestrator_tool signatures」，当时 import 目标 workspace/skills 桥接真实存在、registry 层集成是新尝试）；07-27（3edb0a4f）去硬编码只修 overlays 未重跑 vendor（漂移出生）；07-29（02bc229e）orchestrator-core 迁到根 skills/，桥接 import 路径死亡——**同一 commit 内 tool_registration.py 两层注册成为替代实现**，此后 orchestrator_tool 再无提交，成为不再被调度但仍随 vendor 管道分发的尸体。
+**存在却被判死的原因 = 历史演进残留**，时间线（git 考古）：07-19（ef184ebc）tool_registration.py 雏形（353 行）已存在，**先于 orchestrator_tool 两天——替代机制与旧工具自始并行**；07-21 15:32（31345964）orchestrator_tool 诞生（import 指向 workspace/skills/…/subagent_tools、E:/ 硬编码）；07-21 16:11（2b532b00）诞生 38 分钟即被同日 e2e 判「triply broken」并恢复 override；07-27（3edb0a4f）修补——import 改聚合桥接 workspace.skills.orchestrator_core_bridge、E:/→parents[4]，**只修 overlays 未重跑 vendor**（漂移出生）；07-29（02bc229e）orchestrator-core 迁到根 skills/，桥接 import 目标死亡——旧工具彻底死亡，tool_registration 两层注册（07-19 起并行存在）成为唯一机制，此后 orchestrator_tool 再无提交，成为不再被调度但仍随 vendor 管道分发的尸体。
 
 **被谁替代、替代质量**：tool_registration.py:214-297——第 1 层把 4 个 schema 灌 agent.tools（conversation_loop 只读此处），第 2 层以 `override=True` 注册进全局 registry（:283-294）。关键：**override=True 正是上游 registry 为「插件替换内建工具」预留的官方扩展点**（registry.py:251-254 docstring 自证设计意图）⇒ 替代实现走在正规扩展点上，enum 收敛为 4 正名（:242）、context 改 string、handler 直连活桥接，正确。**残留问题是负面外部性**：vendored 副本每次启动仍被 discover_builtin_tools 自动 import 并注册 4 个坏工具，再被 override 仪式性盖掉——纯噪音 + 双份 193 行文件 + E:/ 死路径。🟡 建议：直接从 overlays 删除本文件并清理 vendored 副本（runtime override 已自足），或在报告 §5 裁决后随胜出路线一并处置。
 
@@ -279,8 +281,8 @@ flowchart TD
 
 | 改动（#） | 动机可推断性 | 正确性风险 | 上游同步冲突面 | 松耦合替代方案（本可用 X 而不必改源码） |
 |---|---|---|---|---|
-| 身份扩展链 #1-#4 | ✅ 高：PATCHES :90-92 与代码注释自证（主 7/子 3 文件、双路径探测） | 🟢 低：try/except 包裹 + `_identity_path` 缺省回落 HERMES_HOME；实测活链路依赖它工作 | 🟡 中：system_prompt 补丁锚定上游 17 行文本（改写法则 no-match，脚本 :123 有告警防护不炸）；**run_agent/agent_init 以整文件 overlay 锁死**（5358+1763 行，上游任何演进全部丢失，且 overlays 版与精简包版三份一致性靠手工维护） | 🟡 部分：上游 system_prompt 无身份扩展点（仅 SOUL.md :88-100 + DEFAULT_AGENT_IDENTITY 回落），确需改源或**部署期把 7 文件合并生成 SOUL.md**（数据级替代，代价失文件粒度、子智能体目录同理）；更优路径是给上游提 feature/PR |
-| #7 stream_options 移除 | ✅ 高：注释「removed for vLLM compatibility」 | 🟡 中：流式 usage 恒缺失（vLLM 不发 usage chunk），usage_obj=None 传入 mock response（chat_completion_helpers.py:2038/:2062）——不炸但**流式路径 token 计量退化为空**（account_usage/上下文预算拿不到服务端数据）；活路径（/query/stream） | 🟡 中：该文件是上游高频改动区（基线后上游已多次演进该函数），行级手工改动每次 re-vendor 都要对齐 | 🟡 存在模式不存在开关：上游有 per-provider extra_body 机制先例（:656 github_reasoning_extra、:1377 reasoning 分支）——**本可按 provider 条件分支**（vLLM 才不带 stream_options）而非全局删除；升级 vLLM 版本可能根本不需要此改动（待查：172.16.12.41 vLLM 版本） |
+| 身份扩展链 #1-#4 | ✅ 高：PATCHES :90-92 与代码注释自证（主 7/子 3 文件、双路径探测） | 🟢 低：try/except 包裹 + `_identity_path` 缺省回落 HERMES_HOME；活链路证据 = import 边 + pyc（身份内容实际落入 prompt 的直接观测归 §4 E1；try/except 静默失败 ⇒ 非硬依赖，身份缺失时退回原生 SOUL.md 行为） | 🟡 中：system_prompt 补丁锚定上游 17 行文本（改写法则 no-match，脚本 :123 有告警防护不炸）；**run_agent/agent_init 以整文件 overlay 锁死**（5358+1763 行，上游任何演进全部丢失，且 overlays 版与精简包版三份一致性靠手工维护） | 🟡 部分：上游 system_prompt 无身份扩展点（仅 SOUL.md :88-100 + DEFAULT_AGENT_IDENTITY 回落），确需改源或**部署期把 7 文件合并生成 SOUL.md**（数据级替代，代价失文件粒度、子智能体目录同理）；更优路径是给上游提 feature/PR |
+| #7 stream_options 移除 | ✅ 高：注释「removed for vLLM compatibility」 | 🟡 中：按代码注释与 usage_obj=None 路径**推断**流式 usage 缺失（vLLM 是否真不发 usage chunk 未直接观测），usage_obj=None 传入 mock response（chat_completion_helpers.py:2038/:2062）——不炸但**流式路径 token 计量退化为空**（account_usage/上下文预算拿不到服务端数据）；活路径（/query/stream） | 🟡 中：该文件是上游高频改动区（基线后上游已多次演进该函数），行级手工改动每次 re-vendor 都要对齐 | 🟡 存在模式不存在开关：上游有 per-provider extra_body 机制先例（:656 github_reasoning_extra、:1377 reasoning 分支）——**本可按 provider 条件分支**（vLLM 才不带 stream_options）而非全局删除；升级 vLLM 版本可能根本不需要此改动（待查：172.16.12.41 vLLM 版本——归属 §4 E 系实证或 §3 项目适配盘点处理，勿在 L2 悬置） |
 | #8 OpenRouter timeout | ✅ 高：注释自证（内网不可达、阻塞 ~12s、已由 vLLM /v1/models 提供） | 🟢 低：超时→静态回退（上游 :234 自带 offline fallback），语义无损 | 🟢 小：锚定单行 | ❌ 无：OPENROUTER_MODELS_URL 是编译期常量（hermes_constants.py:496），无 env/config 开关——**四类改动中最正当的一处**；但现 PATCHES 文本已漂移成重跑即产出语法错误文件（🔴，2.6），须先修声明再谈复现 |
 | #9 去 jiter 预载 | ❌ 低：无注释；对照 jiter_preload.py docstring（Windows 专用 import-order workaround）推测为「清理无关代码」，但项目恰从 Windows 开发（D:\Hermes） | 🟢 低（Linux 部署无影响）/ Windows 开发机理论风险 | 🟢 小 | ✅ 本可不改：`# noqa: F401` 的预载无害；如要移除也应记入 overlays 而非只改 vendored 树 |
 | #5 hermes_constants 死扩展 | ✅ 高（身份扩展配套）但**从未接线** | 🟢 无（零调用） | 🟢 小 | 应删除（活链路用 identity_loader 那份） |
@@ -290,17 +292,17 @@ flowchart TD
 
 ### 2.6 量化与上游同步策略评估（检查项 2.6）
 
-**改动行数分布**（对真上游 7df3aa3，l2-real-mods-vs-upstream.patch）：
+**改动行数分布**（对真上游 7df3aa34，l2-real-mods-vs-upstream.patch）：
 
 | 类别 | 文件数 | +行/−行 | 占比 |
 |---|---|---|---|
 | 身份文件扩展（#1-#5，含死代码 #5） | 5 | +178/−2 | 46% |
-| 编排（#6 orchestrator_tool） | 1 | +193 | 51% |
+| 编排（#6 orchestrator_tool） | 1 | +193 | 50% |
 | 项目特化/环境适配（#7/#8/#11） | 3 | +8/−3 | 2% |
 | 无法推断（#9/#10） | 2 | +5/−10 | 1% |
-| **合计（.py 代码改动）** | **11** | **标准 diffstat +384/−15；非空行口径 +333/−13**（新文件空行占比高：identity_loader 102 行中非空 78、orchestrator_tool 193 行中非空 176） | 626 个 .py 中涉及 11 个（9 改 2 新增）≈ 1.8% |
+| **合计（.py 代码改动）** | **11** | **标准 diffstat +384/−15；非空行口径 +333/−13**（新文件空行占比高：identity_loader 102 行中非空 78、orchestrator_tool 193 行中非空 176；占比按 diffstat 行数四舍五入，列和不等于 100%） | 626 个 .py 中涉及 11 个（9 改 2 新增）≈ 1.8% |
 
-**文件耦合度**：(a) 三份拷贝组 ×3（run_agent.py、agent_init.py、orchestrator_tool.py 前两者三份逐字节一致靠手工同步，后者两份已漂移——拷贝一致性无任何机制保障）；(b) 跨树 import 3 条且方向倒挂：vendored→精简包 2 条（system_prompt.py:112、agent_init.py:1747——**上游树代码 import 项目精简包**，venv editable install 是唯一粘合剂）、精简包内 1 条（run_agent.py:416）；(c) IDENTITY_FILES 双份（2.3）；(d) 上游 lockstep 缺失：uv.lock/版本声明仍是上游 0.16.0，无任何「本树 = 7df3aa3 + 11 处改动」的 provenance 记录（0.5.3 声明的局限经 L2 已可消除，建议在 vendored 根落一个 BASE_COMMIT/PROVENANCE 文件）。
+**文件耦合度**：(a) 三份拷贝组 ×3（run_agent.py、agent_init.py、orchestrator_tool.py 前两者三份逐字节一致靠手工同步，后者两份已漂移——拷贝一致性无任何机制保障）；(b) 跨树 import 3 条且方向倒挂：vendored→精简包 2 条（system_prompt.py:112、agent_init.py:1747——**上游树代码 import 项目精简包**，venv editable install 是唯一粘合剂）、精简包内 1 条（run_agent.py:416）——静态口径 2 条倒挂，运行时口径仅 system_prompt.py:112 一条真正跨树执行（vendored agent_init.py 严格未触达（§1.2），:1747 从不执行；运行时 agent_init 是精简包自身文件，其 identity_loader import 属包内自引）；(c) IDENTITY_FILES 双份（2.3）；(d) 上游 lockstep 缺失：uv.lock/版本声明仍是上游 0.16.0，无任何「本树 = 7df3aa34 + 11 处改动」的 provenance 记录（0.5.3 声明的局限经 L2 已可消除，建议在 vendored 根落一个 BASE_COMMIT/PROVENANCE 文件）。
 
 **上游同步策略评估（一句话：vendor 管道设计思路正确、现状完全不可复现，处于「一次性快照」状态）**。四个断点（全部有实证）：
 
@@ -309,7 +311,7 @@ flowchart TD
 3. 🟡 **overlays 不完整**：#5/#9 两个改动 07-23 被移出 overlays 后仅存于 vendored 树，重跑 vendor 即**静默丢失**（其中 #7 从未有过声明载体，同样丢失）。
 4. 🟡 **排除集与实树不符**：skills/（467 文件）与 .env.example 缺席但未被 EXCLUDE 声明——重跑会引入 467 个文件，且**框架内建技能库将出现在 skill_view/skills_list 里，改变主智能体可见技能集**（行为差异，非纯体积问题）；vendored 独有的 web_dist/、start-api-server.bat 则会在重跑后消失。
 
-上游演进压力：上游至今已发布至 v2026.9.11 = 0.21.2，vendored 0.16.0 落后 **16 个 tag / 15 个版本化 release（0.17.0→0.21.2，l2-upstream-base-id.txt 标签映射）**；结合 §1.3（554/626 非死重量）与 2.5 冲突面评估，升级须先修 4 个断点并把「整文件 overlay」（run_agent/agent_init）降级为「最小 patch 或上游 PR」，否则每次升级都是手工重做。修复清单为 §6 P0 候选：①修脚本语法+PATCHES 文本（以实树为准回填）；②把 #5/#7/#9 补进 overlays/PATCHES 或显式决策删除；③EXCLUDE_DIRS 显式加入 skills/（或决策保留上游技能库）；④落 PROVENANCE 文件记录基线 commit；⑤删除 orchestrator_tool（2.4）。
+上游演进压力：上游至今已发布至 v2026.9.11 = 0.21.2，vendored 0.16.0 落后 **16 个 tag / 15 个版本化 release（0.17.0→0.21.2，l2-upstream-base-id.txt 标签映射）**；结合 §1.3（554/626 非死重量）与 2.5 冲突面评估，升级须先修 4 个断点并把「整文件 overlay」（run_agent/agent_init）降级为「最小 patch 或上游 PR」，否则每次升级都是手工重做。修复清单为 §6 P0 候选：①修脚本语法+PATCHES 文本（以实树为准回填）；②把 #5/#7/#9 补进 overlays/PATCHES 或显式决策删除；③EXCLUDE_DIRS 显式加入 skills/（或决策保留上游技能库）；④落 PROVENANCE 文件记录基线 commit；⑤删除 orchestrator_tool（2.4）；⑥utils.py os.sync 必炸点改回 os.fsync 或删除该死文件（§2.2 🟡——防后续任务把 §2.2 建议当作已穷尽而漏收）。
 
 ## 3. L3 项目适配审计
 
