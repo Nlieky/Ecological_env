@@ -317,7 +317,7 @@ flowchart TD
 
 <!-- 覆盖设计文档 §3 L3 检查项 3.1–3.5 -->
 
-**范围与方法**：按实际三入口审（计划原文"唯一入口=agent_service.py"已被 §1.1 修正），主审 `scripts/start_agent.py`（523 行，活链路服务）、`skills/orchestrator-core/scripts/subagent_entry.py`（227 行，第三入口；计划所写 scripts/subagent_entry.py 实际位于活编排目录）、`backend/services/agent_service.py`（207 行，仅 backend/main.py:179-186 启动自检引用）+ HTTP 转发端 backend/api/routes/query.py。运行时证据：`sessions/_subagent_traces/`（5 份全量 subprocess 日志，全部 2026-08-04）+ `sessions/session_*/`（结果文件与 task.json）+ git 工作区状态。严重度沿用 §2 约定：🔴=触发即必炸（含"触发即必错"的数据正确性红线，单独注明）、🟡=确定性缺陷/风险、🟢=健康。
+**范围与方法**：按实际三入口审（计划原文"唯一入口=agent_service.py"已被 §1.1 修正），主审 `scripts/start_agent.py`（523 行，活链路服务）、`skills/orchestrator-core/scripts/subagent_entry.py`（227 行，第三入口；计划所写 scripts/subagent_entry.py 实际位于活编排目录）、`backend/services/agent_service.py`（207 行，仅 backend/main.py:179-186 启动自检引用）+ HTTP 转发端 backend/api/routes/query.py。运行时证据：`sessions/_subagent_traces/`（5 份全量 subprocess 日志，全部 2026-08-04）+ `sessions/session_*/`（结果文件与 task.json）+ git 工作区状态。严重度沿用 §2 约定：🔴=触发即必炸（含"触发即必错"的数据正确性红线，单独注明）、🟡=确定性缺陷/风险、🟢=健康。🔴 的最终归级（尤其数据正确性类与运行时口径类，如 ④⑤ 无崩溃但标红的边缘分级）由 §5 裁决与 §6 路线图终裁。
 
 ### 3.1 接入层逐行审（检查项 3.1）
 
@@ -369,7 +369,7 @@ flowchart TD
 
 **断链定性**：④⑤的"断"是**从未发生**而非"接不上"——每次查询是否走到④⑤由主智能体 LLM 即兴决定（无强制 pipeline 编排；tool_registration 只给工具不给顺序，顺序引导在 workspace/AGENTS.md:99-135 的任务链描述里，且 :135 指向的还是退役路径 workspace/skills/orchestrator-core/）。sessions/ 里唯一有完整多环节的会话（session_20260804_151448：data+anomaly）也止步于③。结论：**五环节代码全通、运行时通 3 断 2**；"influxdb→感知→异常检测"闭环成立（含数据新鲜度保留意见），"→规则推理→处置执行"后两环在活框架链路上零执行记录，专利叙事的完整违规判定-预警闭环（根 CLAUDE.md"4 类违规/预警分级"）在现运行时没有一次完整走通的实证。
 
-**依赖接缝补充**：🔴→🟡 influxdb-client **未声明依赖**（requirements.txt/pyproject.toml 均无，venv 实装 1.50.0 系 LLM 运行时 pip install 所致——trace 实证两次安装，且装进了 `~/.local/lib/python3.10`（terminal 裸 `python` 解析到 3.10 用户环境，与服务 venv 3.12 不是一个解释器）；15:33 轮崩溃正因解释器解析不稳定）。venv 重建后 get_data.py 必然 ModuleNotFoundError，直到 LLM 再自己 pip install 一次。修法一行：requirements.txt 加 influxdb-client。
+**依赖接缝补充**：🟡 influxdb-client **未声明依赖**（requirements.txt/pyproject.toml 均无，venv 实装 1.50.0 系 LLM 运行时 pip install 所致——trace 实证两次安装，且装进了 `~/.local/lib/python3.10`（terminal 裸 `python` 解析到 3.10 用户环境，与服务 venv 3.12 不是一个解释器）；15:33 轮崩溃正因解释器解析不稳定）。归级说明：此条曾是 🔴 断链候选，因环节①已有 InfluxDB 直连跑通的 trace 实证（链路本身通）降为 🟡——风险是环境脆弱性（venv 重建后 get_data.py 必然 ModuleNotFoundError，直到 LLM 再自己 pip install 一次）叠加①行数据新鲜度存疑，而非当前断链。修法一行：requirements.txt 加 influxdb-client。
 
 ### 3.4 workspace 身份文件 vs 框架加载一致性（检查项 3.4）
 
