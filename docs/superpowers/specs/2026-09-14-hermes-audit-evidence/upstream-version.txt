@@ -1,0 +1,9 @@
+== pyproject name/version:
+name = "hermes-agent"
+version = "0.16.0"
+
+== git 元数据:
+无 git 元数据
+
+== CHANGELOG 头部:
+无 CHANGELOG.md

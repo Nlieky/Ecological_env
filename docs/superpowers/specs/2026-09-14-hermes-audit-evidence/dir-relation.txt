@@ -1,0 +1,74 @@
+== 上游根目录:
+acp_adapter
+acp_registry
+agent
+AGENTS.md
+batch_runner.py
+cli-config.yaml.example
+cli.py
+constraints-termux.txt
+CONTRIBUTING.md
+cron
+docker-compose.windows.yml
+docker-compose.yml
+Dockerfile
+flake.lock
+flake.nix
+gateway
+hermes
+hermes_agent.egg-info
+hermes-already-has-routines.md
+hermes_bootstrap.py
+hermes_cli
+hermes_constants.py
+hermes_logging.py
+hermes_state.py
+hermes_time.py
+LICENSE
+MANIFEST.in
+mcp_serve.py
+mini_swe_runner.py
+model_tools.py
+== 包副本目录:
+agent
+__init__.py
+__pycache__
+run_agent.py
+utils.py
+== 上游内是否也有 hermes_agent 包:
+无
+== overlays:
+shared/framework/hermes-overlays/run_agent.py
+shared/framework/hermes-overlays/tools/orchestrator_tool.py
+shared/framework/hermes-overlays/agent/agent_init.py
+=== diff agent/__init__.py ===
+完全一致
+
+=== diff agent/process_bootstrap.py ===
+31,35c31
+< try:
+<     from utils import base_url_hostname, normalize_proxy_url
+< except ImportError:
+<     # Fallback to local framework utils
+<     from shared.framework.hermes_agent.utils import base_url_hostname, normalize_proxy_url
+---
+> from utils import base_url_hostname, normalize_proxy_url
+
+=== identity_loader.py 是否上游存在 ===
+上游无此文件（本地新增）
+=== overlays/run_agent.py vs hermes_agent/run_agent.py ===
+完全一致
+
+=== overlays/agent/agent_init.py vs hermes_agent/agent/agent_init.py ===
+完全一致
+
+== [审查补证 2026-09-14] cmp 逐字节比对（无输出+exit 0 = 一致）:
+$ cmp shared/framework/hermes_agent/run_agent.py shared/framework/hermes-agent/run_agent.py
+(exit 0 → 逐字节一致)
+
+$ cmp shared/framework/hermes_agent/agent/agent_init.py shared/framework/hermes-agent/agent/agent_init.py
+(exit 0 → 逐字节一致)
+
+== [审查补证] 上游顶层条目总数（此前 head -30 截断）:
+$ ls shared/framework/hermes-agent/ | wc -l
+51
