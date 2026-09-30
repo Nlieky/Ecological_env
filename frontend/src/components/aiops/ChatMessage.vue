@@ -9,7 +9,7 @@
       <div v-else-if="msg.streaming" class="stream-text muted">{{ msg.progress ? '' : '思考中…' }}</div>
       <!-- 数据曲线(chartData) -->
       <div v-if="charts.length" class="charts">
-        <div v-for="(c, i) in charts" :key="i" :ref="el => setChartRef(el, i)" class="chart-item"></div>
+        <div v-for="(_, i) in charts" :key="i" :ref="el => setChartRef(el, i)" class="chart-item"></div>
       </div>
       <div v-if="msg.trace" class="cards">
         <DecisionFlow :trace="msg.trace" />
