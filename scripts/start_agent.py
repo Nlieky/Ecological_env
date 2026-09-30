@@ -56,6 +56,7 @@ from shared.framework.hermes_agent.run_agent import AIAgent
 # 此时 HERMES_HOME/HERMES_TOTAL_TIMEOUT 已设、AIAgent 已加载(sys.modules 缓存命中)，
 # 不破坏上方"先设 env 再 import AIAgent"的时序。
 from backend.services.agent_strategy import get_strategy as _gst
+from backend.services.agent_turn_guard import AgentTurnGuard
 from backend.services import llm_providers as _lp
 
 # 配置日志
@@ -111,9 +112,21 @@ class AgentService:
         # master_agent 是单例共享，run_conversation 会改它的内部状态（messages/session_id），
         # 并发查询会串台。用锁串行化对 master_agent 的访问（配合 /query 走线程池）。
         self._agent_lock = threading.Lock()
+        self._turn_guard = AgentTurnGuard()
         # 排队超时直接返回"忙"（2026-09-10 对齐墙钟 900：排队窗口 ≥ 一轮研判时长，
         # 排在第二位的用户等第一位跑完还能轮到，而不是 5 分钟就被拒）
         self._agent_lock_timeout = int(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=900))
+
+    def _begin_agent_turn(self) -> bool:
+        """Reject overlap with an orphaned timed-out worker and recover safely."""
+        if self._turn_guard.state == "quarantined":
+            if not self._turn_guard.wait_for_recovery(timeout=0):
+                return False
+            logger.warning("上一轮超时工作线程已退出，重建主智能体后恢复服务")
+            if not self.initialize():
+                return False
+            self._turn_guard.mark_agent_rebuilt()
+        return self._turn_guard.try_begin()
 
     def initialize(self):
         """初始化主智能体实例"""
@@ -349,6 +362,10 @@ class AgentService:
             # 调用主智能体（加锁串行化，避免并发查询串台；排队超时直接返回"忙"）
             if not self._agent_lock.acquire(timeout=self._agent_lock_timeout):
                 return {"success": False, "error": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"}
+            if not self._begin_agent_turn():
+                self._agent_lock.release()
+                return {"success": False,
+                        "error": "服务隔离中：上一轮超时任务尚未完全退出，请稍后重试"}
             # 挂进度队列收集 call_subagent 调用（让阻塞 /query 也能回传子智能体 trace，供审计）
             import queue as _q
             _trace_q = _q.Queue()
@@ -367,6 +384,7 @@ class AgentService:
                 _wall = int(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT",
                                 default=900))
                 _conv_result: dict = {}
+                _worker_done = threading.Event()
 
                 def _run_conv():
                     try:
@@ -377,12 +395,15 @@ class AgentService:
                         )
                     except Exception as _e:  # 工作线程异常带回主线程
                         _conv_result["err"] = _e
+                    finally:
+                        _worker_done.set()
 
                 import threading as _th
                 _wt = _th.Thread(target=_run_conv, daemon=True, name="conv-wall")
                 _wt.start()
                 _wt.join(timeout=_wall)
                 if _wt.is_alive():
+                    self._turn_guard.mark_timed_out(_worker_done)
                     logger.error(f"研判墙钟超时(>{_wall}s): session={session_id} query={query[:40]}")
                     result = {"success": False,
                               "error": (f"研判总超时（>{_wall}s）——主智能体本轮未完成。"
@@ -392,7 +413,10 @@ class AgentService:
                     raise _conv_result["err"]
                 else:
                     result = _conv_result.get("r") or {"success": False, "error": "研判无返回"}
+                    self._turn_guard.finish()
             finally:
+                if self._turn_guard.state == "running":
+                    self._turn_guard.finish()
                 if _tool_reg is not None:
                     _tool_reg._current_progress_queue = None
                 self._agent_lock.release()
@@ -679,6 +703,10 @@ def query_stream(request: QueryRequest):
         if not agent_service._agent_lock.acquire(timeout=agent_service._agent_lock_timeout):
             q.put({"type": "error", "message": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"})
             return
+        if not agent_service._begin_agent_turn():
+            agent_service._agent_lock.release()
+            q.put({"type": "error", "message": "服务隔离中：上一轮超时任务尚未完全退出，请稍后重试"})
+            return
         try:
             agent_service._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
             _apply_style_strategy(agent_service.master_agent)   # /query/stream 路径:风格策略即时生效
@@ -700,12 +728,39 @@ def query_stream(request: QueryRequest):
                                     f"run_detector 传 start/end 用这段的起止时间）")
                 except Exception:
                     pass
-            result = agent_service.master_agent.run_conversation(
-                user_message=user_msg,
-                conversation_history=history,
-                task_id=session_id,
-                stream_callback=lambda text: q.put({"type": "delta", "text": text}),
+            _stream_result = {}
+            _stream_done = threading.Event()
+
+            def _run_stream_turn():
+                try:
+                    _stream_result["result"] = agent_service.master_agent.run_conversation(
+                        user_message=user_msg,
+                        conversation_history=history,
+                        task_id=session_id,
+                        stream_callback=lambda text: q.put({"type": "delta", "text": text}),
+                    )
+                except Exception as exc:
+                    _stream_result["error"] = exc
+                finally:
+                    _stream_done.set()
+
+            _stream_thread = threading.Thread(
+                target=_run_stream_turn, daemon=True, name="stream-conv-wall"
             )
+            _stream_thread.start()
+            _wall = int(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=900))
+            _stream_thread.join(timeout=_wall)
+            if _stream_thread.is_alive():
+                agent_service._turn_guard.mark_timed_out(_stream_done)
+                q.put({"type": "error", "message": (
+                    f"研判总超时（>{_wall}s）——后台任务正在隔离退出，服务恢复前拒绝新查询"
+                )})
+                return
+            if "error" in _stream_result:
+                raise _stream_result["error"]
+            result = _stream_result.get("result") or {
+                "success": False, "error": "研判无返回"
+            }
             if isinstance(result, dict) and "messages" in result:
                 agent_service.session_histories[session_id] = result["messages"]
             content = (result.get("final_response") or "（智能体未产出文本回复，请重试或换种问法）") if isinstance(result, dict) else (str(result) if result else "（智能体未产出文本回复）")
@@ -715,6 +770,7 @@ def query_stream(request: QueryRequest):
             logger.error(f"流式查询失败: {e}")
             q.put({"type": "error", "message": str(e)})
         finally:
+            agent_service._turn_guard.finish()
             if tool_reg is not None:
                 tool_reg._current_progress_queue = None
             agent_service._agent_lock.release()

@@ -204,6 +204,9 @@ def _compact_result_for_master(result):
                 compact["time_range"] = md["time_range"]
             if md.get("plant"):
                 compact["plant"] = md["plant"]  # 多厂:标明本结果是哪个厂
+            freshness = md.get("freshness")
+            if isinstance(freshness, dict):
+                compact["freshness"] = freshness
         # ★ summary 头条区分"有进水"和"仅出水"(无进水厂),主智能体不再误判"无数据"
         ind_list = ", ".join(stats.keys()) if stats else "各指标"
         if n_in > 0:
@@ -216,6 +219,12 @@ def _compact_result_for_master(result):
             f"时序曲线 chartData 已生成，前端自动渲染。"
             f"用户要的'曲线/图'已包含——不要为画曲线再调本子智能体。"
         )
+        if compact.get("freshness", {}).get("is_stale"):
+            compact["summary"] = (
+                "⚠️ 数据已停更，不能称为实时或最近数据："
+                + str(compact["freshness"].get("warning") or "数据新鲜度校验未通过")
+                + " " + compact["summary"]
+            )
         # ★ 多厂归档透传(2026-08-27):子智能体一次调用可能跑了多个厂(data_result.json
         # 只留最后一个厂,主智能体会漏看其他厂)。data_result_plants.json 是逐厂累积统计,
         # 附进 compact.all_plants_stats——主智能体不用再调①就能拿到本会话全部厂的数字。

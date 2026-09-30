@@ -11,6 +11,11 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
 import time
+from subagent_registry import (
+    known_subagent_names,
+    prepare_result_target,
+    resolve_subagent,
+)
 
 
 def _project_root() -> Path:
@@ -34,32 +39,8 @@ def _param(key, env_key, default):
 
 
 # 子智能体路径映射（完整名称和简化名称）
-SUBAGENT_PATHS = {
-    # 完整名称
-    "multi-dimensional-data-perception": "../subagents/multi-dimensional-data-perception-agent",
-    "anomaly-detection": "../subagents/anomaly-detection-agent",
-    "rule-reasoning": "../subagents/rule-reasoning-agent",
-    "disposition-execution": "../subagents/disposition-execution-agent",
-    # 简化名称（向后兼容）
-    "data-perception": "../subagents/multi-dimensional-data-perception-agent",
-    "anomaly": "../subagents/anomaly-detection-agent",
-    "rule": "../subagents/rule-reasoning-agent",
-    "disposition": "../subagents/disposition-execution-agent"
-}
-
-# 结果文件名映射（完整名称和简化名称）
-RESULT_FILE_NAMES = {
-    # 完整名称映射
-    "multi-dimensional-data-perception": "data_result.json",
-    "anomaly-detection": "anomaly_result.json",
-    "rule-reasoning": "rule_reasoning_result.json",
-    "disposition-execution": "disposition_result.json",
-    # 简化名称映射
-    "data-perception": "data_result.json",
-    "anomaly": "anomaly_result.json",
-    "rule": "rule_reasoning_result.json",
-    "disposition": "disposition_result.json"
-}
+SUBAGENT_PATHS = {name: resolve_subagent(name).directory for name in known_subagent_names()}
+RESULT_FILE_NAMES = {name: resolve_subagent(name).result_file for name in known_subagent_names()}
 
 
 def get_session_dir() -> Optional[str]:
@@ -175,7 +156,9 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
         }
 
     # 验证子智能体名称
-    if subagent_name not in SUBAGENT_PATHS:
+    try:
+        subagent_spec = resolve_subagent(subagent_name)
+    except ValueError:
         return {
             "task_id": generate_task_id(),
             "status": "failed",
@@ -197,6 +180,11 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
             "error": "Failed to get or create session directory",
             "metadata": {"timestamp": datetime.now().isoformat()}
         }
+
+    # A carried result is context only. Once this stage is requested, remove its
+    # previous output before any later preflight can fail, so callers cannot
+    # mistake an old file for this invocation's result.
+    prepare_result_target(session_dir, subagent_spec.result_file)
 
     # 生成任务 ID
     task_id = generate_task_id()
@@ -233,8 +221,7 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
 
     # 获取子智能体路径——SUBAGENT_PATHS 形如 "../subagents/X"(旧 workspace 相对约定)，
     # 去掉前导 ../ 后从项目根解析，与脚本自身位置无关
-    subagent_rel_path = SUBAGENT_PATHS[subagent_name]
-    subagent_path = (_project_root() / subagent_rel_path.replace("../", "", 1)).resolve()
+    subagent_path = (_project_root() / subagent_spec.directory).resolve()
 
     if not subagent_path.exists():
         return {
@@ -249,7 +236,7 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
     env = os.environ.copy()
     env['HERMES_HOME'] = str(subagent_path)
     env['SESSION_DIR'] = session_dir
-    env['SUBAGENT_NAME'] = subagent_name
+    env['SUBAGENT_NAME'] = subagent_spec.name
 
     # 显式添加 LLM 配置环境变量（确保子进程能访问 LLM 服务）
     # Hermes Agent 框架期望 OPENAI_API_KEY，所以我们需要同时设置两者
@@ -364,7 +351,7 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
         }
 
     # 读取结果文件
-    result_file_name = RESULT_FILE_NAMES.get(subagent_name, f"{subagent_name}_result.json")
+    result_file_name = subagent_spec.result_file
     result_file = Path(session_dir) / result_file_name
 
     if not result_file.exists():

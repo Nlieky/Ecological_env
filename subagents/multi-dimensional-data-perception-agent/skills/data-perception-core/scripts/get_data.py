@@ -22,6 +22,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # 项目根(subagents/.../scripts/ 上 5 层),供 import shared.data.influxdb_query
 sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
@@ -44,6 +45,49 @@ _KEEP_FIELDS = ["pH", "COD", "TN", "AN", "TP", "flow", "discharge", "suspended_s
 # 当前工艺的水力停留时间(小时)。标注进 metadata,供下游按需做进水出水时间对齐。
 # 数据感知本身不做对齐(零分析)。
 _HRT_HOURS = 2
+
+
+def assess_data_freshness(influent, effluent, *, requested_relative,
+                          now=None, stale_after_hours=6):
+    """Describe actual bounds and whether a relative-window result is stale."""
+    timestamps = []
+    for row in [*(influent or []), *(effluent or [])]:
+        if row.get("timestamp"):
+            timestamps.append(pd.Timestamp(row["timestamp"]))
+    mode = "relative" if requested_relative else "historical"
+    if not timestamps:
+        return {
+            "mode": mode, "actual_start": None, "actual_end": None,
+            "lag_hours": None, "stale_after_hours": stale_after_hours,
+            "is_stale": None, "warning": "查询窗口内没有监测数据",
+        }
+    start, end = min(timestamps), max(timestamps)
+    source_tz = ZoneInfo(os.environ.get("DATA_TIMEZONE", "Asia/Shanghai"))
+    current = pd.Timestamp(now or datetime.now(source_tz))
+    timestamp_tz = current.tzinfo or source_tz
+    if start.tzinfo is None:
+        start = start.tz_localize(timestamp_tz)
+    if end.tzinfo is None:
+        end = end.tz_localize(timestamp_tz)
+    if current.tzinfo is None:
+        current = current.tz_localize(source_tz)
+    lag_hours = max(0.0, (current - end).total_seconds() / 3600)
+    is_stale = bool(requested_relative and lag_hours > stale_after_hours)
+    warning = None
+    if is_stale:
+        warning = (
+            f"请求的是相对当前时间窗口，但最新数据停在 {end.isoformat()}，"
+            f"距当前约 {lag_hours:.1f} 小时；不得表述为实时或最近数据。"
+        )
+    return {
+        "mode": mode,
+        "actual_start": start.isoformat(),
+        "actual_end": end.isoformat(),
+        "lag_hours": round(lag_hours, 2),
+        "stale_after_hours": stale_after_hours,
+        "is_stale": is_stale,
+        "warning": warning,
+    }
 
 
 def _load_env() -> None:
@@ -176,6 +220,10 @@ def main():
     influent_data = _get("influent")
     effluent_data = _get("effluent")
     client.close()
+    freshness = assess_data_freshness(
+        influent_data, effluent_data, requested_relative=not use_range,
+        stale_after_hours=float(os.environ.get("DATA_STALE_AFTER_HOURS", "6")),
+    )
 
     time_range_str = label
     result = {
@@ -197,6 +245,7 @@ def main():
                     use_range, args.start if use_range else None,
                     args.end if use_range else None, hours_back),
                 "data_source": "influxdb",
+                "freshness": freshness,
             },
         },
         "metadata": {

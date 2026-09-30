@@ -124,7 +124,7 @@ Ecological_env/                    # 项目主目录
 │   │   └── components/             # 组件
 │   └── package.json               # 前端依赖
 │
-├── workspace/                     # Hermes 主智能体工作区
+├── workspace/                     # Hermes 主智能体身份工作区
 │   ├── SOUL.md                    # 主智能体身份和个性
 │   ├── AGENTS.md                  # 工作区规范
 │   ├── MEMORY.md                  # 全局长期记忆
@@ -132,12 +132,9 @@ Ecological_env/                    # 项目主目录
 │   ├── IDENTITY.md                # 身份卡片
 │   ├── HEARTBEAT.md               # 周期性任务
 │   ├── TOOLS.md                   # 工具配置
-│   └── skills/                    # 主智能体技能包
-│       └── orchestrator-core/     # 编排器核心技能
-│           ├── SKILL.md
-│           ├── scripts/           # 实现脚本
-│           ├── references/        # 参考文档
-│           └── assets/            # 资源文件
+├── skills/                        # 主智能体技能包（项目根，HERMES_HOME 作用域）
+│   ├── orchestrator-core/         # 编排器核心技能与调用接缝
+│   └── action-command-core/       # 前端动作与轻量检测技能
 │
 ├── subagents/                     # 4 个子智能体
 │   ├── multi-dimensional-data-perception-agent/  # 多维数据感知
