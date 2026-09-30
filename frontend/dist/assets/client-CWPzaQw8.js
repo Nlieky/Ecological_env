@@ -1,1 +1,0 @@
-import{M as o,E as i}from"./index-hv74Bv9j.js";const r=o.create({baseURL:"/api",timeout:3e5});r.interceptors.request.use(e=>e,e=>Promise.reject(e));r.interceptors.response.use(e=>e.data,e=>{var s,t;const a=((t=(s=e.response)==null?void 0:s.data)==null?void 0:t.detail)||e.message||"请求失败";return i.error(a),Promise.reject(e)});export{r as a};
