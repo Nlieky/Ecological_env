@@ -38,6 +38,8 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+# Root-level temporary pytest basetemp directories (reproducible test output)
+/.tmp-*/
 
 # Runtime SQLite databases (created by init_db.py, not version-controlled)
 *.db

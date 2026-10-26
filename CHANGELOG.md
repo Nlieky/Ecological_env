@@ -2,6 +2,29 @@
 
 All notable changes to the wastewater monitoring system will be documented in this file.
 
+## [Unreleased] - 2026-10-26
+
+### 系统能力与数据边界
+
+- 新增全局侧边助手，基于当前页面上下文准备导航、展示和受限操作；专业废水研判仍由主页面 AI 助手处理。
+- 增加操作候选确认、审计记录和事件变更流程；事件写入默认关闭，可通过部署环境显式控制。
+- 区分 `monitoring-real` 与 `monitoring-simulation` 数据 bucket，并统一来源、历史模式和新鲜度标记。
+- 改善 AI 助手会话运行状态、会话检索、日志中心、配置页面和监测页面交互。
+- 补充数据查询证据、流式响应、配置草稿和页面操作契约相关测试。
+
+### 开发与部署说明
+
+- 更新 Python 依赖声明及 `uv.lock`，包含后端、InfluxDB、数据处理、MCP 和测试依赖。
+- 更新 `.env.example`，明确历史数据模式、来源分桶、事件写入默认关闭，以及 Prometheus 子进程默认关闭。
+- README 改为描述当前服务组成、数据来源、Windows 开发启动和验证方式。
+- 根目录 pytest 临时基准目录纳入 `.gitignore`。
+
+### 已知边界
+
+- 监管平台实时数据 API 尚未接入，真实业务数据仍由下载报表导入。
+- Prometheus / Grafana 当前搁置；遗留 `/metrics` 中废水 gauge 由历史 CSV 推进，不代表真实实时业务数据。
+- 全局助手的模型澄清仍可能出现冗余追问；跨页候选操作偶尔会被上下文保护拦截，需要在浏览器继续验收。
+
 ## [2.2.0] - 2026-07-14
 
 ### 身份文件完善
