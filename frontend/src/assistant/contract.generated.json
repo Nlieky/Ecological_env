@@ -1,0 +1,591 @@
+{
+  "contract_version": "1.0.0",
+  "capabilities": [
+    {
+      "id": "navigate",
+      "target_page": null,
+      "target_path": null,
+      "title": "\u6253\u5f00\u9875\u9762",
+      "parameters": {
+        "pageId": [
+          "dashboard",
+          "metrics",
+          "events",
+          "audit",
+          "graph",
+          "logs",
+          "config",
+          "chat"
+        ]
+      },
+      "required": [
+        "pageId"
+      ],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "pageId": "\u8bf7\u660e\u786e\u76ee\u6807\u9875\u9762"
+      },
+      "inheritance": {},
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "destination",
+        "fields": [],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "dashboard.view",
+      "target_page": "dashboard",
+      "target_path": "/dashboard",
+      "title": "\u8c03\u6574\u5927\u5c4f\u89c6\u56fe",
+      "parameters": {
+        "plant": "text",
+        "indicator": [
+          "pH",
+          "COD",
+          "TN",
+          "AN",
+          "TP",
+          "suspended_solids"
+        ],
+        "side": [
+          "influent",
+          "effluent",
+          "all"
+        ]
+      },
+      "required": [],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "plant": "\u8bf7\u660e\u786e\u5382\u7ad9",
+        "indicator": "\u8bf7\u660e\u786e\u6307\u6807",
+        "side": "\u8bf7\u660e\u786e\u8fdb\u6c34\u6216\u51fa\u6c34\u4fa7\u522b"
+      },
+      "inheritance": {
+        "plant": "plant",
+        "indicator": "indicator",
+        "side": "filters.side"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "relative",
+        "fields": [
+          "pageId",
+          "route",
+          "objectId",
+          "plant",
+          "source",
+          "range"
+        ],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "dashboard.range",
+      "target_page": "dashboard",
+      "target_path": "/dashboard",
+      "title": "\u5207\u6362\u91c7\u6837\u7a97\u53e3",
+      "parameters": {
+        "range": [
+          "1h",
+          "6h",
+          "24h",
+          "7d",
+          "30d"
+        ]
+      },
+      "required": [
+        "range"
+      ],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "range": "\u8bf7\u660e\u786e\u91c7\u6837\u65f6\u6bb5"
+      },
+      "inheritance": {
+        "range": "range"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "relative",
+        "fields": [
+          "pageId",
+          "route",
+          "objectId",
+          "plant",
+          "source",
+          "range"
+        ],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "dashboard.detect",
+      "target_page": "dashboard",
+      "target_path": "/dashboard",
+      "title": "\u51c6\u5907\u7edf\u8ba1\u68c0\u6d4b",
+      "parameters": {
+        "algorithm": [
+          "constant",
+          "changepoint",
+          "iforest"
+        ],
+        "indicator": [
+          "pH",
+          "COD",
+          "TN",
+          "AN",
+          "TP",
+          "suspended_solids"
+        ],
+        "side": [
+          "influent",
+          "effluent"
+        ]
+      },
+      "required": [
+        "algorithm",
+        "indicator",
+        "side"
+      ],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "algorithm": "\u8bf7\u660e\u786e\u68c0\u6d4b\u7b97\u6cd5",
+        "indicator": "\u8bf7\u660e\u786e\u6307\u6807",
+        "side": "\u8bf7\u660e\u786e\u8fdb\u6c34\u6216\u51fa\u6c34\u4fa7\u522b"
+      },
+      "inheritance": {
+        "indicator": "indicator",
+        "side": "filters.side"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {
+          "algorithm": "iforest"
+        },
+        "explanation": "\u63a2\u7d22\u6027\u79bb\u7fa4\u7edf\u8ba1\u5019\u9009\uff0c\u4e0d\u4ee3\u8868\u8d85\u9650\u6216\u8fdd\u89c4\u3002"
+      },
+      "readiness": {
+        "status": [
+          "ready"
+        ],
+        "required_context": [
+          "pageId",
+          "plant",
+          "source",
+          "range"
+        ],
+        "range_requires_bounds": true
+      },
+      "invalidation": {
+        "mode": "window",
+        "fields": [
+          "pageId",
+          "route",
+          "plant",
+          "source",
+          "range",
+          "indicator",
+          "filters.side"
+        ],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "metrics.filter",
+      "target_page": "metrics",
+      "target_path": "/metrics",
+      "title": "\u7b5b\u9009\u6307\u6807",
+      "parameters": {
+        "plant": "text",
+        "indicator": [
+          "pH",
+          "COD",
+          "TN",
+          "AN",
+          "TP"
+        ],
+        "range": [
+          "1h",
+          "6h",
+          "24h"
+        ]
+      },
+      "required": [],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "plant": "\u8bf7\u660e\u786e\u5382\u7ad9",
+        "indicator": "\u8bf7\u660e\u786e\u6307\u6807",
+        "range": "\u8bf7\u660e\u786e\u91c7\u6837\u65f6\u6bb5"
+      },
+      "inheritance": {
+        "plant": "plant",
+        "indicator": "indicator",
+        "range": "range"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "relative",
+        "fields": [
+          "pageId",
+          "route",
+          "objectId",
+          "plant",
+          "source",
+          "range"
+        ],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "events.filter",
+      "target_page": "events",
+      "target_path": "/events",
+      "title": "\u7b5b\u9009\u4e8b\u4ef6",
+      "parameters": {
+        "status": [
+          "",
+          "pending",
+          "processing",
+          "resolved",
+          "ignored"
+        ],
+        "severity": [
+          "",
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "required": [],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "status": "\u8bf7\u660e\u786e\u5904\u7406\u72b6\u6001",
+        "severity": "\u8bf7\u660e\u786e\u4e25\u91cd\u7a0b\u5ea6"
+      },
+      "inheritance": {
+        "status": "filters.status",
+        "severity": "filters.severity"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "destination",
+        "fields": [],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "events.detail",
+      "target_page": "events",
+      "target_path": "/events",
+      "title": "\u67e5\u770b\u4e8b\u4ef6",
+      "parameters": {
+        "eventId": "text"
+      },
+      "required": [
+        "eventId"
+      ],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "eventId": "\u8bf7\u660e\u786e\u4e8b\u4ef6\u7f16\u53f7"
+      },
+      "inheritance": {
+        "eventId": "objectId"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "destination",
+        "fields": [],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "audit.focus",
+      "target_page": "audit",
+      "target_path": "/agents/audit",
+      "title": "\u5b9a\u4f4d\u5ba1\u8ba1\u4f1a\u8bdd",
+      "parameters": {
+        "sessionId": "text"
+      },
+      "required": [
+        "sessionId"
+      ],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "sessionId": "\u8bf7\u660e\u786e\u4f1a\u8bdd\u7f16\u53f7"
+      },
+      "inheritance": {
+        "sessionId": "objectId"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "destination",
+        "fields": [],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "graph.focus",
+      "target_page": "graph",
+      "target_path": "/agents/knowledge",
+      "title": "\u5b9a\u4f4d\u56fe\u8c31\u8282\u70b9",
+      "parameters": {
+        "nodeId": "text"
+      },
+      "required": [
+        "nodeId"
+      ],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "nodeId": "\u8bf7\u660e\u786e\u8282\u70b9\u7f16\u53f7"
+      },
+      "inheritance": {
+        "nodeId": "objectId"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "destination",
+        "fields": [],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "event.propose",
+      "target_page": "events",
+      "target_path": "/events",
+      "title": "\u51c6\u5907\u4e8b\u4ef6\u72b6\u6001\u53d8\u66f4",
+      "parameters": {
+        "eventId": "text",
+        "new_status": [
+          "pending",
+          "processing",
+          "resolved",
+          "ignored"
+        ],
+        "reason": "text"
+      },
+      "required": [
+        "eventId",
+        "new_status",
+        "reason"
+      ],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "eventId": "\u8bf7\u660e\u786e\u4e8b\u4ef6\u7f16\u53f7",
+        "new_status": "\u8bf7\u660e\u786e\u76ee\u6807\u72b6\u6001",
+        "reason": "\u8bf7\u660e\u786e\u53d8\u66f4\u7406\u7531"
+      },
+      "inheritance": {
+        "eventId": "objectId"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [
+          "ready"
+        ],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "proposal",
+        "fields": [
+          "pageId",
+          "route",
+          "objectId",
+          "plant",
+          "source",
+          "range"
+        ],
+        "revision_only": false
+      },
+      "level": "proposal",
+      "requires_confirmation": true
+    },
+    {
+      "id": "logs.filter",
+      "target_page": "logs",
+      "target_path": "/logs",
+      "title": "\u7b5b\u9009\u65e5\u5fd7",
+      "parameters": {
+        "module": [
+          "all",
+          "api",
+          "master",
+          "subagent",
+          "operator",
+          "llm",
+          "error"
+        ]
+      },
+      "required": [
+        "module"
+      ],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "module": "\u8bf7\u660e\u786e\u65e5\u5fd7\u6a21\u5757"
+      },
+      "inheritance": {
+        "module": "filters.module"
+      },
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "destination",
+        "fields": [],
+        "revision_only": false
+      },
+      "level": "read",
+      "requires_confirmation": false
+    },
+    {
+      "id": "strategy.draft",
+      "target_page": "config",
+      "target_path": "/agents/config",
+      "title": "\u51c6\u5907\u7b56\u7565\u8349\u7a3f",
+      "parameters": {
+        "language_constraint": [
+          "zh",
+          "en",
+          "none"
+        ],
+        "conclusion_first": "bool",
+        "confidence_labeling": "bool"
+      },
+      "required": [],
+      "minimum_parameters": 1,
+      "missing_prompts": {
+        "language_constraint": "\u8bf7\u660e\u786e\u8bed\u8a00\u7ea6\u675f",
+        "conclusion_first": "\u8bf7\u660e\u786e\u662f\u5426\u7ed3\u8bba\u4f18\u5148",
+        "confidence_labeling": "\u8bf7\u660e\u786e\u662f\u5426\u6807\u660e\u7f6e\u4fe1\u5ea6"
+      },
+      "inheritance": {},
+      "defaults": {
+        "requires_delegation": true,
+        "values": {},
+        "explanation": ""
+      },
+      "readiness": {
+        "status": [
+          "ready"
+        ],
+        "required_context": [],
+        "range_requires_bounds": false
+      },
+      "invalidation": {
+        "mode": "relative",
+        "fields": [
+          "pageId",
+          "route",
+          "objectId",
+          "plant",
+          "source",
+          "range"
+        ],
+        "revision_only": false
+      },
+      "level": "draft",
+      "requires_confirmation": true
+    }
+  ]
+}

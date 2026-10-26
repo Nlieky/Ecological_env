@@ -18,6 +18,7 @@ import asyncio
 import copy
 import sqlite3
 import time
+import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -142,11 +143,14 @@ def _build_status_data() -> dict:
     plants = []
     try:
         from shared.data.discover_plants import discover_plants
+        from shared.data.source_context import describe_data_context, sampling_timestamp
         for p in discover_plants():  # 返回 list[dict]
+            context = describe_data_context(os.environ.get('INFLUXDB_BUCKET', 'monitoring-data'), p.get('latest_time') or None)
             plants.append({
                 "plant_id": p.get("plant_id", ""),
-                "latest_time": str(p.get("latest_time", ""))[:16].replace("T", " "),
-                "status": "online",  # 能被发现=有数据
+                "latest_time": sampling_timestamp(p['latest_time']).strftime('%Y-%m-%d %H:%M') if p.get('latest_time') else '',
+                "status": context['freshness'],
+                "data_context": context,
                 "data_types": sorted(p.get("data_types", [])),
             })
     except Exception:
@@ -193,22 +197,25 @@ async def get_system_status():
 async def get_system_history(days: int = 30):
     """按天聚合的历史态势：每天监测点数、进/出水均值、超标次数。"""
     import pandas as pd
-    from shared.data.influxdb_query import get_client_and_bucket
+    from shared.data.influxdb_query import get_client_and_bucket, source_filter
+    from shared.data.source_context import data_timezone
+    import json
 
     client, bucket = get_client_and_bucket()
     try:
         q = (
-            f'from(bucket: "{bucket}") |> range(start: 0) '
-            f'|> filter(fn: (r) => r._measurement == "wastewater") '
+            f'from(bucket: {json.dumps(bucket)}) |> range(start: 0) '
+            f'|> filter(fn: (r) => r._measurement == "wastewater"{source_filter(bucket)}) '
             f'|> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")'
         )
         df = client.query_api().query_data_frame(q)
         if isinstance(df, list):
-            df = pd.concat([d for d in df if not d.empty], ignore_index=True) if df else pd.DataFrame()
+            tables = [d for d in df if not d.empty]
+            df = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
         if df is None or df.empty:
             return {"success": True, "data": []}
 
-        df["_time"] = pd.to_datetime(df["_time"])
+        df["_time"] = pd.to_datetime(df["_time"], utc=True).dt.tz_convert(data_timezone())
         df["day"] = df["_time"].dt.strftime("%Y-%m-%d")
         fields = [f for f in ("pH", "COD", "TN", "AN", "TP", "suspended_solids") if f in df.columns]
 

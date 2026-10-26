@@ -20,6 +20,9 @@ class LogEntry(BaseModel):
     content: str
     details: Optional[dict] = None
     latency_ms: Optional[float] = None
+    level: str = "info"
+    slow: bool = False
+    session_id: Optional[str] = None
 
 
 class LogListResponse(BaseModel):

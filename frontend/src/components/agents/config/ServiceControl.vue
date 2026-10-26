@@ -4,23 +4,24 @@
       <div class="sc-h">Agent 服务（端口 {{ status?.port || 8642 }}）</div>
       <div class="sc-row">
         <span class="sc-k">状态</span>
-        <span class="sc-v" :class="status?.alive ? 'ok' : 'bad'">
-          {{ restarting ? '重启中…' : (status?.alive ? '● 运行中' : '● 已停止') }}
+        <span class="sc-v" :class="!statusError && !restarting && status?.ready ? 'ok' : 'bad'">
+          {{ restarting ? '重启中…' : statusError ? '状态读取失败（显示上次结果）' : !status ? '状态未知' : status.ready ? '● 已就绪' : status.alive ? '● 可连接，尚未就绪' : '● 不可连接' }}
         </span>
       </div>
       <div class="sc-row"><span class="sc-k">进程 PID</span>
         <span class="sc-v mono">{{ status?.pids?.length ? status.pids.join(', ') : '—' }}</span></div>
-      <div class="sc-row"><span class="sc-k">模型</span>
-        <span class="sc-v mono">{{ status?.model || '—' }}</span></div>
+      <div class="sc-row"><span class="sc-k">已保存兜底模型</span>
+        <span class="sc-v mono">{{ status?.saved_model || status?.model || '—' }}</span></div>
+      <p>模型来自保存的 llm_model 兜底值，未验证运行中供应商实际加载的模型。</p>
+      <p v-if="statusError">{{ statusError }}；请刷新重试。</p>
       <div class="sc-acts">
-        <button class="btn primary" @click="doRestart" :disabled="restarting">
+        <button class="btn primary" @click="doRestart" :disabled="restarting || confirming">
           {{ restarting ? `重启中（${pollSec}s）…` : '一键重启' }}
         </button>
         <button class="btn" @click="refresh" :disabled="restarting">刷新状态</button>
       </div>
-      <div v-if="lastResult" class="sc-res" :class="lastResult.ok ? 'ok' : 'bad'">
-        {{ lastResult.ok ? `✓ 已重启（旧 PID ${lastResult.old_pids?.length ? lastResult.old_pids.join(', ') : '无'}）` +
-           (lastResult.new_alive ? '' : ' ⚠ health 未就绪，请看 agent 控制台日志') : `✗ ${lastResult.error}` }}
+      <div v-if="lastResult" class="sc-res" :class="lastResult.ok && lastResult.new_ready === true ? 'ok' : 'bad'">
+        {{ lastResult.ok && lastResult.new_ready === true ? '✓ 已重启并就绪' : lastResult.new_alive ? '⚠ 服务可连接，但尚未就绪：' + (lastResult.warn || lastResult.error || '请查看 agent 日志') : '✗ ' + (lastResult.error || '重启未完成') }}
       </div>
     </div>
   </div>
@@ -29,20 +30,28 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { agentConfigService } from '@/api/modules/agentConfig'
+import { agentConfigService, type ServiceStatus } from '@/api/modules/agentConfig'
+import { requireSuccess } from '@/composables/useConfigDraft'
 
-interface SvcStatus { alive: boolean; port: number; pids: number[]; model: string }
-const status = ref<SvcStatus | null>(null)
+const status = ref<ServiceStatus | null>(null)
+const statusError = ref('')
+let disposed = false
+let refreshGeneration = 0
 const restarting = ref(false)
+const confirming = ref(false)
 const pollSec = ref(0)
-const lastResult = ref<{ ok: boolean; old_pids?: number[]; new_alive?: boolean; error?: string } | null>(null)
+const lastResult = ref<{ ok: boolean; old_pids?: number[]; new_alive?: boolean; new_ready?: boolean; error?: string; warn?: string } | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
 
 async function refresh() {
+  const generation = ++refreshGeneration
   try {
     const r: any = await agentConfigService.serviceStatus()
-    status.value = (r?.data ?? r) as SvcStatus
-  } catch { status.value = null }
+    if (disposed || generation !== refreshGeneration) return
+    requireSuccess(r)
+    status.value = r.data
+    statusError.value = ''
+  } catch (e: any) { if (!disposed && generation === refreshGeneration) statusError.value = e?.message || '状态读取失败' }
 }
 
 function startCountdown() {
@@ -56,27 +65,31 @@ function stopCountdown() {
 }
 
 async function doRestart() {
+  if (disposed || restarting.value || confirming.value) return
+  confirming.value = true
   try {
     await ElMessageBox.confirm('重启会中断正在进行的查询，确认重启 agent 服务？', '确认重启', { type: 'warning' })
   } catch { return }
+  finally { confirming.value = false }
+  if (disposed) return
   restarting.value = true; lastResult.value = null
   startCountdown()
   try {
     const r: any = await agentConfigService.serviceRestart()
+    if (disposed) return
     lastResult.value = r
-    if (r?.ok && r?.new_alive) ElMessage.success('agent 服务已重启')
-    else if (r?.ok) ElMessage.warning('进程已启动但 health 未就绪——请看 agent 控制台日志')
+    if (r?.ok && r?.new_ready === true) ElMessage.success('agent 服务已重启并就绪')
+    else if (r?.new_alive) ElMessage.warning('服务可连接但尚未就绪——请看 agent 控制台日志')
     else ElMessage.error('重启失败：' + (r?.error || '未知'))
-  } catch (e: any) { ElMessage.error('重启请求失败：' + (e?.message || e)) }
+  } catch (e: any) { if (!disposed) ElMessage.error('重启请求失败：' + (e?.message || e)) }
   finally {
     stopCountdown()
-    restarting.value = false
-    await refresh()
+    if (!disposed) { restarting.value = false; await refresh() }
   }
 }
 
 onMounted(refresh)
-onUnmounted(stopCountdown)
+onUnmounted(() => { disposed = true; stopCountdown() })
 </script>
 
 <style scoped>

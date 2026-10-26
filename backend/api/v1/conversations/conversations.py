@@ -21,7 +21,8 @@ conversation_service = ConversationService()
 async def list_conversations(
     page: int = Query(default=1, ge=1, description="页码"),
     page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
-    status: Optional[str] = Query(None, description="状态过滤")
+    status: Optional[str] = Query(None, description="状态过滤"),
+    search: Optional[str] = Query(None, max_length=200, description="标题或会话ID搜索")
 ):
     """获取对话历史列表
 
@@ -31,7 +32,8 @@ async def list_conversations(
         result = conversation_service.list_conversations(
             page=page,
             page_size=page_size,
-            status=status
+            status=status,
+            search=search
         )
         return StandardResponse(
             success=True,

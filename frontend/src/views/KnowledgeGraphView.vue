@@ -1,12 +1,10 @@
 <template>
-  <div class="kg-page">
+  <PageShell title="知识图谱" subtitle="厂区、指标、模式与法规的关系地图" scroll="contained" class="kg-page">
+    <template #actions><el-button size="small" :loading="store.loading" @click="reloadGraph">刷新图谱</el-button></template>
+    <template #toolbar>
     <!-- 页面级顶部导航栏：左标题+副标题，中 tab，右搜索+图例开关+重置 -->
     <div class="kg-navbar">
       <div class="kg-navbar-left">
-        <div class="kg-navbar-title">
-          <span class="kg-navbar-name">知识图谱</span>
-          <span class="kg-navbar-sub">厂区 · 指标 · 违规模式 · 算子 · 法规 关系地图</span>
-        </div>
         <el-radio-group :model-value="store.activeTab" size="small" @update:model-value="store.setTab">
           <el-radio-button value="domain">领域知识</el-radio-button>
           <el-radio-button value="topology">服务拓扑</el-radio-button>
@@ -40,7 +38,9 @@
         </button>
       </div>
     </div>
+    </template>
 
+    <template #context>
     <!-- 统计条：紧贴导航栏下沿（tab 切换数字跟着走） -->
     <div class="kg-statbar" v-if="store.seeded">
       <div v-for="s in statTiles" :key="s.label" class="kg-stat">
@@ -49,16 +49,11 @@
       </div>
       <span class="kg-statbar-hint">节点大小 = 连接数 · 点击图例行显隐 · 拖拽缩放</span>
     </div>
+    </template>
 
     <!-- 加载失败（后端不可达等）——与"未初始化"分开，不给跑 seed 的错误指引 -->
-    <el-alert v-if="store.error && !store.seeded" type="error" :closable="false"
-              :title="`知识图谱加载失败：${store.error}`" />
-    <el-empty v-else-if="!store.loading && !store.seeded" description="知识图谱未初始化">
-      <template #image><el-icon :size="48"><Connection /></el-icon></template>
-      <p class="kg-hint">运行初始化：ecological_env\Scripts\python.exe shared\knowledge_graph\seed_importer.py</p>
-    </el-empty>
-
-    <div v-else class="kg-body">
+    <PageState :state="graphState" :preserve-content="store.seeded" :message="graphMessage" @retry="reloadGraph">
+    <div v-if="store.seeded" class="kg-body">
       <aside v-if="legendOpen" class="kg-legend">
         <div class="kg-panel-title">节点类型</div>
         <button v-for="(meta, t) in tabTypes" :key="t" type="button"
@@ -101,7 +96,9 @@
         </el-table>
       </div>
 
-      <div v-if="store.selectedNode || detailLoading" v-loading="detailLoading" class="kg-detail">
+      <component :is="narrowDetail ? ElDrawer : 'div'" v-if="store.selectedNodeId" :model-value="true"
+                 :with-header="false" size="min(420px, 100vw)" :class="narrowDetail ? 'kg-detail-drawer' : 'kg-detail'"
+                 @update:model-value="closeNode" @closed="onResize">
         <div class="kg-detail-head">
           <span class="kg-dot" :style="{ background: NODE_META[store.selectedNode?.type ?? '']?.color }" />
           <h3>{{ store.selectedNode?.label }}</h3>
@@ -111,8 +108,13 @@
                      @click="toggleCaseLink">
             {{ selectedCaseLinked ? '取消链路' : '🔗 高亮链路' }}
           </el-button>
-          <el-button text size="small" @click="store.clearSelection">关闭</el-button>
+          <el-button text size="small" @click="closeNode">关闭</el-button>
         </div>
+        <el-button v-if="store.selectedNodeNotFound" size="small" @click="openNode(store.selectedNodeId!)">重新查找节点</el-button>
+        <PageState :state="detailLoading ? 'initial-loading' : store.selectedNodeError ? 'error' : store.selectedNodeNotFound ? 'not-found' : 'ready'"
+                   :message="store.selectedNodeError || (store.selectedNodeNotFound ? `未找到节点：${store.selectedNodeId}` : undefined)"
+                   @retry="openNode(store.selectedNodeId!)">
+        <div v-if="store.selectedNode && !store.allNodes.some(n => n.id === store.selectedNodeId)" class="empty">节点详情已加载，但该节点不在当前图谱中，无法在画布高亮。</div>
         <el-descriptions v-if="store.selectedNode" :column="1" size="small" border>
           <el-descriptions-item v-for="(v, k) in basicProps" :key="k"
                                 :label="String(k)">{{ String(v) }}</el-descriptions-item>
@@ -134,15 +136,21 @@
           <button v-for="n in list" :key="n.id" type="button" class="kg-nb-chip"
                   @click="openNode(n.id)">{{ n.label }}</button>
         </div>
-      </div>
+        </PageState>
+      </component>
     </div>
-  </div>
+    </PageState>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Connection, Operation, RefreshRight } from '@element-plus/icons-vue'
+import { useAssistantContext } from '@/composables/useAssistantContext'
+import { Operation, RefreshRight } from '@element-plus/icons-vue'
+import { ElDrawer } from 'element-plus'
+import PageShell from '@/components/common/PageShell.vue'
+import PageState from '@/components/common/PageState.vue'
 import echarts from '@/lib/echarts'
 import {
   useKnowledgeStore, NODE_META, toEChartsSeries, impactNodeStyle,
@@ -150,6 +158,11 @@ import {
 import type { GraphLinkDatum } from '@/stores/knowledge'
 
 const store = useKnowledgeStore()
+const graphState = computed(() => store.loading ? (store.seeded ? 'refreshing' : 'initial-loading') : store.error ? (store.seeded ? 'stale' : 'error') : !store.seeded || !store.allNodes.length ? 'empty' : 'ready')
+const graphMessage = computed(() => store.error || (graphState.value === 'empty' ? '暂无图谱数据，请联系管理员核验知识库初始化状态' : undefined))
+const narrowDetail = ref(typeof window !== 'undefined' && window.innerWidth <= 1200)
+function closeNode() { store.clearSelection(); void nextTick(onResize) }
+async function reloadGraph() { await store.loadGraph(); await nextTick(); if (!disposed) renderChart() }
 const chartEl = ref<HTMLDivElement>()
 const renderError = ref(false)
 let chart: ReturnType<typeof echarts.init> | null = null
@@ -163,14 +176,16 @@ function onSearch(id: string) {
 }
 
 // 详情侧栏加载态（store.selectNode 不切换 store.loading，故页面自持）
-const detailLoading = ref(false)
+const detailLoading = computed(() => store.selectedNodeLoading)
+let disposed = false
 async function openNode(id: string) {
-  detailLoading.value = true
-  try {
-    await store.selectNode(id)
-  } finally {
-    detailLoading.value = false
-  }
+  if (disposed) return
+  await store.selectNode(id)
+  if (disposed || store.selectedNodeId !== id || !store.selectedNode) return
+  const type = store.selectedNode.type
+  const tabs = NODE_META[type]?.tab
+  if (tabs?.length && !tabs.includes(store.activeTab)) store.setTab(tabs[0])
+  if (store.hiddenTypes.includes(type)) store.toggleType(type)
 }
 
 // 案例链路入口A按钮：当前选中的 case 是否正是高亮链路的起点
@@ -228,9 +243,9 @@ const paramRows = computed(() => {
 })
 
 function renderChart() {
-  if (!chartEl.value || !store.seeded) return
+  if (disposed || !chartEl.value || !store.seeded) return
   try {
-    if (!chart) chart = echarts.init(chartEl.value)
+    if (!chart) { chart = echarts.init(chartEl.value); chart.on('click', onNodeClick) }
     const series = toEChartsSeries(store.allNodes, store.allEdges, store.visibleTypes)
 
     // ── 推演/链路/健康着色叠加（视图层，不进 store 纯映射）──
@@ -354,7 +369,7 @@ function onNodeClick(params: any) {
   if (store.impactMode) store.runImpact(params.data.id)
   else openNode(params.data.id)
 }
-function onResize() { chart?.resize() }
+function onResize() { narrowDetail.value = window.innerWidth <= 1200; void nextTick(() => chart?.resize()) }
 
 // 推演摘要条：波及名单前 3（多则省略号）
 const impactDownLabels = computed(() => {
@@ -366,29 +381,30 @@ const impactDownLabels = computed(() => {
 // 服务健康 60s 慢轮询句柄（后端探测自带 10s 缓存，页面分钟级足够）
 let healthTimer: ReturnType<typeof setInterval> | null = null
 const route = useRoute()
+useAssistantContext(() => ({ pageId: 'graph', objectId: store.selectedNodeId || null, source: '知识图谱接口', filters: { tab: store.activeTab }, status: store.loading ? 'loading' : store.error ? 'error' : store.allNodes.length ? 'ready' : 'empty', actions: ['navigate', 'graph.focus'] }), async action => {
+  if (action.capability !== 'graph.focus') return { success: false, message: '图谱页不支持该操作' }
+  const id = String(action.parameters.nodeId)
+  await openNode(id)
+  const success = store.selectedNodeId === id && store.selectedNode?.id === id
+  return { success, message: success ? `已定位节点 ${id}` : '节点不存在或加载失败' }
+})
 
 onMounted(async () => {
+  window.addEventListener('resize', onResize)
   await store.loadGraph()
   await nextTick()
+  if (disposed) return
   renderChart()
-  chart?.on('click', onNodeClick)
-  window.addEventListener('resize', onResize)
   healthTimer = setInterval(() => { store.refreshHealth().catch(() => {}) }, 60_000)
-  // focus query：?focus=<node_id> 直开详情侧栏（事件中心等外链深入口）。
-  // 审查 Issue B：上次停在服务拓扑 tab 时跳 focus（case 等领域类型节点不在拓扑
-  // visibleTypes 里）→ 详情开了画布看不见节点；先切回领域 tab 再开详情
-  const focus = typeof route.query.focus === 'string' ? route.query.focus : ''
-  if (focus) {
-    const nodeType = focus.split(':')[0]
-    const domainPrefixes = ['case', 'plant', 'indicator', 'violation_pattern',
-      'operator', 'regulation', 'knowledge_doc', 'category', 'library']
-    if (store.activeTab === 'topology' && domainPrefixes.includes(nodeType)) {
-      store.setTab('domain')
-    }
-    openNode(focus)
-  }
 })
+watch(() => route.query.focus, focus => {
+  if (disposed) return
+  if (typeof focus === 'string' && focus.trim()) void openNode(focus)
+  else store.clearSelection()
+}, { immediate: true })
 onBeforeUnmount(() => {
+  disposed = true
+  store.clearSelection()
   window.removeEventListener('resize', onResize)
   if (healthTimer) clearInterval(healthTimer)
   if (centerTimer) clearTimeout(centerTimer)
@@ -403,11 +419,19 @@ watch([() => store.visibleTypes, () => store.allNodes, () => store.impactResult,
   () => nextTick(renderChart))
 
 // 详情侧栏出现/消失使图区宽度变化 → resize，否则 canvas 按旧宽度溢出、盖住侧栏拦截点击
-watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
+watch([() => !!store.selectedNodeId, narrowDetail, legendOpen], () => nextTick(() => chart?.resize()))
+
+// A reload can remove the canvas entirely. Never reuse an instance bound to its old DOM.
+watch(chartEl, element => {
+  if (centerTimer) { clearTimeout(centerTimer); centerTimer = null }
+  chart?.dispose()
+  chart = null
+  if (element && !disposed) renderChart()
+}, { flush: 'post' })
 </script>
 
 <style scoped>
-.kg-page { padding: 16px 20px; height: 100%; display: flex; flex-direction: column; gap: 12px; }
+.kg-page { min-height: 0 }
 
 /* ── 页面级顶部导航栏 ── */
 .kg-navbar {
@@ -418,6 +442,9 @@ watch(() => store.selectedNode, () => nextTick(() => chart?.resize()))
   box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,.06));
   padding: 12px 16px;
 }
+.kg-navbar { flex-wrap: wrap }
+.kg-navbar-right { flex-wrap: wrap }
+@media (max-width: 1200px) { .kg-search { width: 160px } .kg-statbar-hint { display: none } .kg-legend { width: 130px; overflow-y: auto } }
 .kg-navbar-left { display: flex; align-items: center; gap: 18px; min-width: 0; }
 .kg-navbar-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .kg-navbar-name { font-size: 17px; font-weight: 700; color: var(--text-primary, #1e293b); line-height: 1.2; }

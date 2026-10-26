@@ -1,0 +1,4 @@
+<template><div class="master-detail"><section class="master-detail__master"><div class="master-detail__list"><slot name="list" /></div><footer v-if="$slots.pagination"><slot name="pagination" /></footer></section><section class="master-detail__detail"><slot name="detail"><slot /></slot></section></div></template>
+<style scoped>
+.master-detail{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:16px;flex:1;height:100%;min-height:0;min-width:0}.master-detail__master{display:flex;flex-direction:column;min-height:0;min-width:0}.master-detail__list{overflow:auto;flex:1;min-height:0}.master-detail__detail{overflow:auto;min-height:0;min-width:0}footer{flex-shrink:0;padding-top:12px}@media(max-width:760px){.master-detail{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(180px,40%) minmax(200px,1fr)}}
+</style>

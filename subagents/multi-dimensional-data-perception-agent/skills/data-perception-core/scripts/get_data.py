@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""通用数据获取脚本 - 从 InfluxDB 取真实监测数据(2026 真实报表)。
+"""按监测点和采样时间窗口获取 InfluxDB 监测记录。
 
-数据源: InfluxDB ``monitoring-data`` bucket (measurement=wastewater)
-  - 进水 data_type=influent / 出水 data_type=effluent
-  - 由 shared/data/import_to_influxdb.py 从 real-time/*.xls 真实报表导入
-  (当阳市金桥污水处理厂, 2026-01-01 ~ 07-25 逐小时)
-
-接口与输出格式与旧 CSV 版完全一致(NH3-N/flow_rate/discharge_volume/SS 字段名不变),
-下游异常检测/规则推理零改动。
+来源及新鲜度由共享 source_context 契约描述；旧 monitoring-data 来源未核实。
+保留 NH3-N/flow_rate/discharge_volume/SS 字段及下游快照格式。
 
 使用方法:
     python get_data.py --hours 24
@@ -29,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
 
 import pandas as pd
 from influxdb_client import InfluxDBClient
+from shared.data.source_context import sampling_timestamp, describe_data_context
 
 _MEASUREMENT = "wastewater"
 
@@ -53,7 +49,7 @@ def assess_data_freshness(influent, effluent, *, requested_relative,
     timestamps = []
     for row in [*(influent or []), *(effluent or [])]:
         if row.get("timestamp"):
-            timestamps.append(pd.Timestamp(row["timestamp"]))
+            timestamps.append(sampling_timestamp(row["timestamp"]))
     mode = "relative" if requested_relative else "historical"
     if not timestamps:
         return {
@@ -64,7 +60,7 @@ def assess_data_freshness(influent, effluent, *, requested_relative,
     start, end = min(timestamps), max(timestamps)
     source_tz = ZoneInfo(os.environ.get("DATA_TIMEZONE", "Asia/Shanghai"))
     current = pd.Timestamp(now or datetime.now(source_tz))
-    timestamp_tz = current.tzinfo or source_tz
+    timestamp_tz = source_tz
     if start.tzinfo is None:
         start = start.tz_localize(timestamp_tz)
     if end.tzinfo is None:
@@ -106,9 +102,11 @@ def _load_env() -> None:
 def _fetch_df(client, bucket: str, data_type: str, plant: str | None = None) -> pd.DataFrame:
     """查一侧数据(委托共享模块)+ 重命名为旧 CSV 键名,下游零改动。
 
-    plant: 厂(监测点)过滤——多厂库必传,不传=全库混合(单厂遗留)。
+    plant: 厂(监测点)过滤，必须明确指定，防止跨厂混合。
     """
     from shared.data.influxdb_query import fetch_wastewater_df, CANONICAL_FIELDS
+    if not plant:
+        raise ValueError("必须指定 --plant，禁止混合多个监测点")
     df = fetch_wastewater_df(client, bucket, data_type, CANONICAL_FIELDS, plant_id=plant)
     return df.rename(columns=_FIELD_RENAME)
 
@@ -134,9 +132,28 @@ def _df_to_records(df: pd.DataFrame) -> list:
 
 
 def get_data_by_hours(client, bucket, data_type, hours_back=24, plant=None):
-    """最近 N 小时(按数据集最新时间往回取 N 条,1 条/小时)。"""
-    df = _fetch_df(client, bucket, data_type, plant)
-    return _df_to_records(df.tail(hours_back))
+    rows_in, rows_out, _ = get_data_window(client, bucket, plant, hours_back=hours_back)
+    return rows_in if data_type == "influent" else rows_out
+
+
+def get_data_window(client, bucket, plant, *, hours_back=24, start=None, end=None):
+    """Use one elapsed window anchored to the latest sample on either side."""
+    frames = [_fetch_df(client, bucket, side, plant) for side in ("influent", "effluent")]
+    latest = max((df.index.max() for df in frames if not df.empty), default=None)
+    if start is not None and end is not None:
+        left = sampling_timestamp(start).tz_localize(None)
+        right = sampling_timestamp(end).tz_localize(None)
+        if len(str(end).strip()) == 10:
+            right += pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)
+    elif latest is not None:
+        from backend.services.monitoring_data_loader import parse_window_endpoints
+        left, right = parse_window_endpoints(latest, f"{hours_back}h")
+    else:
+        return [], [], (None, None)
+    if left > right:
+        raise ValueError("开始时间不能晚于结束时间")
+    selected = [df.loc[(df.index >= left) & (df.index <= right)] if not df.empty else df for df in frames]
+    return *[_df_to_records(df) for df in selected], (left, right)
 
 
 def get_data_by_range(client, bucket, data_type, start_time, end_time, plant=None):
@@ -144,12 +161,12 @@ def get_data_by_range(client, bucket, data_type, start_time, end_time, plant=Non
     df = _fetch_df(client, bucket, data_type, plant)
     if df.empty:
         return []
-    start_dt = pd.to_datetime(start_time)
-    end_dt = pd.to_datetime(end_time)
+    start_dt = sampling_timestamp(start_time).tz_localize(None)
+    end_dt = sampling_timestamp(end_time).tz_localize(None)
     # --end 只给日期（如 "2026-07-15"）时 pd.to_datetime 解析为 00:00:00，会漏掉当天
     # 01:00~23:00 的数据。检测到 end 是午夜（00:00:00）就补到 23:59:59，覆盖整天。
-    if end_dt == end_dt.normalize():
-        end_dt = end_dt + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    if len(str(end_time).strip()) == 10:
+        end_dt = end_dt + pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)
     mask = (df.index >= start_dt) & (df.index <= end_dt)
     return _df_to_records(df.loc[mask])
 
@@ -159,21 +176,21 @@ def _compute_missing_points(records, use_range, start, end, hours_back):
 
     数据感知只标记缺失(客观事实),不补齐(缺失是异常信号,交下游)。
     """
-    if not records:
-        return []
-    timestamps = [r.get("timestamp") for r in records if r.get("timestamp")]
-    if not timestamps:
+    timestamps = [r.get("timestamp") for r in (records or []) if r.get("timestamp")]
+    if not timestamps and not (use_range and start is not None and end is not None):
         return []
     ts = pd.to_datetime(timestamps)
     actual = set(ts)
-    if use_range and start and end:
-        start_dt = pd.to_datetime(start)
-        end_dt = pd.to_datetime(end)
-        expected = pd.date_range(start_dt, end_dt, freq="H")
+    if use_range and start is not None and end is not None:
+        start_dt = sampling_timestamp(start).tz_localize(None)
+        end_dt = sampling_timestamp(end).tz_localize(None)
+        if len(str(end).strip()) == 10:
+            end_dt += pd.Timedelta(days=1) - pd.Timedelta(nanoseconds=1)
+        expected = pd.date_range(start_dt, end_dt, freq="h")
     else:
         latest = ts.max()
         expected = pd.date_range(latest - pd.Timedelta(hours=max(hours_back - 1, 0)),
-                                 latest, freq="H")
+                                 latest, freq="h")
     missing = [t for t in expected if t not in actual]
     return [t.strftime("%Y-%m-%d %H:%M:%S") for t in missing]
 
@@ -201,6 +218,10 @@ def main():
     chart_inds = ([x.strip() for x in args.chart_indicators.split(",") if x.strip()]
                   if args.chart_indicators else None)
     plant = args.plant.strip() or None
+    if not plant:
+        parser.error("必须指定 --plant，禁止跨厂混合")
+    if bool(args.start) != bool(args.end):
+        parser.error("--start 和 --end 必须同时指定")
 
     task_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     hours_back = args.hours or (args.days * 24 if args.days else 24)
@@ -208,17 +229,13 @@ def main():
 
     client = InfluxDBClient(url=url, token=token, org=org, timeout=30_000)
 
-    def _get(data_type):
-        if use_range:
-            return get_data_by_range(client, bucket, data_type, args.start, args.end, plant)
-        return get_data_by_hours(client, bucket, data_type, hours_back, plant)
-
     label = f"{args.start} 至 {args.end}" if use_range else f"最近{hours_back}小时"
     if plant:
         label = f"{plant} {label}"
     print(f"获取 {label} 的数据 (InfluxDB bucket={bucket}) ...")
-    influent_data = _get("influent")
-    effluent_data = _get("effluent")
+    influent_data, effluent_data, bounds = get_data_window(
+        client, bucket, plant, hours_back=hours_back,
+        start=args.start if use_range else None, end=args.end if use_range else None)
     client.close()
     freshness = assess_data_freshness(
         influent_data, effluent_data, requested_relative=not use_range,
@@ -242,10 +259,16 @@ def main():
                 "hrt_hours": _HRT_HOURS,
                 "missing_points": _compute_missing_points(
                     influent_data or effluent_data or [],
-                    use_range, args.start if use_range else None,
-                    args.end if use_range else None, hours_back),
+                    True, bounds[0], bounds[1], hours_back),
+                "missing_points_by_side": {
+                    "influent": _compute_missing_points(influent_data, True, *bounds, hours_back),
+                    "effluent": _compute_missing_points(effluent_data, True, *bounds, hours_back)},
                 "data_source": "influxdb",
                 "freshness": freshness,
+                "sampling_range": {"start": freshness["actual_start"], "end": freshness["actual_end"]},
+                "query_window": {"start": sampling_timestamp(bounds[0]).isoformat() if bounds[0] is not None else None,
+                                 "end": sampling_timestamp(bounds[1]).isoformat() if bounds[1] is not None else None},
+                "data_context": describe_data_context(bucket, freshness["actual_end"]),
             },
         },
         "metadata": {
@@ -288,6 +311,8 @@ def main():
                     out[k] = {"min": round(min(vs), 2), "max": round(max(vs), 2), "mean": round(sum(vs)/len(vs), 2), "n": len(vs)}
             return out
         plants[pid] = {
+            "status": result["status"],
+            "metadata": result["result"]["metadata"].copy(),
             "plant": pid,
             "time_range": label,
             "influent": _stats(influent_data),

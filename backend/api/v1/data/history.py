@@ -17,14 +17,15 @@ async def query_history_data(
     indicators: Optional[str] = Query(None, description="指标列表（逗号分隔）"),
     aggregation: str = Query(default="raw", description="聚合方式（raw, hourly, daily）"),
     page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=50, ge=1, le=500, description="每页数量")
+    page_size: int = Query(default=50, ge=1, le=500, description="每页数量"),
+    plant_id: str = Query(..., min_length=1, description='必须指定厂区，禁止跨厂混算')
 ):
     """查询历史监测数据
 
     支持按时间范围、指标、聚合方式查询历史监测数据。
     """
     try:
-        data = data_service.query_history_data(
+        data = DataService(plant_id).query_history_data(
             time_range=time_range,
             indicators=indicators,
             aggregation=aggregation,
@@ -54,14 +55,15 @@ async def query_history_data(
 @router.get("/data/aggregated", response_model=StandardResponse)
 async def get_aggregated_data(
     period: str = Query(default="daily", description="统计周期"),
-    metrics: str = Query(default="avg,max,min", description="统计指标（逗号分隔）")
+    metrics: str = Query(default="avg,max,min", description="统计指标（逗号分隔）"),
+    plant_id: str = Query(..., min_length=1)
 ):
     """获取聚合统计数据
 
     返回指定时间周期的聚合统计数据，如平均值、最大值、最小值等。
     """
     try:
-        data = data_service.get_aggregated_data(period, metrics)
+        data = DataService(plant_id).get_aggregated_data(period, metrics)
         return StandardResponse(
             success=True,
             data=data

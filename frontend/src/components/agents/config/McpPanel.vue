@@ -63,7 +63,7 @@
       <button class="btn primary" @click="$emit('restart')">一键重启 agent</button>
     </div>
 
-    <div v-if="showAdd" class="mp-mask" @click.self="showAdd = false">
+    <div v-if="showAdd" class="mp-mask" @click.self="closeAdd">
       <div class="mp-modal">
         <div class="mp-mh">新增 MCP 接入</div>
         <div class="mp-mrow"><label>名称</label><input v-model="addForm.name" class="mp-in" placeholder="my-server" /></div>
@@ -84,8 +84,8 @@
         <div class="mp-mrow"><label>超时(秒)</label><input v-model.number="addForm.timeout" type="number" class="mp-in" /></div>
         <div class="mp-mf">
           <button class="btn" @click="testAdd">测试连接</button>
-          <button class="btn" @click="showAdd = false">取消</button>
-          <button class="btn primary" @click="add" :disabled="!addForm.name || testedAdd !== true">保存（需测试通过）</button>
+          <button class="btn" @click="closeAdd">取消</button>
+          <button class="btn primary" @click="add" :disabled="adding || !addForm.name || testedAdd !== true">保存（需测试通过）</button>
         </div>
         <div v-if="lastAddTest" class="mp-test" :class="lastAddTest.ok ? 'ok' : 'bad'">
           {{ lastAddTest.ok ? `✓ 握手成功，发现 ${lastAddTest.tools_seen} 工具` : `✗ ${lastAddTest.error}` }}
@@ -96,9 +96,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentConfigService, type McpServerCfg, type McpPreset, type McpMarketItem } from '@/api/modules/agentConfig'
+import { requireSuccess } from '@/composables/useConfigDraft'
 
 defineEmits<{ (e: 'restart'): void }>()
 
@@ -110,6 +111,17 @@ const showAdd = ref(false)
 const addForm = ref({ name: '', transport: 'stdio', command: 'npx', argsStr: '', url: '', timeout: 60 })
 const testedAdd = ref<null | boolean>(null)
 const lastAddTest = ref<{ ok: boolean; tools_seen?: number; error?: string | null } | null>(null)
+const addBaseline = ref(JSON.stringify(addForm.value))
+const adding = ref(false)
+const dirty = computed(() => adding.value || (showAdd.value && JSON.stringify(addForm.value) !== addBaseline.value))
+defineExpose({ dirty })
+watch(addForm, () => { testedAdd.value = null; lastAddTest.value = null }, { deep: true, flush: 'sync' })
+function closeAdd() {
+  if (adding.value || (dirty.value && !window.confirm('有未保存的 MCP 编辑，确定丢弃？'))) return
+  showAdd.value = false
+  addForm.value = { name: '', transport: 'stdio', command: 'npx', argsStr: '', url: '', timeout: 60 }
+  addBaseline.value = JSON.stringify(addForm.value)
+}
 
 // ── 市场 ──
 const marketQuery = ref('')
@@ -122,6 +134,7 @@ const installedPkgs = ref(new Set<string>())
 
 async function reloadServers() {
   const r: any = await agentConfigService.getMcp()
+  requireSuccess(r)
   const d = r.data ?? r
   servers.value = d.servers
   // 已安装包名集合（args 里含该包名的即视为已装）
@@ -155,7 +168,7 @@ async function installFromMarket(m: McpMarketItem) {
   } finally { mkInstalling.value = '' }
 }
 
-onMounted(reloadServers)
+onMounted(() => reloadServers().catch(e => ElMessage.error('MCP 读取失败：' + e.message)))
 
 function buildCfg(): McpServerCfg {
   const f = addForm.value
@@ -182,7 +195,7 @@ async function testCfg(cfg: McpServerCfg, name: string) {
 
 async function installPreset(name: string) {
   try {
-    await agentConfigService.installMcpPreset(name)
+    requireSuccess(await agentConfigService.installMcpPreset(name))
     ElMessage.success(`已安装 ${name}（需重启生效）`)
     const r: any = await agentConfigService.getMcp()
     servers.value = (r.data ?? r).servers
@@ -192,42 +205,48 @@ async function installPreset(name: string) {
 async function toggleEnabled(name: string, cfg: McpServerCfg) {
   const next = { ...cfg, enabled: cfg.enabled === false }
   try {
-    await agentConfigService.putMcp({ name, config: next })
+    requireSuccess(await agentConfigService.putMcp({ name, config: next }))
     servers.value[name] = next
-    ElMessage.success(next.enabled === false ? '已停用（重启后不加载）' : '已启用')
+    ElMessage.success('启停配置已保存，需重启加载')
   } catch (e: any) { ElMessage.error('操作失败：' + (e?.message || e)) }
 }
 
 async function del(name: string) {
   try {
     await ElMessageBox.confirm(`删除 MCP 接入 ${name}？`, '删除', { type: 'warning' })
-    await agentConfigService.deleteMcp(name)
+    requireSuccess(await agentConfigService.deleteMcp(name))
     delete servers.value[name]
     ElMessage.success('已删除（需重启生效）')
   } catch (e: any) { if (e !== 'cancel') ElMessage.error('删除失败：' + (e?.message || e)) }
 }
 
 async function testAdd() {
+  const captured = JSON.stringify(addForm.value)
   lastAddTest.value = null; testedAdd.value = null
   try {
     const r: any = await agentConfigService.testMcp(buildCfg())
+    if (captured !== JSON.stringify(addForm.value)) return
     lastAddTest.value = r
     testedAdd.value = r.ok
   } catch (e: any) { lastAddTest.value = { ok: false, error: e?.message || String(e) } }
 }
 
 async function add() {
+  if (adding.value || testedAdd.value !== true) return
+  const captured = JSON.stringify(addForm.value)
+  adding.value = true
   try {
-    await agentConfigService.putMcp({ name: addForm.value.name, config: buildCfg() })
+    requireSuccess(await agentConfigService.putMcp({ name: addForm.value.name, config: buildCfg() }))
     ElMessage.success('已保存（需重启生效）')
-    showAdd.value = false
+    addBaseline.value = captured
+    if (JSON.stringify(addForm.value) === captured) showAdd.value = false
     testedAdd.value = null; lastAddTest.value = null
     const r: any = await agentConfigService.getMcp()
     servers.value = (r.data ?? r).servers
   } catch (e: any) {
     const errs = e?.response?.data?.detail?.errors
     ElMessage.error('保存失败：' + (errs?.join('；') || e?.message || e))
-  }
+  } finally { adding.value = false }
 }
 </script>
 

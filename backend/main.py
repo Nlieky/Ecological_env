@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 from backend.exceptions import BackendException
 from backend.api.routes import health, query, logs, realtime, events, tracing
+from backend.api.routes import assistant
 from backend.api.v1 import data as v1_data
 from backend.api.v1 import conversations as v1_conversations
 from backend.core.config import settings
@@ -124,6 +125,15 @@ app.include_router(logs.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(tracing.router, prefix="/api")
+app.include_router(assistant.router, prefix="/api")
+
+
+@app.on_event("startup")
+async def _initialize_assistant_tables():
+    from backend.database.base import engine
+    from backend.models.assistant_event import AssistantEventProposal, AssistantEventOperation
+    AssistantEventProposal.__table__.create(bind=engine, checkfirst=True)
+    AssistantEventOperation.__table__.create(bind=engine, checkfirst=True)
 
 # 注册v1路由
 app.include_router(v1_data.realtime.router, prefix="/api/v1")

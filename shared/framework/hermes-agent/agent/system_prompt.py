@@ -110,7 +110,8 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
             _id_path = _Path(_os.environ["HERMES_HOME"])
         if _id_path:
             from shared.framework.hermes_agent.agent.identity_loader import load_identity_files_from_path
-            _id_content = load_identity_files_from_path(_id_path)
+            _id_content = load_identity_files_from_path(
+                _id_path, filenames=getattr(agent, '_identity_filenames', None))
             if _id_content:
                 stable_parts.append(_id_content)
     except Exception:

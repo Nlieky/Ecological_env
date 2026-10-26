@@ -26,10 +26,10 @@ class DataService:
     与历史 mock 版本保持一致，仅数据来源改为真实监测数据。
     """
 
-    def __init__(self):
+    def __init__(self, plant_id=None):
         # 保留 data_dir 以向后兼容；真实数据目录由 loader 单例管理
         self.data_dir = Path(__file__).parent.parent.parent / "data"
-        self._loader = get_monitoring_data()
+        self._loader = get_monitoring_data(plant_id) if plant_id else get_monitoring_data()
 
     # ---------- 内部辅助 ----------
 
@@ -42,18 +42,25 @@ class DataService:
             f = float(v)
         except (TypeError, ValueError):
             return None
-        if pd.isna(f):
+        if pd.isna(f) or f in (float('inf'), -float('inf')):
             return None
         return round(f, 4)
 
     @staticmethod
     def _iso_z(ts: pd.Timestamp) -> str:
         """ISO 8601 时间戳并以 ``Z`` 标注 UTC（满足 RealtimeDataResponse 时区校验）。"""
-        return ts.isoformat() + "Z"
+        from shared.data.source_context import sampling_timestamp
+        return sampling_timestamp(ts).tz_convert('UTC').isoformat().replace('+00:00', 'Z')
 
     def _metrics(self, row: pd.Series) -> Dict[str, Optional[float]]:
         """从一行数据提取响应指标 {pH, COD, TN, TP}。"""
         return {c: self._round_or_none(row[c]) for c in RESPONSE_INDICATORS if c in row.index}
+
+    def _context(self):
+        from shared.data.source_context import describe_data_context
+        context = describe_data_context(getattr(self._loader, '_bucket', 'csv-unverified'), self._loader.latest_timestamp)
+        context['plant_id'] = getattr(self._loader, '_plant_id', None)
+        return context
 
     # ---------- 查询方法 ----------
 
@@ -65,11 +72,11 @@ class DataService:
         effluent = loader.effluent()
         latest = loader.latest_timestamp
 
-        in_row = influent.iloc[-1]
-        out_row = effluent.iloc[-1]
+        in_row = influent.ffill().iloc[-1] if not influent.empty else pd.Series(dtype=float)
+        out_row = effluent.ffill().iloc[-1] if not effluent.empty else pd.Series(dtype=float)
 
         # 流量取进水最新非缺失值
-        flow_series = influent["flow"].dropna()
+        flow_series = influent.get('flow', pd.Series(dtype=float)).dropna()
         flow_rate = self._round_or_none(flow_series.iloc[-1]) if len(flow_series) else None
 
         # 质量评分基于最近 24h
@@ -82,8 +89,9 @@ class DataService:
             "timestamp": self._iso_z(latest),
             "influent": self._metrics(in_row),
             "effluent": self._metrics(out_row),
-            "flow_rate": flow_rate if flow_rate is not None else 0.0,
+            "flow_rate": flow_rate,
             "quality_score": quality_score,
+            'data_context': self._context(),
         }
 
     def get_data_quality(self, time_range: str = "24h") -> Dict[str, Any]:
@@ -114,6 +122,7 @@ class DataService:
             "missing_data_count": missing,
             "anomaly_count": anomaly_count,
             "last_update": self._iso_z(loader.latest_timestamp),
+            'data_context': self._context(),
         }
 
     def query_history_data(self, time_range: str = "24h",
@@ -136,18 +145,18 @@ class DataService:
         # 聚合：hourly/daily 取均值，raw 不聚合
         rule = {"hourly": "1H", "daily": "1D"}.get(aggregation)
         if rule:
-            agg_inf = win_inf[ind_inf].resample(rule).mean()
-            agg_eff = win_eff[ind_eff].resample(rule).mean()
+            agg_inf = win_inf[ind_inf].resample(rule).mean() if not win_inf.empty else win_inf[ind_inf]
+            agg_eff = win_eff[ind_eff].resample(rule).mean() if not win_eff.empty else win_eff[ind_eff]
         else:
             agg_inf = win_inf[ind_inf]
             agg_eff = win_eff[ind_eff]
 
         # 按时间戳合并进水/出水
         records = []
-        for ts in agg_inf.index:
+        for ts in agg_inf.index.union(agg_eff.index).sort_values():
             rec: Dict[str, Any] = {
                 "timestamp": self._iso_z(ts),
-                "influent": {c: self._round_or_none(agg_inf.loc[ts, c]) for c in ind_inf},
+                "influent": {c: self._round_or_none(agg_inf.loc[ts, c]) for c in ind_inf} if ts in agg_inf.index else {},
                 "effluent": {},
             }
             if ts in agg_eff.index:
@@ -158,7 +167,7 @@ class DataService:
 
         # 分页（夹紧到合法区间）
         page = max(1, page)
-        page_size = max(1, min(100, page_size))
+        page_size = max(1, min(500, page_size))
         total_count = len(records)
         lo, hi = (page - 1) * page_size, (page - 1) * page_size + page_size
 
@@ -178,6 +187,7 @@ class DataService:
             "page": page,
             "page_size": page_size,
             "timestamp": self._iso_z(loader.latest_timestamp),
+            'data_context': self._context(),
         }
 
     def get_aggregated_data(self, period: str = "daily",
@@ -205,8 +215,15 @@ class DataService:
         func_list = [fn for _, fn in funcs]
 
         def _aggregate(df: pd.DataFrame) -> Dict[str, Dict[str, Optional[float]]]:
+            if df.empty:
+                return {}
             sub = df[[c for c in ind if c in df.columns]]
             res = sub.resample(rule).agg(func_list) if func_list else sub.resample(rule).mean()
+            if 'sum' in func_list:
+                # pandas sum defaults to zero for empty/all-missing buckets.
+                counts = sub.resample(rule).count()
+                for column in sub.columns:
+                    res[(column, 'sum')] = res[(column, 'sum')].where(counts[column] > 0)
             out: Dict[str, Dict[str, Optional[float]]] = {}
             for ts in res.index:
                 bucket: Dict[str, Optional[float]] = {}
@@ -225,6 +242,7 @@ class DataService:
 
         return {
             "period": period,
+            'data_context': self._context(),
             "metrics": [label for label, _ in funcs],
             "data": {
                 "influent": _aggregate(loader.influent()),

@@ -26,15 +26,17 @@ def discover_plants() -> List[Dict]:
     返回: [{"plant_id": str, "data_types": ["influent",...],
             "latest_time": str, "point_count": int}]
     """
-    from shared.data.influxdb_query import get_client_and_bucket
+    from shared.data.influxdb_query import get_client_and_bucket, source_filter
+    import json
     client, bucket = get_client_and_bucket()
     flux = (
-        f'from(bucket: "{bucket}") '
+        f'from(bucket: {json.dumps(bucket)}) '
         f'|> range(start: 0) '
-        f'|> filter(fn: (r) => r._measurement == "wastewater") '
-        f'|> group(columns: ["plant_id", "data_type"]) '
+        f'|> filter(fn: (r) => r._measurement == "wastewater"{source_filter(bucket)}) '
         f'|> last() '
         f'|> keep(columns: ["plant_id", "data_type", "_time"])'
+        f'|> group(columns: ["plant_id", "data_type"]) '
+        f'|> sort(columns: ["_time"]) |> last(column: "_time") '
     )
     try:
         tables = client.query_api().query(flux)

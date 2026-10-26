@@ -9,12 +9,13 @@
 measurement=wastewater,tags=data_type(influent/effluent)+plant_id,
 fields=pH/COD/TN/AN/TP/flow/discharge/suspended_solids(+各 *_mass)。
 
-时区:导入时按 UTC 写入(naive 视作 UTC);此处读出后转回 naive Timestamp,
-与 CSV loader 的 ``latest_timestamp`` 语义一致(供 data_service ``_iso_z`` 拼 ``Z``)。
+时区:报表时间按 DATA_TIMEZONE 解释后以 UTC 存储；共享查询读回本地 naive
+采样时间，API 输出时显式转 UTC 或携带本地时区 metadata。缓存每15秒刷新。
 """
 from __future__ import annotations
 
 import threading
+import time
 from typing import List, Optional
 
 import pandas as pd
@@ -32,11 +33,14 @@ _MEASUREMENT = "wastewater"
 class InfluxDBMonitoringDataset:
     """从 InfluxDB 读监测数据,鸭子兼容 :class:`MonitoringDataset`。
 
-    数据为静态导入;首次访问时全量查询并缓存(无 mtime 概念,``maybe_reload`` 不重载)。
+    按厂区查询；短期缓存到期后重新加载，不能把首次导入永久缓存。
     """
 
-    def __init__(self, url: str, token: str, org: str, bucket: str):
+    def __init__(self, url: str, token: str, org: str, bucket: str, plant_id: str | None = None):
         self._bucket = bucket
+        self._plant_id = plant_id
+        self._loaded_at = None
+        self._cache_ttl = 15.0
         self._client = InfluxDBClient(url=url, token=token, org=org, timeout=30_000)
         self._query_api = self._client.query_api()
         self._in: Optional[pd.DataFrame] = None
@@ -48,13 +52,15 @@ class InfluxDBMonitoringDataset:
     def _fetch(self, data_type: str, fields: List[str]) -> pd.DataFrame:
         """查一侧数据(委托 shared.data.influxdb_query,避免查询逻辑重复)。"""
         from shared.data.influxdb_query import fetch_wastewater_df
-        return fetch_wastewater_df(self._client, self._bucket, data_type, fields)
+        if not self._plant_id:
+            raise DataUnavailableException('多厂区查询必须指定 plant_id，禁止混合厂区数据')
+        return fetch_wastewater_df(self._client, self._bucket, data_type, fields, plant_id=self._plant_id)
 
     def _load(self) -> None:
-        if self._in is not None and self._out is not None:
+        if self._loaded_at is not None and time.monotonic() - self._loaded_at < self._cache_ttl:
             return
         with self._lock:
-            if self._in is not None and self._out is not None:
+            if self._loaded_at is not None and time.monotonic() - self._loaded_at < self._cache_ttl:
                 return
             in_df = self._fetch("influent", INFLUENT_FIELDS)
             out_df = self._fetch("effluent", EFFLUENT_FIELDS)
@@ -65,17 +71,18 @@ class InfluxDBMonitoringDataset:
                 )
             self._in = in_df
             self._out = out_df
+            self._loaded_at = time.monotonic()
 
     # ---------- 契约接口(与 MonitoringDataset 一致)----------
 
     def maybe_reload(self) -> None:
-        """数据静态导入;首次访问触发加载,之后不重载(与 CSV 版按 mtime 重载不同)。"""
+        """Refresh the plant-scoped snapshot when the TTL expires."""
         self._load()
 
     @property
     def latest_timestamp(self) -> pd.Timestamp:
         self._load()
-        return max(self._in.index.max(), self._out.index.max())
+        return max(df.index.max() for df in (self._in, self._out) if not df.empty)
 
     def influent(self) -> pd.DataFrame:
         self._load()
@@ -95,4 +102,4 @@ class InfluxDBMonitoringDataset:
 
         df = self.influent() if side == "influent" else self.effluent()
         start, end = parse_window_endpoints(self.latest_timestamp, time_range)
-        return df.loc[start:end]
+        return df.loc[start:end] if not df.empty else df

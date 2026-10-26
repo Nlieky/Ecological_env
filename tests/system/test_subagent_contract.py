@@ -85,6 +85,8 @@ def test_compact_result_exposes_stale_warning_to_master():
             "effluent": [],
             "metadata": {
                 "time_range": "最近24小时",
+                "data_context": {"origin": "real", "mode": "historical"},
+                "sampling_range": {"start": "2026-07-24T00:00:00+08:00", "end": "2026-07-25T00:00:00+08:00"},
                 "freshness": {
                     "is_stale": True,
                     "warning": "最新数据已停更",
@@ -97,4 +99,15 @@ def test_compact_result_exposes_stale_warning_to_master():
 
     assert compact["freshness"]["is_stale"] is True
     assert compact["summary"].startswith("⚠️ 数据已停更")
+    assert compact['data_context']['mode'] == 'historical'
+    assert compact['sampling_range']['end'] == '2026-07-25T00:00:00+08:00'
+
+
+def test_compact_empty_sides_do_not_report_successful_chart():
+    spec = importlib.util.spec_from_file_location('tool_registration_empty_test', SCRIPTS / 'tool_registration.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    result = module._compact_result_for_master({'status': 'completed', 'result': {'influent': [], 'effluent': []}})
+    assert 'chart_generated' not in result
+    assert 'data_stats' not in result
 

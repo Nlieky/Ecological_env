@@ -2,8 +2,9 @@
 <template>
   <div class="pv">
     <div class="pv-t">模型供应商
-      <span class="pv-sub" v-if="currentDefault">当前默认：{{ currentDefault }}（重启后生效）</span>
+      <span class="pv-sub" v-if="currentDefault">已保存默认：{{ currentDefault }}（重启后加载）</span>
     </div>
+    <p class="pv-meta">供应商编辑、启停、删除和默认选择保存后需重启加载；连接测试通过不代表运行中正在使用。</p>
     <div class="pv-grid">
       <div v-for="p in providers" :key="p.name" class="pv-card" :class="{ off: !p.enabled, def: p.name === currentDefault }">
         <div class="pv-head">
@@ -33,7 +34,7 @@
       <button class="btn primary" @click="$emit('restart')">一键重启 agent</button>
     </div>
 
-    <div v-if="showForm" class="pv-mask" @click.self="showForm = false">
+    <div v-if="showForm" class="pv-mask" @click.self="closeForm">
       <div class="pv-modal">
         <div class="pv-mh">{{ form.name && isEdit ? '编辑供应商' : '新增供应商' }}</div>
         <div class="pv-mrow"><label>名称</label><input v-model="form.name" class="pv-in" :disabled="isEdit" placeholder="deepseek" /></div>
@@ -42,7 +43,7 @@
         <div class="pv-mrow"><label>api_key（编辑留空=不修改）</label>
           <input v-model="form.api_key" type="password" class="pv-in" :placeholder="isEdit ? '•••（不修改请留空）' : 'sk-…'" /></div>
         <div class="pv-mf">
-          <button class="btn" @click="showForm = false">取消</button>
+          <button class="btn" @click="closeForm">取消</button>
           <button class="btn primary" @click="save" :disabled="saving">{{ saving ? '保存中…' : '保存' }}</button>
         </div>
       </div>
@@ -51,9 +52,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentConfigService, type ProviderRow } from '@/api/modules/agentConfig'
+import { requireSuccess } from '@/composables/useConfigDraft'
 
 defineEmits<{ (e: 'restart'): void }>()
 
@@ -66,15 +68,21 @@ const showForm = ref(false)
 const isEdit = ref(false)
 const saving = ref(false)
 const form = ref({ name: '', base_url: '', model: '', api_key: '' })
+const formBaseline = ref(JSON.stringify(form.value))
+const dirty = computed(() => saving.value || (showForm.value && JSON.stringify(form.value) !== formBaseline.value))
+defineExpose({ dirty })
+function canDiscard() { return !dirty.value || window.confirm('有未保存的供应商编辑，确定丢弃？') }
+function closeForm() { if (saving.value || !canDiscard()) return; showForm.value = false }
 
 async function load() {
   const r: any = await agentConfigService.getProviders()
+  requireSuccess(r)
   const d = r.data ?? r
   providers.value = d.providers
   eligible.value = d.eligible
   currentDefault.value = d.current_default
 }
-onMounted(load)
+onMounted(() => load().catch(e => ElMessage.error('供应商读取失败：' + e.message)))
 
 async function test(name: string) {
   testing.value = name
@@ -89,51 +97,62 @@ async function test(name: string) {
 
 async function setDefault(name: string) {
   try {
-    await agentConfigService.setDefaultProvider(name)
+    requireSuccess(await agentConfigService.setDefaultProvider(name))
     ElMessage.success(`已设 ${name} 为默认（重启 agent 后生效）`)
     await load()
   } catch (e: any) { ElMessage.error('设置失败：' + (e?.response?.data?.detail || e?.message || e)) }
 }
 
 function openCreate() {
+  if (saving.value || !canDiscard()) return
   isEdit.value = false
   form.value = { name: '', base_url: '', model: '', api_key: '' }
+  formBaseline.value = JSON.stringify(form.value)
   showForm.value = true
 }
 
 function openEdit(p: ProviderRow) {
+  if (saving.value || !canDiscard()) return
   isEdit.value = true
   form.value = { name: p.name, base_url: p.base_url, model: p.model, api_key: '' }
+  formBaseline.value = JSON.stringify(form.value)
   showForm.value = true
 }
 
 async function save() {
+  if (saving.value) return
+  const captured = { ...form.value }
   saving.value = true
   try {
-    await agentConfigService.putProvider({
-      name: form.value.name, base_url: form.value.base_url,
-      api_key: form.value.api_key || undefined, model: form.value.model,
-      enabled: isEdit.value ? (providers.value.find(p => p.name === form.value.name)?.enabled ?? true) : true,
-    })
-    ElMessage.success('已保存（api_key 脱敏显示）')
-    showForm.value = false
+    requireSuccess(await agentConfigService.putProvider({
+      ...captured, api_key: captured.api_key || undefined,
+      enabled: isEdit.value ? (providers.value.find(p => p.name === captured.name)?.enabled ?? true) : true,
+    }))
+    ElMessage.success('供应商已保存，需重启加载')
+    const unchanged = JSON.stringify(form.value) === JSON.stringify(captured)
+    if (form.value.api_key === captured.api_key) form.value.api_key = ''
+    formBaseline.value = JSON.stringify({ ...captured, api_key: '' })
+    if (unchanged) showForm.value = false
     await load()
   } catch (e: any) { ElMessage.error('保存失败：' + (e?.message || e)) }
   finally { saving.value = false }
 }
 
 async function toggleEnabled(p: ProviderRow) {
-  await agentConfigService.putProvider({
+  try {
+  requireSuccess(await agentConfigService.putProvider({
     name: p.name, base_url: p.base_url, api_key: undefined, model: p.model, enabled: !p.enabled,
-  })
+  }))
+  ElMessage.success('启停配置已保存，需重启加载')
   await load()
+  } catch (e: any) { ElMessage.error('保存失败：' + (e?.message || e)) }
 }
 
 async function del(name: string) {
   try {
     await ElMessageBox.confirm(`删除供应商 ${name}？${name === currentDefault.value ? ' 它是当前默认，删除后 agent 走 env 兜底！' : ''}`, '删除', { type: 'warning' })
-    await agentConfigService.deleteProvider(name)
-    ElMessage.success('已删除')
+    requireSuccess(await agentConfigService.deleteProvider(name))
+    ElMessage.success('删除已保存，需重启加载')
     await load()
   } catch (e: any) { if (e !== 'cancel') ElMessage.error('删除失败：' + (e?.message || e)) }
 }

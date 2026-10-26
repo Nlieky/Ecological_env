@@ -183,6 +183,7 @@ const disabledSkills = ref<string[]>([])
 const installed = computed(() => new Set(skills.value.map(s => s.name)))
 
 const dirty = computed(() => content.value !== original.value)
+defineExpose({ dirty })
 const entityLabel = computed(() => props.entity === 'master' ? '主智能体' : props.entity)
 
 const diffText = computed(() => {

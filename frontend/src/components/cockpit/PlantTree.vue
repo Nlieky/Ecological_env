@@ -1,7 +1,7 @@
 <template>
   <div class="ptree">
     <div v-if="store.treeLoading" class="hint">加载厂目录…</div>
-    <div v-else-if="store.treeError" class="hint err">⚠ {{ store.treeError }}</div>
+    <div v-else-if="store.treeError" class="hint err" role="alert">⚠ {{ store.treeError }} <button type="button" @click="store.fetchTree(true)">重试</button></div>
     <template v-else>
       <div v-for="city in store.tree?.cities" :key="city.name" class="city">
         <button class="lvl1" @click="store.toggleCity(city.name)">
@@ -16,8 +16,8 @@
               <button v-for="p in dist.plants" :key="p.plant_id" class="plant"
                 :class="{ active: store.activePlant === p.plant_id }"
                 @click="pick(p.plant_id, city.name, dist.name)">
-                <span class="dot" :class="p.status" />{{ shortName(p.plant_id) }}
-                <span class="time">{{ p.latest_time.slice(5, 16) }}</span>
+                <span class="dot" :class="p.status" :title="plantStatusLabel(p.status)" />{{ shortName(p.plant_id) }}
+                <span class="time" :title="formatSamplingTime(p.latest_time, store.dashboard?.data_context?.timezone || 'Asia/Shanghai')">{{ shortSamplingTime(p.latest_time, store.dashboard?.data_context?.timezone) }}</span>
               </button>
             </div>
           </div>
@@ -31,7 +31,7 @@
           <button v-for="p in store.tree.ungrouped" :key="p.plant_id" class="plant"
             :class="{ active: store.activePlant === p.plant_id }"
             @click="pick(p.plant_id, '__ungrouped__')">
-            <span class="dot" :class="p.status" />{{ p.plant_id }}
+            <span class="dot" :class="p.status" :title="plantStatusLabel(p.status)" />{{ p.plant_id }}
           </button>
         </div>
       </div>
@@ -45,6 +45,7 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
 import { usePlantsStore } from '@/stores/plants'
+import { shortSamplingTime, formatSamplingTime, plantStatusLabel } from '@/composables/dashboardData'
 
 const props = defineProps<{ activeId?: string }>()
 const emit = defineEmits<{ (e: 'select', plantId: string): void }>()

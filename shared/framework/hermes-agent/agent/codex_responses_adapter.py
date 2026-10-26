@@ -136,6 +136,9 @@ def _summarize_user_message_for_log(content: Any) -> str:
     text and notes any attached images.  Returns an empty string for empty
     lists and ``str(content)`` for unexpected scalar types.
     """
+    from hermes_cli.plugins import hooks_suppressed
+    if hooks_suppressed():
+        return '[restricted system-interaction turn]'
     if content is None:
         return ""
     if isinstance(content, str):

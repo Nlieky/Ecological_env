@@ -2,8 +2,8 @@
   <div class="ds">
     <div class="head">
       <div>
-        <div class="ttl">链路追踪数据源</div>
-        <div class="sub">管理可观测性数据源（Jaeger / Zipkin / Tempo 等）</div>
+        <div class="ttl">可观测性数据源</div>
+        <div class="sub">管理 Jaeger / Zipkin / Tempo 等系统追踪数据源</div>
       </div>
       <el-button type="primary" @click="openCreate"><el-icon><Plus/></el-icon>&nbsp;新增数据源</el-button>
     </div>

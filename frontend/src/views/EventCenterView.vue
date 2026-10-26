@@ -1,18 +1,18 @@
 <template>
-  <div class="evc">
-    <div class="head">
-      <div class="ttl">事件中心</div>
+  <PageShell title="事件中心" subtitle="按严重程度与处理状态筛选，查看证据和处置链路" scroll="contained" class="evc">
+    <template #toolbar>
       <div class="filters">
-        <el-select v-model="severity" placeholder="严重度" clearable size="small" style="width:120px" @change="load">
+        <el-select v-model="severity" placeholder="严重度" clearable size="small" style="width:120px" @change="filterChanged">
           <el-option v-for="s in ['low','medium','high']" :key="s" :label="sevLabel(s)" :value="s" />
         </el-select>
-        <el-select v-model="status" placeholder="状态" clearable size="small" style="width:120px" @change="load">
+        <el-select v-model="status" placeholder="状态" clearable size="small" style="width:120px" @change="filterChanged">
           <el-option v-for="s in ['pending','processing','resolved','ignored']" :key="s" :label="statusLabel(s)" :value="s" />
         </el-select>
       </div>
-    </div>
+    </template>
 
-    <el-table :data="events" v-loading="loading" stripe style="width: 100%" @row-click="openDetail">
+    <PageState :state="listState" :preserve-content="events.length > 0" :message="listMessage" @retry="load">
+    <el-table :data="events" stripe height="100%" style="width: 100%" @row-click="openDetail">
       <el-table-column label="时间" width="170">
         <template #default="{ row }"><span class="ts">{{ fmt(row.timestamp) }}</span></template>
       </el-table-column>
@@ -23,14 +23,20 @@
       <el-table-column label="严重度" width="100">
         <template #default="{ row }"><el-tag size="small" :type="sevType(row.severity)" effect="dark">{{ sevLabel(row.severity) }}</el-tag></template>
       </el-table-column>
-      <el-table-column label="状态" width="100">
+      <el-table-column label="处理状态" width="100">
         <template #default="{ row }"><el-tag size="small" :type="statusType(row.status)" effect="plain">{{ statusLabel(row.status) }}</el-tag></template>
       </el-table-column>
+      <el-table-column label="模型可信度" width="120">
+        <template #default="{ row }">{{ confidenceLabel(row.confidence) }}</template>
+      </el-table-column>
     </el-table>
-    <div v-if="!loading && !events.length" class="empty">无匹配事件</div>
+    </PageState>
+    <template #footer>
+    <el-pagination :current-page="page" :page-size="pageSize" :total="total" layout="total, prev, pager, next" @current-change="setPage" />
+    </template>
 
     <!-- 详情抽屉 -->
-    <el-drawer v-model="drawerVisible" :title="`事件详情 · ${current?.id || ''}`" direction="rtl" size="560px">
+    <el-drawer v-model="drawerVisible" :title="`事件详情 · ${current?.id || ''}`" direction="rtl" size="min(560px, 100vw)" @close="closeDetail">
       <template v-if="current">
         <div class="d-meta">
           <div><span class="k">类型</span>{{ (current.violationTypes || []).join('、') || '—' }}</div>
@@ -44,17 +50,19 @@
         <!-- 状态流转 -->
         <div class="d-status">
           <span class="k">处置状态</span>
-          <el-select v-model="current.status" size="small" style="width:140px" @change="saveStatus">
-            <el-option v-for="s in ['pending','processing','resolved','ignored']" :key="s" :label="statusLabel(s)" :value="s" />
+          <el-select :model-value="current.status" :disabled="saving" :loading="saving" size="small" style="width:140px" @change="confirmStatus">
+            <el-option v-for="s in allowedStatuses" :key="s" :label="statusLabel(s)" :value="s" />
           </el-select>
+          <span v-if="saveError" role="alert">{{ saveError }}</span>
         </div>
 
         <!-- 研判行动 -->
         <div class="d-sec">
           <div class="d-ttl">研判行动</div>
           <div class="li">▸ <b>{{ current.action || '—' }}</b>
-            <span v-if="current.confidence != null" class="muted">置信度 {{ (current.confidence * 100).toFixed(1) }}%</span>
+            <span class="muted">模型可信度 {{ confidenceLabel(current.confidence) }}</span>
           </div>
+          <RouterLink v-if="current.conversationId" :to="{ path: '/agents/audit', query: { session: current.conversationId } }">查看研判审计</RouterLink>
         </div>
 
         <!-- 指标异常点 -->
@@ -114,6 +122,7 @@
         <div class="d-sec">
           <div class="d-ttl">关联链路</div>
           <div v-if="caseLinkLoading" class="li muted">加载中…</div>
+          <div v-else-if="caseLinkError" class="li" role="alert">{{ caseLinkError }} <el-button size="small" @click="loadRelation">重试</el-button></div>
           <template v-else-if="caseLink">
             <div class="case-chain">
               <template v-for="(el, i) in caseLink" :key="el.id">
@@ -131,26 +140,46 @@
         </div>
       </template>
     </el-drawer>
-  </div>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import PageShell from '@/components/common/PageShell.vue'
+import PageState from '@/components/common/PageState.vue'
+import { formatDateTime } from '@/utils/displayFormat'
 import { eventsService } from '@/api/modules/events'
 import { knowledgeService } from '@/api/modules/knowledge'
+import { SILENT } from '@/api/client'
+import { useEventCenter } from '@/composables/useEventCenter'
 import { NODE_META } from '@/stores/knowledge'
 import { splitEvidence, OTHER_CATEGORY_LABELS } from '@/views/eventEvidence'
 import type { AlertEvent } from '@/api/types/api.types'
+import { useAssistantContext } from '@/composables/useAssistantContext'
 
-const events = ref<AlertEvent[]>([])
-const loading = ref(false)
-const severity = ref('')
-const status = ref('')
-
-const drawerVisible = ref(false)
-const current = ref<AlertEvent | null>(null)
+const { events, loading, severity, status, page, pageSize, total, listError, drawerVisible, current,
+  saving, saveError, allowedStatuses, caseLink, caseLinkLoading, caseLinkError,
+  load, filterChanged, setPage, openDetail: selectDetail, closeDetail, loadRelation, saveStatus, dispose,
+} = useEventCenter({ ...eventsService, node: id => knowledgeService.node(id, SILENT) })
+const listState = computed(() => loading.value ? (events.value.length ? 'refreshing' : 'initial-loading') : listError.value ? (events.value.length ? 'stale' : 'error') : events.value.length ? 'ready' : 'empty')
+const listMessage = computed(() => listError.value || (listState.value === 'empty' ? '无匹配事件，请调整筛选条件' : undefined))
+useAssistantContext(() => ({ pageId: 'events', objectId: current.value?.id || null, plant: current.value?.plantId || null, source: '事件接口', freshness: current.value?.updatedAt || null, filters: { status: status.value, severity: severity.value, page: page.value }, status: loading.value ? 'loading' : listError.value ? 'error' : events.value.length ? 'ready' : 'empty', actions: ['navigate', 'events.filter', 'events.detail'] }), async action => {
+  if (action.capability === 'events.filter') {
+    if (typeof action.parameters.status === 'string') status.value = action.parameters.status
+    if (typeof action.parameters.severity === 'string') severity.value = action.parameters.severity
+    await filterChanged()
+    return { success: !listError.value, message: listError.value || `筛选完成，共 ${total.value} 条事件` }
+  }
+  if (action.capability === 'events.detail') {
+    const row = await eventsService.detail(String(action.parameters.eventId))
+    if (!row?.id || row.id !== action.parameters.eventId) return { success: false, message: '事件不存在或响应对象不一致' }
+    openDetail(row)
+    return { success: current.value?.id === row.id, message: `已打开事件 ${row.id}` }
+  }
+  return { success: false, message: '事件页不支持该操作' }
+})
+function confidenceLabel(value: unknown) { return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? `${(value * 100).toFixed(1)}%` : '—' }
 
 // 详情抽屉渲染用拆分（单次计算，替代模板里 6 处重复调用）
 const evParts = computed(() => splitEvidence(current.value?.evidence))
@@ -164,53 +193,18 @@ function kvRows(o: Record<string, unknown>): [string, string][] {
     .map(([k, v]) => [k, v == null ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v)])
 }
 
-async function load() {
-  loading.value = true
-  try {
-    const r = await eventsService.list({ severity: severity.value || undefined, status: status.value || undefined })
-    events.value = r.data
-  } catch { events.value = [] }
-  finally { loading.value = false }
-}
 function openDetail(row: AlertEvent) {
-  current.value = row
-  drawerVisible.value = true
+  selectDetail(row)
+  void loadRelation()
+}
+function confirmStatus(next: AlertEvent['status']) {
+  if (!current.value || next === current.value.status || saving.value || !allowedStatuses.value.includes(next)) return
+  if (window.confirm(`确认将事件 ${current.value.id} 的处理状态改为“${statusLabel(next)}”？`)) return saveStatus(next)
 }
 
 // ── 关联链路（子项目4 T3 入口B）──
 // 查 case:{event_id} 的一跳邻居，取 厂(involves)+模式(cites) 拼链路；
 // 节点 404 = 研判未写回图谱 → 静默降级为"无关联"提示（不打扰主流程）
-interface CaseLinkEl { id: string; label: string; type: string }
-const caseLink = ref<CaseLinkEl[] | null>(null)
-const caseLinkLoading = ref(false)
-let caseLinkSeq = 0 // 请求序号守卫（审查 Issue C）
-watch(current, async (ev) => {
-  caseLink.value = null
-  if (!ev) return
-  // 请求序号守卫（审查 Issue C）：快速关/开抽屉时旧响应晚到不覆盖新事件
-  const seq = ++caseLinkSeq
-  caseLinkLoading.value = true
-  try {
-    const resp = await knowledgeService.node(`case:${ev.id}`)
-    if (seq !== caseLinkSeq) return
-    const ORDER: Record<string, number> = { plant: 0, violation_pattern: 1 } // 厂→模式
-    const out: CaseLinkEl[] = []
-    for (const [type, list] of Object.entries(resp.neighbors || {})) {
-      if (type === 'plant' || type === 'violation_pattern') {
-        for (const n of list as { id: string; label: string }[]) {
-          out.push({ id: n.id, label: n.label, type })
-        }
-      }
-    }
-    out.sort((a, b) => (ORDER[a.type] ?? 9) - (ORDER[b.type] ?? 9))
-    caseLink.value = out.length ? out : null
-  } catch {
-    if (seq !== caseLinkSeq) return
-    caseLink.value = null // 404（无写回）静默
-  } finally {
-    if (seq === caseLinkSeq) caseLinkLoading.value = false
-  }
-})
 const router = useRouter()
 function goGraph() {
   if (!current.value) return
@@ -220,15 +214,8 @@ function goGraph() {
 // 色点/类型名与图谱页同源（NODE_META）
 function typeColor(t: string): string { return NODE_META[t]?.color ?? '#94a3b8' }
 function typeCn(t: string): string { return NODE_META[t]?.label ?? t }
-async function saveStatus(s: string) {
-  if (!current.value) return
-  try {
-    await eventsService.updateStatus(current.value.id, s)
-    ElMessage.success('状态已更新')
-  } catch { /* 拦截器已弹错 */ }
-}
 
-function fmt(t: string) { return t ? t.replace('T', ' ').slice(0, 19) : '—' }
+const fmt = formatDateTime
 // 工单推荐行动切前三条
 function recommendedActions(wo: Record<string, unknown> | null | undefined): string[] {
   const a = wo?.recommended_actions
@@ -245,10 +232,11 @@ function sevType(s: string): 'info' | 'warning' | 'danger' { return s === 'high'
 function statusType(s: string): 'info' | 'warning' | 'success' | 'danger' { return s === 'resolved' ? 'success' : s === 'pending' ? 'danger' : 'info' }
 
 onMounted(load)
+onUnmounted(dispose)
 </script>
 
 <style scoped>
-.evc { display: flex; flex-direction: column; gap: 14px }
+.evc { min-height: 0 }
 .head { display: flex; justify-content: space-between; align-items: center }
 .ttl { font-size: 16px; font-weight: 700 }
 .filters { display: flex; gap: 8px }

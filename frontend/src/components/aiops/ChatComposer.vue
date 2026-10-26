@@ -8,11 +8,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { mainAssistantDraft, formatHandoffDraft } from '@/assistant/handoff'
 import { useChatStore } from '@/stores/chat'
 const props = withDefaults(defineProps<{ channel?: 'chat' | 'action' }>(), { channel: 'chat' })
 const chat = useChatStore()
 const text = ref('')
+watch(mainAssistantDraft, draft => {
+  if (props.channel === 'chat' && draft) {
+    text.value = text.value.trim() ? `${text.value}\n\n${formatHandoffDraft(draft)}` : formatHandoffDraft(draft)
+    mainAssistantDraft.value = null
+  }
+}, { immediate: true })
 function send() {
   const q = text.value.trim()
   if (!q || chat.loading) return

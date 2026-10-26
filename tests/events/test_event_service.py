@@ -58,6 +58,23 @@ def make_session(root: Path, name: str, level: str, plant: str = "当阳市金�
     return sd
 
 
+def test_pagination_timestamp_ties_use_id_descending(svc):
+    from datetime import datetime
+    from backend.models.alert_event import AlertEvent
+    import backend.services.event_service as es
+
+    with es.SessionLocal() as db:
+        for event_id in ["evt_a", "evt_c", "evt_b"]:
+            db.add(AlertEvent(id=event_id, timestamp=datetime(2026, 1, 1),
+                              session_id=event_id, plant_id="test", severity="low", status="pending"))
+        db.commit()
+    first = svc.list_events(page=1, page_size=2)
+    second = svc.list_events(page=2, page_size=2)
+    assert [row["id"] for row in first["data"]] == ["evt_c", "evt_b"]
+    assert [row["id"] for row in second["data"]] == ["evt_a"]
+    assert first["total"] == second["total"] == 3
+
+
 def test_collect_high_medium_low_in_none_skipped(svc, tmp_path):
     for lvl in ("high", "medium", "low", "none"):
         make_session(tmp_path, f"session_t1_{lvl}", lvl)

@@ -6,6 +6,9 @@
       </div>
     </div>
 
+    <PageState :state="viewState" :preserve-content="loaded" :message="error ? (loaded ? '刷新失败，保留上次加载的数据。' : '历史态势加载失败，请重试。') : undefined" @retry="load">
+    <p v-if="error" role="alert">{{ error }}</p>
+    <button v-if="viewState === 'empty'" type="button" @click="load">重新加载</button>
     <template v-if="rows.length">
       <div class="grid">
         <!-- 每日监测点数 -->
@@ -39,15 +42,17 @@
         </div>
       </div>
     </template>
-    <div v-else class="loading">{{ loading ? '聚合历史态势…' : '暂无历史数据' }}</div>
+    </PageState>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import echarts from '@/lib/echarts'
 import api from '@/api/client'
 import { usePolling } from '@/composables/usePolling'
+import { requestGate } from '@/composables/dashboardData'
+import PageState from '@/components/common/PageState.vue'
 
 interface DayRow {
   day: string; points: number; influent_points: number; effluent_points: number; exceed: number
@@ -60,6 +65,11 @@ const WINDOWS = [
 const days = ref(30)
 const rows = ref<DayRow[]>([])
 const loading = ref(false)
+const error = ref('')
+const loaded = ref(false)
+let loadedDays: number | null = null
+const gate = requestGate()
+const viewState = computed(() => loading.value ? (loaded.value ? 'refreshing' : 'initial-loading') : error.value ? 'error' : rows.value.length ? 'ready' : 'empty')
 
 const ptsEl = ref<HTMLDivElement>()
 const exceedEl = ref<HTMLDivElement>()
@@ -71,12 +81,21 @@ let c3: ReturnType<typeof echarts.init> | null = null
 const m = (r: DayRow, f: string) => r.metrics?.effluent?.[f] ?? '—'
 
 async function load() {
+  const request = gate.begin()
+  if (request === null) return
+  const requestedDays = days.value
+  if (loadedDays !== requestedDays) { rows.value = []; loaded.value = false }
   loading.value = true
+  error.value = ''
   try {
-    const r = await api.get<unknown, { data: DayRow[] }>('/v1/system/history', { params: { days: days.value } })
+    const r = await api.get<unknown, { data: DayRow[] }>('/v1/system/history', { params: { days: requestedDays } })
+    if (!gate.current(request)) return
     rows.value = r.data
-    nextTick(render)
-  } catch { rows.value = [] } finally { loading.value = false }
+    loadedDays = requestedDays
+    loaded.value = true
+    await nextTick()
+    if (gate.current(request)) render()
+  } catch (e) { if (gate.current(request)) error.value = e instanceof Error ? e.message : '历史态势加载失败' } finally { if (gate.current(request)) loading.value = false }
 }
 
 function render() {
@@ -120,20 +139,38 @@ function render() {
 
 function resize() { c1?.resize(); c2?.resize(); c3?.resize() }
 watch(days, load)
-
-onMounted(async () => {
-  await load()
-  if (ptsEl.value) c1 = echarts.init(ptsEl.value)
-  if (exceedEl.value) c2 = echarts.init(exceedEl.value)
-  if (trendEl.value) c3 = echarts.init(trendEl.value)
+let resizeObserver: ResizeObserver | undefined
+const elements: (HTMLDivElement | undefined)[] = []
+function syncCharts() {
+  if (!gate.alive()) return
+  const current = [ptsEl.value, exceedEl.value, trendEl.value]
+  const charts = [c1, c2, c3]
+  current.forEach((el, i) => {
+    if (el === elements[i]) return
+    if (elements[i]) resizeObserver?.unobserve(elements[i]!)
+    charts[i]?.dispose()
+    elements[i] = el
+    charts[i] = el ? echarts.init(el) : null
+    if (el) resizeObserver?.observe(el)
+  })
+  ;[c1, c2, c3] = charts
   render()
+}
+watch([ptsEl, exceedEl, trendEl], syncCharts, { flush: 'post' })
+const { start, stop } = usePolling(load, 60_000)
+onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined') resizeObserver = new ResizeObserver(resize)
   window.addEventListener('resize', resize)
-  const { start } = usePolling(load, 60_000)
   start()
 })
 onBeforeUnmount(() => {
+  gate.dispose()
+  stop()
   window.removeEventListener('resize', resize)
+  elements.forEach(el => { if (el) resizeObserver?.unobserve(el) })
+  resizeObserver?.disconnect()
   c1?.dispose(); c2?.dispose(); c3?.dispose()
+  c1 = null; c2 = null; c3 = null
 })
 </script>
 
@@ -150,7 +187,7 @@ onBeforeUnmount(() => {
 .card.wide { grid-column: 1 / -1 }
 .c-ttl { font-size: 13px; font-weight: 600; margin-bottom: 8px }
 .chart { height: 220px }
-.tbl { font-size: 12.5px; max-height: 340px; overflow: auto }
+.tbl { font-size: 12.5px }
 .tr { display: grid; grid-template-columns: 1.2fr .7fr .7fr .7fr .7fr .7fr .7fr .7fr .7fr; gap: 6px;
   padding: 7px 10px; border-top: 1px solid #eef2f7; align-items: center }
 .tr.th { border-top: 0; color: var(--text-muted); font-size: 11px; font-weight: 600; background: #f8fafc; position: sticky; top: 0 }

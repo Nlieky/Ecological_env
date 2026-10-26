@@ -13,7 +13,7 @@ export interface FileHistoryItem { commit: string; date: string; author: string;
 export interface ParamItem {
   key: string; value: string | number; default: string | number
   type: 'int' | 'str' | 'secret'; effect: 'immediate' | 'restart'
-  reader: string; desc: string
+  reader: string; desc: string; read_timing: string
 }
 export interface PlantConfig {
   hierarchy: Record<string, Record<string, string[]>>
@@ -29,9 +29,11 @@ export interface ApiResponse<T> { success: boolean; data: T }
 export interface StrategyItem {
   key: string; value: boolean | string | number; default: unknown
   type: 'bool' | 'enum' | 'int' | 'str' | 'ref'; effect: 'immediate' | 'restart'
-  desc: string; choices?: string[]
+  desc: string; choices?: string[]; read_timing: string
 }
 export interface StrategyData { groups: Record<string, StrategyItem[]>; params: ParamItem[] }
+export interface ConfigSaveResult { success: boolean; restart_needed: boolean; applied_keys: string[]; effects: Record<string, 'immediate' | 'restart'> }
+export interface ServiceStatus { alive: boolean; ready: boolean; port: number; pids: number[]; model: string; saved_model: string; detail?: string }
 export interface SkillItem {
   name: string; display_name: string; description: string
   scripts: string[]; enabled: boolean
@@ -93,14 +95,14 @@ export const agentConfigService = {
 
   /** 批量保存参数；secret 留空=不改 */
   saveParams: (params: Record<string, string | number>) =>
-    api.put<unknown, { success: boolean; restart_needed: boolean }>('/v1/agents/config/params', { params }),
+    api.put<unknown, ConfigSaveResult>('/v1/agents/config/params', { params }),
 
   /** LLM 连通性测试（空字段=用当前生效配置） */
   llmTest: (body: { base_url?: string; model?: string; api_key?: string }) =>
     api.post<unknown, { ok: boolean; latency_ms?: number; error: string | null }>('/v1/agents/config/llm/test', body),
 
   /** agent 服务状态 */
-  serviceStatus: () => api.get<unknown, ApiResponse<unknown>>('/v1/agents/config/service/status'),
+  serviceStatus: () => api.get<unknown, ApiResponse<ServiceStatus>>('/v1/agents/config/service/status'),
 
   /** 重启 agent 服务（confirm=true） */
   serviceRestart: () =>
@@ -112,7 +114,7 @@ export const agentConfigService = {
 
   /** 批量保存策略；空值=不改（含 secret/ref） */
   saveStrategy: (items: Record<string, string | boolean | number>) =>
-    api.put<unknown, { success: boolean; restart_needed: boolean }>('/v1/agents/config/strategy', { items }),
+    api.put<unknown, ConfigSaveResult>('/v1/agents/config/strategy', { items }),
 
   // ── V2: 技能 ──
   getSkills: (entity: string) =>

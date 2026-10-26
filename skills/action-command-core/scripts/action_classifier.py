@@ -149,9 +149,12 @@ def _ui_action_desc(ad: dict) -> str:
     return "已执行"
 
 
-def classify_action(query: str, timeout_s: int = 20) -> ActionVerdict:
+def classify_action(query: str, timeout_s: int | None = None) -> ActionVerdict:
     """单轮 LLM 分类。任何异常都返回 is_action=False(落回主智能体管线,安全兜底)。"""
     try:
+        if timeout_s is None:
+            from backend.services.agent_strategy import get_strategy
+            timeout_s = get_strategy("action_shortcircuit_timeout", default=30)
         client = _get_client()
         resp = client.chat.completions.create(
             model=os.environ.get("LLM_MODEL", "deepseek-v4-pro"),
@@ -159,6 +162,7 @@ def classify_action(query: str, timeout_s: int = 20) -> ActionVerdict:
                       {"role": "user", "content": query}],
             max_tokens=200,
             temperature=0,
+            timeout=timeout_s,
         )
         raw = (resp.choices[0].message.content or "").strip()
         # 剥可能的代码块包裹

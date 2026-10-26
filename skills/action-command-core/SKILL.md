@@ -5,6 +5,8 @@ description: 主智能体动作指令技能——识别用户的"动作指令"�
 
 # Action Command Core - 动作指令技能
 
+> 这是主页面旧actionData协议兼容入口，不用于右下角的system-interaction模式。系统交互的意图边界、页面说明、确认规则由 `system-interaction-core` 统一维护；侧栏只生成受限候选，不调用本文件的run_detector工具。以下仅保留旧主页面协议与算法工具接线，不能用于绕过新模式限制。
+
 ## 你做什么
 
 你负责分辨用户的这句话是**"下一个指令"**还是**"要一个答案"**。指令由你处理（让大屏实时变化），答案走问答技能（orchestrator-core）。
@@ -30,7 +32,7 @@ description: 主智能体动作指令技能——识别用户的"动作指令"�
 ### set_view（切视图）
 ```
 {"cmd":"set_view","indicators":["pH","COD"],"side":"all"}
-已切换大屏视图：pH、COD
+已准备切换大屏视图：pH、COD；实际结果以前端执行回执为准。
 ```
 `side` 可选值：`influent`（只看进水）/ `effluent`（只看出水）/ `all`。
 `indicators` 是指标列表，用户没指定就不带此字段（保持全部）。
@@ -39,7 +41,7 @@ description: 主智能体动作指令技能——识别用户的"动作指令"�
 ### set_time_range（切时间）
 ```
 {"cmd":"set_time_range","range":"7d"}
-已切换时间范围：最近7天
+已准备切换时间范围：最近7天；实际结果以前端执行回执为准。
 ```
 `range` 可选值：`1h`/`6h`/`24h`/`7d`/`30d`，或 `"date":"2026-07-14"` 指定单日。
 
@@ -85,7 +87,7 @@ description: 主智能体动作指令技能——识别用户的"动作指令"�
 
 ```
 {"cmd":"run_detector","indicator":"pH","annotations":[...工具返回的actionData.annotations...]}
-检出 2 段平稳异常（00:00-08:00、15:00-23:00），已在大屏标注。
+检出 2 段平稳异常（00:00-08:00、15:00-23:00），标注结果以前端执行回执为准。
 ```
 
 前端只认第一行的 JSON。**别放代码块里，别加多余文字在 JSON 前面。**

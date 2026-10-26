@@ -1,5 +1,6 @@
 // frontend/src/api/modules/knowledge.ts
 import api from '../client'
+import type { AxiosRequestConfig } from 'axios'
 
 export interface KGNode {
   id: string
@@ -67,8 +68,8 @@ export const knowledgeService = {
         live,
       },
     }),
-  node: (id: string) =>
-    api.get<unknown, NodeResp>(`/v1/knowledge/node/${encodeURIComponent(id)}`),
+  node: (id: string, config?: AxiosRequestConfig) =>
+    api.get<unknown, NodeResp>(`/v1/knowledge/node/${encodeURIComponent(id)}`, config),
   impact: (id: string, direction = 'both') =>
     api.get<unknown, ImpactResp>(
       `/v1/knowledge/impact/${encodeURIComponent(id)}`, { params: { direction } }),

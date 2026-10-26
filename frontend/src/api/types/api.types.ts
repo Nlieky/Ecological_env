@@ -248,7 +248,7 @@ export interface ConversationListResponse {
 }
 
 // ========== Logs / Trace ==========
-export type LogType = 'api' | 'master' | 'subagent' | 'operator' | 'llm' | 'error'
+export type LogType = 'all' | 'api' | 'master' | 'subagent' | 'operator' | 'llm' | 'error'
 export interface LogEntryV1 {
   id: string
   timestamp: string
@@ -256,6 +256,9 @@ export interface LogEntryV1 {
   content: string
   details?: any
   latency_ms?: number | null
+  level?: 'info' | 'warning' | 'error'
+  slow?: boolean
+  session_id?: string | null
 }
 export interface SessionTrace {
   session_id: string
@@ -278,7 +281,16 @@ export interface PlantDistrict { name: string; plants: PlantNode[] }
 export interface PlantCity { name: string; districts: PlantDistrict[] }
 export interface PlantTree { cities: PlantCity[]; ungrouped: PlantNode[] }
 
-export interface IndicatorTrendPoint { time: string; value: number }
+export interface DataContext {
+  origin: 'real' | 'simulated' | 'unverified'
+  mode: 'historical' | 'simulation' | 'live' | 'unverified'
+  bucket: string
+  timezone: string
+  latest_sample_at: string | null
+  freshness: string
+  warning: string | null
+}
+export interface IndicatorTrendPoint { time: string; value: number | null }
 export interface PlantIndicator {
   label: string
   unit: string
@@ -289,6 +301,7 @@ export interface PlantIndicator {
   series: { influent: IndicatorTrendPoint[]; effluent: IndicatorTrendPoint[] }
 }
 export interface PlantDashboard {
+  data_context?: DataContext
   plant_id: string
   window_hours: number
   latest_time?: string

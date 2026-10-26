@@ -7,6 +7,11 @@
       <MarkdownRenderer v-if="!msg.streaming && msg.content" :content="msg.content" />
       <div v-else-if="msg.content" class="stream-text">{{ msg.content }}<span class="cur">▋</span></div>
       <div v-else-if="msg.streaming" class="stream-text muted">{{ msg.progress ? '' : '思考中…' }}</div>
+      <div v-if="msg.error" class="failure" role="alert">⚠ {{ msg.error }}</div>
+      <div v-if="msg.elapsedMs !== undefined" class="timing">总耗时 {{ (msg.elapsedMs / 1000).toFixed(1) }} 秒</div>
+      <div v-if="msg.queueElapsedMs !== undefined" class="timing">排队 {{ (msg.queueElapsedMs / 1000).toFixed(1) }} 秒</div>
+      <div v-if="msg.turnElapsedMs !== undefined" class="timing">服务处理 {{ (msg.turnElapsedMs / 1000).toFixed(1) }} 秒</div>
+      <div v-for="(stage, i) in msg.stageDurations || []" :key="i" class="timing">{{ stage.subagent }} · {{ (stage.elapsedMs / 1000).toFixed(1) }} 秒</div>
       <!-- 数据曲线(chartData) -->
       <div v-if="charts.length" class="charts">
         <div v-for="(_, i) in charts" :key="i" :ref="el => setChartRef(el, i)" class="chart-item"></div>
@@ -74,6 +79,8 @@ watch(charts, async () => {
 .prog { font-size: 12.5px; color: var(--primary); background: var(--primary-soft, #eef2ff); border-radius: 8px; padding: 7px 11px; margin-bottom: 9px }
 .stream-text { white-space: pre-wrap; word-break: break-word; font-size: 13.5px; line-height: 1.7 }
 .stream-text.muted { color: var(--text-muted) }
+.failure { color: #b42318; margin-top: 8px; white-space: pre-wrap }
+.timing { color: var(--text-muted); font-size: 12px; margin-top: 5px }
 .cur { animation: blink 1s step-start infinite; color: var(--primary); margin-left: 1px }
 @keyframes blink { 50% { opacity: 0 } }
 .charts { margin-top: 12px; display: flex; flex-direction: column; gap: 10px }

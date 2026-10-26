@@ -101,7 +101,8 @@ def build_points_at(t: datetime, rng: random.Random, plant: str = "", sides: tup
     flow_out = gen_value("flow", "effluent", t, rng)
     pts: list[Point] = []
     for side in sides:
-        p = Point("wastewater").tag("data_type", side).tag("plant_id", plant or PLANT_ID)
+        p = Point("wastewater").tag("data_type", side).tag("plant_id", plant or PLANT_ID).tag('data_origin', 'simulated')
+        p = p.field('_ingestion_method', 'simulator')
         for field in PROFILE:
             v = gen_value(field, side, t, rng)
             if v is not None:
@@ -124,11 +125,14 @@ def build_points_at(t: datetime, rng: random.Random, plant: str = "", sides: tup
 def query_latest(client: InfluxDBClient, bucket: str, plant: str | None = None) -> datetime | None:
     """库内(某厂)最新数据时间。"""
     q = client.query_api()
-    pf = f'  and r.plant_id == "{plant}" ' if plant else ""
+    import json
+    from shared.data.influxdb_query import source_filter
+    pf = f'  and r.plant_id == {json.dumps(plant, ensure_ascii=False)} ' if plant else ""
     flux = (
-        f'from(bucket: "{bucket}") |> range(start: 0) '
-        f'|> filter(fn: (r) => r._measurement == "wastewater"{pf}) '
-        f'|> group() |> last() |> keep(columns: ["_time"])'
+        f'from(bucket: {json.dumps(bucket)}) |> range(start: 0) '
+        f'|> filter(fn: (r) => r._measurement == "wastewater"{pf}{source_filter(bucket)}) '
+        f'|> last() |> keep(columns: ["_time"]) '
+        f'|> group() |> sort(columns: ["_time"]) |> last(column: "_time")'
     )
     tables = q.query(flux)
     for tb in tables:
@@ -140,11 +144,13 @@ def query_latest(client: InfluxDBClient, bucket: str, plant: str | None = None) 
 def discover_plants_sides(client: InfluxDBClient, bucket: str) -> dict[str, tuple]:
     """发现库内所有厂及其有的数据侧——模拟器据此分别为各厂续写。"""
     q = client.query_api()
+    import json
+    from shared.data.influxdb_query import source_filter
     flux = (
-        f'from(bucket: "{bucket}") |> range(start: 0) '
-        f'|> filter(fn: (r) => r._measurement == "wastewater") '
-        f'|> group(columns: ["plant_id", "data_type"]) |> last() '
-        f'|> keep(columns: ["plant_id", "data_type"])'
+        f'from(bucket: {json.dumps(bucket)}) |> range(start: 0) '
+        f'|> filter(fn: (r) => r._measurement == "wastewater"{source_filter(bucket)}) '
+        f'|> last() |> keep(columns: ["plant_id", "data_type"]) '
+        f'|> group(columns: ["plant_id", "data_type"]) |> limit(n: 1)'
     )
     out: dict[str, set] = {}
     for tb in q.query(flux):
@@ -173,7 +179,9 @@ def main() -> int:
         return 2
     url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
     org = os.environ.get("INFLUXDB_ORG", "ecological_env")
-    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+    from shared.data.source_context import simulation_bucket
+    bucket = simulation_bucket()
+    catalog_bucket = os.environ.get('INFLUXDB_REAL_BUCKET', 'monitoring-real')
 
     start = datetime.strptime(args.start, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
     rng = random.Random(20260101)  # 固定种子,重启续跑不跳变
@@ -198,11 +206,13 @@ def main() -> int:
         except Exception:
             print("[simulator] 等待 InfluxDB 就绪...", flush=True)
             time.sleep(2)
+    if client.buckets_api().find_bucket_by_name(bucket) is None:
+        client.buckets_api().create_bucket(bucket_name=bucket, org=org)
     write = client.write_api(write_options=SYNCHRONOUS)
 
     # ── 多厂:发现库内全部厂,各厂独立游标+各自的 sides(洗舱站只有 effluent) ──
     plants_sides = ({args.plant: ("influent", "effluent")}
-                    if args.plant else discover_plants_sides(client, bucket))
+                    if args.plant else discover_plants_sides(client, catalog_bucket))
     if not plants_sides:
         plants_sides = {PLANT_ID: ("influent", "effluent")}
     cursors: dict[str, datetime] = {}

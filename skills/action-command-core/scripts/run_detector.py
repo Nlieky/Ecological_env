@@ -12,6 +12,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -39,9 +40,9 @@ INDICATOR_FIELDS = {"pH": "pH", "COD": "COD", "TN": "TN",
 def resolve_plant(client, bucket: str, name: str) -> str | None:
     """厂名解析:精确命中→原样;简称→包含匹配唯一命中;歧义/未中→原样(查不到数据自然报错)。"""
     q = client.query_api()
-    flux = (f'from(bucket: "{bucket}") |> range(start: 0) '
+    flux = (f'from(bucket: {json.dumps(bucket)}) |> range(start: 0) '
             f'|> filter(fn: (r) => r._measurement == "wastewater") '
-            f'|> group(columns: ["plant_id"]) |> last() |> keep(columns: ["plant_id"])')
+            f'|> keep(columns: ["plant_id"]) |> group() |> distinct(column: "plant_id")')
     plants = []
     for tb in q.query(flux):
         for rec in tb.records:
@@ -93,7 +94,7 @@ def load_series(indicator: str, start: str, end: str, side: str = "effluent",
         full = pd.concat(frames).sort_index()
         start_dt = pd.to_datetime(start)
         end_dt = pd.to_datetime(end)
-        if end_dt == end_dt.normalize():  # end 只给日期 → 补到当天 23:59:59
+        if re.fullmatch(r'\d{4}-\d{2}-\d{2}', end):  # 仅日期输入补全天；明确零点必须原样保留
             end_dt = end_dt + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         return full[(full.index >= start_dt) & (full.index <= end_dt)]
     finally:

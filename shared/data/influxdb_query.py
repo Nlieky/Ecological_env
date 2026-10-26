@@ -16,6 +16,7 @@ pH/COD/TN/AN/TP/flow/discharge/suspended_solids);调用方按需 rename:
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -52,12 +53,23 @@ def get_client_and_bucket() -> Tuple[InfluxDBClient, str]:
     return InfluxDBClient(url=url, token=token, org=org, timeout=30_000), bucket
 
 
+def source_filter(bucket: str) -> str:
+    """Declared buckets only admit explicitly tagged records; legacy stays unverified."""
+    origin = None
+    if bucket == os.environ.get('INFLUXDB_REAL_BUCKET', 'monitoring-real'):
+        origin = 'real'
+    elif bucket == os.environ.get('INFLUXDB_SIMULATION_BUCKET', 'monitoring-simulation'):
+        origin = 'simulated'
+    return f' and exists r.data_origin and r.data_origin == "{origin}"' if origin else ''
+
+
 def fetch_wastewater_df(client: InfluxDBClient, bucket: str, data_type: str,
                         fields: Optional[List[str]] = None,
-                        plant_id: Optional[str] = None) -> pd.DataFrame:
+                        plant_id: Optional[str] = None,
+                        include_all_fields: bool = False) -> pd.DataFrame:
     """查一侧(进水/出水)数据,pivot 成宽表。
 
-    返回:timestamp(naive,原 naive 视作 UTC)为索引 + 各英文契约字段列,按时间升序。
+    返回:timestamp 为 DATA_TIMEZONE 本地采样时间的 naive 索引，按时间升序。
     自动丢弃 query_data_frame 附带的 result/table 元数据列;缺失字段自动跳过。
 
     Args:
@@ -65,25 +77,34 @@ def fetch_wastewater_df(client: InfluxDBClient, bucket: str, data_type: str,
         bucket: 桶名
         data_type: "influent" 或 "effluent"
         fields: 要保留的字段(默认 CANONICAL_FIELDS)
-        plant_id: 厂(监测点)过滤——多厂库必传,不传=全库混合(单厂时代旧默认,勿再用)
+        plant_id: 必须显式选择厂(监测点)，不允许混合全库。
     """
+    if not plant_id or not plant_id.strip():
+        raise ValueError('plant_id must be explicitly selected')
     fields = fields or CANONICAL_FIELDS
-    keep = ", ".join([f'"{f}"' for f in fields])
-    plant_filter = f'  and r.plant_id == "{plant_id.replace(chr(34), "")}" ' if plant_id else ""
+    keep = ", ".join(json.dumps(f) for f in fields)
+    plant_filter = f'  and r.plant_id == {json.dumps(plant_id, ensure_ascii=False)} '
     flux = (
-        f'from(bucket: "{bucket}") '
+        f'from(bucket: {json.dumps(bucket)}) '
         f'|> range(start: 0) '
         f'|> filter(fn: (r) => r._measurement == "{_MEASUREMENT}" '
-        f'  and r.data_type == "{data_type}"{plant_filter}) '
+        f'  and r.data_type == {json.dumps(data_type)}{plant_filter}{source_filter(bucket)}) '
         f'|> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value") '
-        f'|> keep(columns: ["_time", {keep}])'
+        + ('' if include_all_fields else f'|> keep(columns: ["_time", {keep}])')
     )
     df = client.query_api().query_data_frame(flux)
     if isinstance(df, list):
-        df = pd.concat([d for d in df if not d.empty], ignore_index=True) if df else pd.DataFrame()
+        tables = [d for d in df if not d.empty]
+        df = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
     if df is None or df.empty:
         return pd.DataFrame()
     df = df.copy()
-    df["_time"] = pd.to_datetime(df["_time"], utc=True).dt.tz_localize(None)
+    from shared.data.source_context import data_timezone
+    df["_time"] = pd.to_datetime(df["_time"], utc=True).dt.tz_convert(data_timezone()).dt.tz_localize(None)
     df = df.rename(columns={"_time": "timestamp"}).set_index("timestamp").sort_index()
+    if include_all_fields:
+        excluded = {'result', 'table', 'data_origin', 'data_type', 'plant_id'}
+        columns = [c for c in df.columns if not c.startswith('_') and c not in excluded
+                   and pd.to_numeric(df[c], errors='coerce').notna().any()]
+        return df[columns].apply(pd.to_numeric, errors='coerce')
     return df[[c for c in fields if c in df.columns]]

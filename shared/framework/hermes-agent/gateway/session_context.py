@@ -94,7 +94,9 @@ def set_current_session_id(session_id: str) -> None:
     """
     import os
 
-    os.environ["HERMES_SESSION_ID"] = session_id
+    from hermes_cli.plugins import hooks_suppressed
+    if not hooks_suppressed():
+        os.environ["HERMES_SESSION_ID"] = session_id
     _SESSION_ID.set(session_id)
 
 

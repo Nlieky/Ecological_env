@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import type { AnnotationContext } from '@/assistant/annotations'
 
 export interface Annotation {
   timestamp: string
@@ -50,6 +51,8 @@ export const useActionStore = defineStore('action', () => {
   const annotations = ref<Annotation[]>([])
   /** 标注所属指标(run_detector 单指标检测时大屏只标该面板) */
   const annotationIndicator = ref<string | null>(null)
+  const annotationContext = ref<AnnotationContext | null>(null)
+  const annotationSide = ref<'influent' | 'effluent'>('effluent')
   /** 标注时间戳版本号(每次新标注+1,供视图watch触发) */
   const annotationSeq = ref(0)
   /** 最后一次动作(供 UI 提示) */
@@ -109,6 +112,8 @@ export const useActionStore = defineStore('action', () => {
       } catch { /* 重测失败就用 LLM 原结果 */ }
     }
     annotations.value = ann
+    annotationContext.value = null
+    annotationSide.value = action.side === 'influent' ? 'influent' : 'effluent'
     annotationIndicator.value = action.indicator ? normalizeIndicator(action.indicator) : null
     annotationSeq.value++
   }
@@ -128,8 +133,11 @@ export const useActionStore = defineStore('action', () => {
 
   function clearAnnotations() {
     annotations.value = []
+    annotationContext.value = null
+    annotationIndicator.value = null
+    annotationSeq.value++
   }
 
-  return { indicators, side, timeRange, date, annotations, annotationIndicator, annotationSeq,
+  return { indicators, side, timeRange, date, annotations, annotationIndicator, annotationContext, annotationSide, annotationSeq,
     plant, lastAction, viewContext, setViewContext, dispatch, clearAnnotations, normalizeIndicator }
 })
