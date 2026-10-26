@@ -63,6 +63,14 @@ def seed_defaults() -> None:
                 s.commit()
             except IntegrityError:
                 s.rollback()
+    # 默认策略也种上：fresh DB 的 agent_strategy 为空 → resolve_default() 恒 None
+    # → agent 服务回落 runtime params(空 api_key)被框架拒收,启动即崩。幂等：已有值不覆盖。
+    try:
+        from backend.services.agent_strategy import get_strategy, set_strategy
+        if not get_strategy("default_llm_provider"):
+            set_strategy("default_llm_provider", "ctgu-vlm")
+    except Exception:
+        pass
 
 
 def _mask(v: str) -> str:
