@@ -33,7 +33,7 @@ python "$HERMES_HOME/skills/data-perception-core/scripts/get_data.py" --hours 24
 
 ## Responsibilities
 
-- 从 **InfluxDB**（`monitoring-data` bucket）取进水/出水数据
+- 从 **InfluxDB**（真实数据 `monitoring-real` bucket）取进水/出水数据
 - **忠实取数**：保留原始（含缺失/异常值），标记缺失时间点，**不做清洗/插值/标准化**
 - 时序对齐（按 2h HRT 滞后）、字段标准化
 - 数据质量报告

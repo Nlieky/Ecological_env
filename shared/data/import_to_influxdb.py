@@ -8,7 +8,7 @@
   INFLUXDB_TOKEN   InfluxDB all-access token   （必填）
   INFLUXDB_URL     默认 http://localhost:8086
   INFLUXDB_ORG     默认 ecological_env
-  INFLUXDB_BUCKET  默认 monitoring-data
+  INFLUXDB_REAL_BUCKET  --bucket 默认值(默认 monitoring-real,可 --bucket 覆盖)
 
 Schema:
   measurement = wastewater

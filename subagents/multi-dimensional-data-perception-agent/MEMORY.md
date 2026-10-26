@@ -4,7 +4,7 @@
 
 | 数据 | 来源 |
 |------|------|
-| 进水/出水 | InfluxDB 2.7（bucket=`monitoring-data`, org=`ecological_env`） |
+| 进水/出水 | InfluxDB 2.7（bucket=`monitoring-real`, org=`ecological_env`） |
 | 数据源切换 | `.env` 的 `MONITORING_DATA_SOURCE`（influxdb / csv 回退） |
 
 ## 监测指标

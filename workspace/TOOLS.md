@@ -21,7 +21,7 @@
 
 | 数据 | 真实路径 |
 |------|---------|
-| 时序监测数据 | InfluxDB 2.7（bucket=`monitoring-data`, org=`ecological_env`） |
+| 时序监测数据 | InfluxDB 2.7（bucket=`monitoring-real`, org=`ecological_env`） |
 | 日志库 | `shared/data/ecological_logs.db`（SQLite） |
 | 算子库 | `shared/operators/`（`machine_learning/` · `specialized/` · `deep_learning/`） |
 | 知识库 | `shared/knowledge/`（法规 / 工艺 / 违规模式 / 专家经验） |

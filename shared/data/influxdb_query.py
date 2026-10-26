@@ -47,7 +47,7 @@ def get_client_and_bucket() -> Tuple[InfluxDBClient, str]:
     url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
     token = os.environ.get("INFLUXDB_TOKEN")
     org = os.environ.get("INFLUXDB_ORG", "ecological_env")
-    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-real")
     if not token:
         raise RuntimeError("INFLUXDB_TOKEN 未设置(环境变量或项目根 .env)")
     return InfluxDBClient(url=url, token=token, org=org, timeout=30_000), bucket

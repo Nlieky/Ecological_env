@@ -18,7 +18,7 @@ def sampling_timestamp(value) -> pd.Timestamp:
 
 def simulation_bucket() -> str:
     bucket = os.environ.get('INFLUXDB_SIMULATION_BUCKET', 'monitoring-simulation')
-    if not bucket or bucket in {os.environ.get('INFLUXDB_REAL_BUCKET', 'monitoring-real'), os.environ.get('INFLUXDB_BUCKET', 'monitoring-data')}:
+    if not bucket or bucket in {os.environ.get('INFLUXDB_REAL_BUCKET', 'monitoring-real'), os.environ.get('INFLUXDB_BUCKET', 'monitoring-real')}:
         raise ValueError('模拟 bucket 必须与真实/业务查询 bucket 不同')
     return bucket
 

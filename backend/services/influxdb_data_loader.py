@@ -1,6 +1,6 @@
 """InfluxDB 监测数据加载器。
 
-从 InfluxDB ``monitoring-data`` bucket 读取废水监测数据,鸭子兼容
+从 InfluxDB 真实数据 bucket(默认 ``monitoring-real``)读取废水监测数据,鸭子兼容
 :class:`backend.services.monitoring_data_loader.MonitoringDataset` 的接口
 (``maybe_reload`` / ``latest_timestamp`` / ``influent`` / ``effluent`` / ``window``),
 使 :mod:`backend.services.data_service` 与 :mod:`backend.metrics.updater` 零改动即可切换数据源。
@@ -66,7 +66,7 @@ class InfluxDBMonitoringDataset:
             out_df = self._fetch("effluent", EFFLUENT_FIELDS)
             if in_df.empty and out_df.empty:
                 raise DataUnavailableException(
-                    "InfluxDB monitoring-data bucket 无 wastewater 数据",
+                    f"InfluxDB 数据 bucket({self._bucket})无 wastewater 数据",
                     details={"bucket": self._bucket, "org_hint": "确认已运行 import_to_influxdb.py"},
                 )
             self._in = in_df

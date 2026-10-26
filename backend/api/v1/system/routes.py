@@ -145,7 +145,7 @@ def _build_status_data() -> dict:
         from shared.data.discover_plants import discover_plants
         from shared.data.source_context import describe_data_context, sampling_timestamp
         for p in discover_plants():  # 返回 list[dict]
-            context = describe_data_context(os.environ.get('INFLUXDB_BUCKET', 'monitoring-data'), p.get('latest_time') or None)
+            context = describe_data_context(os.environ.get('INFLUXDB_BUCKET', 'monitoring-real'), p.get('latest_time') or None)
             plants.append({
                 "plant_id": p.get("plant_id", ""),
                 "latest_time": sampling_timestamp(p['latest_time']).strftime('%Y-%m-%d %H:%M') if p.get('latest_time') else '',

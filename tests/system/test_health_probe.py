@@ -109,7 +109,7 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr("shared.data.discover_plants.discover_plants",
                         lambda: [])
     monkeypatch.setattr("shared.data.influxdb_query.get_client_and_bucket",
-                        lambda: (state["influx"], "monitoring-data"))
+                        lambda: (state["influx"], "monitoring-real"))
     monkeypatch.setattr(sys_routes, "_LOGS_DB_PATH", tmp_path / "logs.db")
     return state
 

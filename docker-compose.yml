@@ -54,12 +54,12 @@ services:
   # InfluxDB 数据一次性导入(real-time/*.xls)——容器化后 bucket 是空的,首启导入
   influxdb-init:
     build: .
-    command: ["sh", "-c", "until curl -sf http://influxdb:8086/health >/dev/null; do echo waiting influxdb; sleep 2; done; python shared/data/import_to_influxdb.py"]
+    command: ["sh", "-c", "until curl -sf http://influxdb:8086/health >/dev/null; do echo waiting influxdb; sleep 2; done; python shared/data/import_to_influxdb.py --create-bucket"]
     environment:
       - INFLUXDB_URL=http://influxdb:8086
       - INFLUXDB_TOKEN=influxdb-local-token
       - INFLUXDB_ORG=ecological_env
-      - INFLUXDB_BUCKET=monitoring-data
+      - INFLUXDB_REAL_BUCKET=monitoring-real
     depends_on:
       - influxdb
     restart: "no"           # 一次性,导完就退出
@@ -76,7 +76,7 @@ services:
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
       - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
       - DOCKER_INFLUXDB_INIT_ORG=ecological_env
-      - DOCKER_INFLUXDB_INIT_BUCKET=monitoring-data
+      - DOCKER_INFLUXDB_INIT_BUCKET=monitoring-real
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=influxdb-local-token
     volumes:
       - influxdb-data:/var/lib/influxdb2

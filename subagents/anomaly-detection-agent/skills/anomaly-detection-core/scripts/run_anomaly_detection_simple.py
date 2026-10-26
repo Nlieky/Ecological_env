@@ -151,7 +151,7 @@ def load_recent_data(hours: int = 24) -> dict:
     url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
     token = os.environ.get("INFLUXDB_TOKEN")
     org = os.environ.get("INFLUXDB_ORG", "ecological_env")
-    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-real")
 
     logger.info(f"加载最近{hours}小时数据(InfluxDB bucket={bucket})...")
 

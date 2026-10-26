@@ -74,7 +74,7 @@ def load_series(indicator: str, start: str, end: str, side: str = "effluent",
     url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
     token = os.environ.get("INFLUXDB_TOKEN")
     org = os.environ.get("INFLUXDB_ORG", "ecological_env")
-    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-real")
     field = INDICATOR_FIELDS.get(indicator, indicator)
 
     client = InfluxDBClient(url=url, token=token, org=org, timeout=30_000)
@@ -146,7 +146,7 @@ def resolve_window(start: str, end: str) -> tuple[str, str]:
     url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
     token = os.environ.get("INFLUXDB_TOKEN")
     org = os.environ.get("INFLUXDB_ORG", "ecological_env")
-    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-real")
     client = InfluxDBClient(url=url, token=token, org=org, timeout=30_000)
     try:
         q = client.query_api()
