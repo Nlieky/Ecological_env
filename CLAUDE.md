@@ -36,7 +36,7 @@
 
 ## Project Overview
 
-Wastewater false discharge monitoring system based on a patent architecture using 6 layers: human-computer interaction, data collection, master agent, task orchestration, sub-agent, and data support layers. The system uses a Large Language Model (LLM) as a core coordinator that reads master/sub-agent identity files and calls pre-developed scripts from four sub-agents.
+Wastewater false discharge monitoring system using 6 layers: human-computer interaction, data collection, master agent, task orchestration, sub-agent, and data support layers. The system uses a Large Language Model (LLM) as a core coordinator that reads master/sub-agent identity files and calls pre-developed scripts from four sub-agents.
 
 **当前状态**：后端 API 完成；前端框架完成(Phase 0-3A)，部分页面待填充(Phase B)；智能体 pipeline 已跑通(2026-07-23)。
 
@@ -229,7 +229,7 @@ curl http://localhost:8000/api/health
 
 ```bash
 # .env 文件配置（当前实际使用：本地部署的 ctgu-vlm）
-LLM_BASE_URL=http://172.16.12.41:30000/v1
+LLM_BASE_URL=http://172.xx.xx.xx:30000/v1
 LLM_API_KEY=sk-xxx  # 由部署方提供
 LLM_MODEL=ctgu-vlm
 
@@ -359,7 +359,7 @@ The system detects 4 types of violations:
 
 - **Python**: 3.12.12
 - **虚拟环境**: `ecological_env` (通过 uv 创建)
-- **LLM**: ctgu-vlm (本地部署 @ http://172.16.12.41:30000/v1，OpenAI 兼容 API；备用 LongCat-2.0 美团)
+- **LLM**: ctgu-vlm (本地部署 @ http://172.xx.xx.xx:30000/v1，OpenAI 兼容 API；备用 LongCat-2.0 美团)
 - **后端端口**: 8000 (FastAPI), 5000 (简单包装器)
 - **Hermes API**: 8642
 

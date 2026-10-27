@@ -240,7 +240,7 @@ def call_subagent(**kwargs) -> Dict[str, Any]:
 
     # 显式添加 LLM 配置环境变量（确保子进程能访问 LLM 服务）
     # Hermes Agent 框架期望 OPENAI_API_KEY，所以我们需要同时设置两者
-    llm_base_url = os.environ.get('LLM_BASE_URL', 'http://172.16.12.41:30000/v1')
+    llm_base_url = os.environ.get('LLM_BASE_URL', 'http://172.xx.xx.xx:30000/v1')
 
     # 安全检查：API Key 必须从环境变量获取
     llm_api_key = os.environ.get('LLM_API_KEY')

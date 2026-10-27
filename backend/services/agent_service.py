@@ -92,7 +92,7 @@ class AgentService:
         self._ensure_correct_directory()
 
         # 读取环境变量
-        base_url = os.environ.get("LLM_BASE_URL", "http://172.16.12.41:30000/v1")
+        base_url = os.environ.get("LLM_BASE_URL", "http://172.xx.xx.xx:30000/v1")
         model = os.environ.get("LLM_MODEL", "ctgu-vlm")
         provider = os.environ.get("LLM_PROVIDER", "custom")
         api_key = os.environ.get("LLM_API_KEY", "")

@@ -378,7 +378,7 @@ model:
   base_url_env: LLM_BASE_URL
   api_key_env: LLM_API_KEY
   model_env: LLM_MODEL
-  base_url: "http://172.16.12.41:30000/v1"
+  base_url: "http://172.xx.xx.xx:30000/v1"
   model: "ctgu-vlm"
   temperature: 0.7
   max_tokens: 4096
@@ -710,7 +710,7 @@ services:
       - INFLUXDB_TOKEN=my-super-secret-token
       - INFLUXDB_ORG=ecological-env
       - INFLUXDB_BUCKET=monitoring-data
-      - LLM_BASE_URL=http://172.16.12.41:30000/v1
+      - LLM_BASE_URL=http://172.xx.xx.xx:30000/v1
       - LLM_API_KEY=sk-4e9a2c7d5f1b8e3c6d0a9b2f4d7e1c3a6b5f8e2d9c7a1b0f
       - LLM_MODEL=ctgu-vlm
     depends_on:
@@ -770,7 +770,7 @@ GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=admin
 
 # ==================== LLM 配置 ====================
-LLM_BASE_URL=http://172.16.12.41:30000/v1
+LLM_BASE_URL=http://172.xx.xx.xx:30000/v1
 LLM_API_KEY=sk-4e9a2c7d5f1b8e3c6d0a9b2f4d7e1c3a6b5f8e2d9c7a1b0f
 LLM_MODEL=ctgu-vlm
 

@@ -50,7 +50,7 @@ def seed_defaults() -> None:
             pass
     with _open_session() as s:
         for name, base_url, model, enabled, key in [
-            ("ctgu-vlm", "http://172.16.12.41:30000/v1", "ctgu-vlm", True, env_key),
+            ("ctgu-vlm", "http://172.xx.xx.xx:30000/v1", "ctgu-vlm", True, env_key),
             ("LongCat-2.0", "https://api.longcat.chat/openai/v1", "LongCat-2.0", False, ""),
         ]:
             row = s.get(LLMProvider, name)

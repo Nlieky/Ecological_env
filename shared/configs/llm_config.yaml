@@ -9,7 +9,7 @@
 # 使用本地部署的 ctgu-vlm 模型（OpenAI 兼容 API）
 custom_llm_server:
   enabled: true
-  base_url: "http://172.16.12.41:30000/v1"
+  base_url: "http://172.xx.xx.xx:30000/v1"
   api_key: ""  # 从环境变量 LLM_API_KEY 读取
   model_name: "ctgu-vlm"  # 本地部署模型
 

@@ -161,7 +161,7 @@ SERVICES: List[Dict] = [
     {"id": "service:sqlite_logs", "label": "SQLite 日志库",
      "props": {"db": "ecological_logs.db"}},
     {"id": "service:llm", "label": "LLM ctgu-vlm",
-     "props": {"endpoint": "http://172.16.12.41:30000/v1"}},
+     "props": {"endpoint": "http://172.xx.xx.xx:30000/v1"}},
 ]
 _ORCHESTRATES = [
     ("agent:master", "agent:multi-dimensional-data-perception"),

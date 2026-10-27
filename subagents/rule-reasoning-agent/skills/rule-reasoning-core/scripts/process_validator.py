@@ -4,7 +4,7 @@
 工艺机理校验模块
 功能：调用工艺知识库进行物理化学合理性判断
 
-基于专利文档：工艺机理校验模块
+工艺机理校验模块
 """
 
 import logging
@@ -18,24 +18,24 @@ logger = logging.getLogger(__name__)
 
 class ProcessValidator:
     """
-    工艺机理校验器（专利增强版）
+    工艺机理校验器
 
     校验的机理规则：
     1. 生化反应联动规则（污染物降解与pH、DO的关系）
     2. 物料平衡规则（进水、出水、污泥之间的关系）
     3. 相关性规则（指标间的协同关系）
-    4. 氨氮-总氮转化规则（专利新增）
+    4. 氨氮-总氮转化规则
     """
 
     def __init__(self):
         """初始化工艺机理校验器"""
         self.name = "工艺机理校验器"
-        self.version = "2.1.0"  # 专利增强版
+        self.version = "2.1.0"
 
         # 工艺知识库
         self.process_knowledge = self._load_process_knowledge()
 
-        # 专利参数：氨氮-总氮转化规则
+        # 参数：氨氮-总氮转化规则
         self.nitrogen_conversion_params = {
             "min_correlation": 0.3,       # 氨氮-总氮最小相关系数
             "nh3_tn_ratio_min": 0.2,      # 出水氨氮/总氮比值下限
@@ -294,7 +294,7 @@ class ProcessValidator:
     def _validate_nitrogen_conversion_rules(self, correlation_results: Dict[str, Any],
                                            data: pd.DataFrame) -> List[Dict[str, Any]]:
         """
-        校验氨氮-总氮转化规则（专利核心算法）
+        校验氨氮-总氮转化规则（核心算法）
 
         工艺机理：
         - NH3-N（氨氮）是TN（总氮）的组成部分

@@ -127,7 +127,7 @@ class AgentService:
     def _create_main_agent(self, system_interaction=False, session_id=None):
         """One provider resolution and workspace identity for both execution modes."""
         model = _gp('llm_model', env_key='LLM_MODEL', default='ctgu-vlm')
-        base_url = _gp('llm_base_url', env_key='LLM_BASE_URL', default='http://172.16.12.41:30000/v1')
+        base_url = _gp('llm_base_url', env_key='LLM_BASE_URL', default='http://172.xx.xx.xx:30000/v1')
         api_key = _gp('llm_api_key', env_key='LLM_API_KEY', default='')
         try:
             _lp.seed_defaults()

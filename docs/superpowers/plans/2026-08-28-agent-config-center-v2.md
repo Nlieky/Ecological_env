@@ -474,7 +474,7 @@ def seed_defaults() -> None:
     from backend.models.agent_config import LLMProvider
     with _open_session() as s:
         for name, base_url, model, enabled in [
-            ("ctgu-vlm", "http://172.16.12.41:30000/v1", "ctgu-vlm", True),
+            ("ctgu-vlm", "http://172.xx.xx.xx:30000/v1", "ctgu-vlm", True),
             ("LongCat-2.0", "https://api.longcat.chat/openai/v1", "LongCat-2.0", False),
         ]:
             if s.get(LLMProvider, name) is None:
@@ -1418,7 +1418,7 @@ from backend.services import llm_providers as _lp
 ```python
             # LLM 读取链:策略 default_llm_provider → providers 表行 → get_param/env 兜底
             model = _gp("llm_model", env_key="LLM_MODEL", default="ctgu-vlm")
-            base_url = _gp("llm_base_url", env_key="LLM_BASE_URL", default="http://172.16.12.41:30000/v1")
+            base_url = _gp("llm_base_url", env_key="LLM_BASE_URL", default="http://172.xx.xx.xx:30000/v1")
             api_key = _gp("llm_api_key", env_key="LLM_API_KEY", default="")
             try:
                 _lp.seed_defaults()

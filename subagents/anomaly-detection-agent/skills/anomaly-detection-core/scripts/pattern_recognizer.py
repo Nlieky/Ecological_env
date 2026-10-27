@@ -4,7 +4,7 @@
 异常模式识别模块
 功能：识别异常点位、异常时段、异常模式
 
-基于专利文档：异常模式识别模块
+异常模式识别模块
 """
 
 import logging
@@ -30,9 +30,9 @@ logger = logging.getLogger(__name__)
 
 class PatternRecognizer:
     """
-    异常模式识别器（专利5类异常特征）
+    异常模式识别器（5类异常特征）
 
-    识别的异常模式（专利要求）：
+    识别的异常模式：
     1. 恒定异常（平稳异常）：指标长时间保持不变
     2. 突变异常：指标突然大幅变化
     3. 趋势异常：指标呈现异常趋势
@@ -45,7 +45,7 @@ class PatternRecognizer:
         self.name = "异常模式识别器"
         self.version = "2.2.0"  # 架构重构版：支持全局算子库
 
-        # 模式定义（专利5类异常特征）
+        # 模式定义（5类异常特征）
         self.patterns = {
             "constant": "恒定异常（平稳异常）",
             "spike": "突变异常",
@@ -54,7 +54,7 @@ class PatternRecognizer:
             "high_freq_volatility": "高频波动异常"
         }
 
-        # 专利参数配置
+        # 参数配置
         self.periodic_params = {
             "window_size": 48,           # 周期检测窗口
             "power_ratio_threshold": 5   # 功率谱比值阈值
@@ -72,7 +72,7 @@ class PatternRecognizer:
             logger.info("[INIT] 全局算子库可用，ChangePointDetector 已加载")
 
         logger.info(f"[INIT] {self.name} v{self.version} initialized")
-        logger.info(f"[INIT] 支持5类专利异常特征识别")
+        logger.info(f"[INIT] 支持5类异常特征识别")
 
         if not SHARED_OPERATORS_AVAILABLE:
             logger.warning("[INIT] 全局算子库不可用，将使用本地实现")
@@ -136,14 +136,14 @@ class PatternRecognizer:
     def _identify_pattern(self, data: pd.DataFrame,
                          moment: Dict[str, Any]) -> str:
         """
-        识别异常模式（专利5类异常特征）
+        识别异常模式（5类异常特征）
 
         检测顺序：
         1. 恒定异常（平稳异常）
         2. 突变异常
         3. 趋势异常
-        4. 周期异常（专利新增）
-        5. 高频波动异常（专利新增）
+        4. 周期异常
+        5. 高频波动异常
         """
         indicator = moment["indicator"]
         index = moment["index"]
@@ -168,11 +168,11 @@ class PatternRecognizer:
         if self._is_trend_pattern(series, index):
             return "trend"
 
-        # 4. 检查周期异常（专利新增）
+        # 4. 检查周期异常
         if self._is_periodic_pattern(series, index):
             return "periodic"
 
-        # 5. 检查高频波动异常（专利新增）
+        # 5. 检查高频波动异常
         if self._is_high_frequency_volatility(series, index):
             return "high_freq_volatility"
 
@@ -325,7 +325,7 @@ class PatternRecognizer:
     def _is_periodic_pattern(self, series: pd.Series, index: int,
                              window: int = None) -> bool:
         """
-        检查周期异常（专利核心算法）
+        检查周期异常（核心算法）
 
         周期异常特征：数据呈现不自然的周期性变化
         例如每N小时出现相同的峰值模式
@@ -401,7 +401,7 @@ class PatternRecognizer:
     def _is_high_frequency_volatility(self, series: pd.Series, index: int,
                                       window: int = None) -> bool:
         """
-        检查高频波动异常（专利核心算法）
+        检查高频波动异常（核心算法）
 
         高频波动异常特征：数据出现不自然的快速波动
         可能是设备故障或数据传输问题

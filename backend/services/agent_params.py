@@ -42,7 +42,7 @@ PARAM_REGISTRY: dict = {
         "read_timing": "下一次新子智能体进程初始化时读取",
         "reader": "subagent_entry.py", "env_key": None,
         "desc": "子智能体最大迭代轮数"},
-    "llm_base_url": {"default": "http://172.16.12.41:30000/v1", "type": "str", "effect": "restart",
+    "llm_base_url": {"default": "http://172.xx.xx.xx:30000/v1", "type": "str", "effect": "restart",
         "reader": "start_agent + subagent_entry", "env_key": "LLM_BASE_URL",
         "desc": "LLM OpenAI 兼容 API 地址"},
     "llm_model": {"default": "ctgu-vlm", "type": "str", "effect": "restart",
