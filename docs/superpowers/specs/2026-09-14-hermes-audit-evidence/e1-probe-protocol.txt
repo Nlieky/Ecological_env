@@ -18,7 +18,7 @@ auxiliary_client.py 15+ 个辅助 client 构造点同样收敛到该方法（:63
   a) patch openai.resources.chat.completions.Completions.create —— 精确 LLM 调用计数器
      （主 client + auxiliary client 全覆盖；非流式可取 usage）
   b) patch httpx.Client.send / AsyncClient.send（openai SDK 底座），过滤 LLM_BASE_URL
-     authority（172.16.12.41:30000）—— 兜底网：任何不经 a) 的端点请求（/models、
+     authority（172.xx.xx.xx:30000）—— 兜底网：任何不经 a) 的端点请求（/models、
      Ollama 风格探测路径等）均现形
 注入方式：PYTHONPATH=/tmp/hermes-audit + sitecustomize.py（解释器启动即 patch，
 只读旁路记录，不消费流式响应体）；call_subagent 以 env 继承启动 subagent_entry.py
@@ -26,7 +26,7 @@ auxiliary_client.py 15+ 个辅助 client 构造点同样收敛到该方法（:63
 "[hermes-probe] installed: httpx=True openai=True" × 5 实证）。
 
 【存活探测（Step 5.0，L3 预警 a）】
-- LLM 端点 http://172.16.12.41:30000/v1/models（带 .env key）→ HTTP 200（9ms），
+- LLM 端点 http://172.xx.xx.xx:30000/v1/models（带 .env key）→ HTTP 200（9ms），
   模型 ctgu-vlm（vllm-0.28.0-tp8，Qwen3.8-27B-FP8，max_model_len 1010000）
 - agent 服务 :8642/health → 200，{"status":"healthy","agent_initialized":true}，
   model=ctgu-vlm（PID 1089133，venv 解释器跑 scripts/start_agent.py）

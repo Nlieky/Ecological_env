@@ -140,14 +140,14 @@
 
 | 配置源 | 活链路是否读取 | 证据 | 要点 |
 |---|---|---|---|
-| `.env`（项目根） | ✅ **唯一真源** | start_agent.py:29 load_dotenv → :95-97 os.getenv；call_subagent.py:260-267 透传子进程（含 OPENAI_API_KEY/OPENAI_BASE_URL 映射） | `LLM_BASE_URL=http://172.16.12.41:30000/v1`（.env:9）、`LLM_MODEL=ctgu-vlm`（:11）、`LLM_API_KEY`=<已脱敏>（:10）、`HERMES_TOTAL_TIMEOUT=300`（:33） |
+| `.env`（项目根） | ✅ **唯一真源** | start_agent.py:29 load_dotenv → :95-97 os.getenv；call_subagent.py:260-267 透传子进程（含 OPENAI_API_KEY/OPENAI_BASE_URL 映射） | `LLM_BASE_URL=http://172.xx.xx.xx:30000/v1`（.env:9）、`LLM_MODEL=ctgu-vlm`（:11）、`LLM_API_KEY`=<已脱敏>（:10）、`HERMES_TOTAL_TIMEOUT=300`（:33） |
 | `$HERMES_HOME/config.yaml`（hermes 自身配置） | ❌ 文件不存在 | hermes_constants.py:423-428（config 路径=HERMES_HOME/config.yaml）+ start_agent.py:33（HERMES_HOME=项目根）+ `ls config.yaml`→无 | hermes 的 yaml 配置整体缺席，框架参数全靠 env 与构造参数 |
 | `.hermes/config.yaml` | ❌ 不存在 | `wc -c` 无输出 | — |
 | `workspace/config.yaml` | ❌ 非活链路（陈旧） | 内容为 LongCat-2.0 @ api.longcat.chat（旧端点）；HERMES_HOME 指向项目根而非 workspace；AIAgent 的 base_url/model 由构造参数显式传入（start_agent.py:97-103） | 遗留文件，若哪天有人「按注释」把 HERMES_HOME 指回 workspace 会引入错误端点——🟡 建议清理（L3） |
 | `shared/configs/llm_config.yaml` | ❌ 零读取 | grep backend/ scripts/ skills/ subagents/ framework 无命中 | 端点描述与 .env 一致，纯文档性质 |
 | `backend/core/config.py` | ✅ 仅 backend 侧 | :28 AGENT_SERVICE_URL、:30 AGENT_TIMEOUT=600 | 不含 LLM 密钥 |
 
-**LLM 端点事实**：全链路（主+4 子智能体）唯一活端点 = **`http://172.16.12.41:30000/v1`，模型 `ctgu-vlm`**（内网 vLLM，OpenAI 兼容）；OpenAI SDK 经 process_bootstrap 懒加载（`from openai import OpenAI`，_load_openai_cls）。`.env` 同时保留 LongCat 注释行（:14）为备用端点说明，未启用。
+**LLM 端点事实**：全链路（主+4 子智能体）唯一活端点 = **`http://172.xx.xx.xx:30000/v1`，模型 `ctgu-vlm`**（内网 vLLM，OpenAI 兼容）；OpenAI SDK 经 process_bootstrap 懒加载（`from openai import OpenAI`，_load_openai_cls）。`.env` 同时保留 LongCat 注释行（:14）为备用端点说明，未启用。
 
 ### 1.5 子智能体注册与调用机制（谁把 4 个子智能体变成框架可调用的）
 
@@ -188,7 +188,7 @@ flowchart TD
     BR -->|"subprocess :291-296<br/>env LLM_*/OPENAI_* 透传"| SUB["subagents/×4-agent<br/>(HERMES_HOME=各自目录)"]
     SUB -->|"subagent_entry.py:38 同款全限定 import"| RA
     SA -.->|"workspace/ 身份文件<br/>identity_path= :101"| WS["workspace/ (7 身份文件)"]
-    RA -->|"OpenAI 兼容<br/>process_bootstrap 懒加载 openai"| LLM["LLM 端点: http://172.16.12.41:30000/v1<br/>模型 ctgu-vlm (.env:9-11, 唯一真源)"]
+    RA -->|"OpenAI 兼容<br/>process_bootstrap 懒加载 openai"| LLM["LLM 端点: http://172.xx.xx.xx:30000/v1<br/>模型 ctgu-vlm (.env:9-11, 唯一真源)"]
     SUB --> LLM
     OV["shared/framework/hermes-overlays/ (3 py)<br/>构建期覆盖源, 运行时零 import"] -.->|"vendor_hermes.py:62-78<br/>构建期拷入(当前已漂移)"| VEND
     AGS["backend/services/agent_service.py<br/>(并行进程内入口, 仅 main.py:181 启动自检引用)"] -.->|"同款 import :13"| RA
@@ -197,9 +197,9 @@ flowchart TD
 
 要点：框架代码实际由两个目录共同构成（精简包 3 个活文件 + vendored 448 个静态可达文件（∪ 历史执行 548））；「身份文件→system_prompt 注入」是精简包与 vendored 树之间唯一的反向依赖（system_prompt.py:112）。
 
-### 1.7 与专利六层架构的映射/偏差（对照仓库根 CLAUDE.md）
+### 1.7 与六层架构的映射/偏差（对照仓库根 CLAUDE.md）
 
-| 专利层 | CLAUDE.md 描述 | 实测（L1） | 判定 |
+| 架构层 | CLAUDE.md 描述 | 实测（L1） | 判定 |
 |---|---|---|---|
 | 1 人机交互层 | middleware/ Flask :5000 + Grafana | 活交互 = frontend/ + backend/ FastAPI :8000（main.py:121-126）；`middleware/` 目录**不存在**（全仓 find 仅 backend/middleware/logging_middleware.py，FastAPI 日志中间件，与 Flask 无关） | ❌ 偏差（CLAUDE.md 描述的旧链路整体已删） |
 | 2 数据采集层 | stream/dual_data_stream.py 推流模拟 | `stream/` 不存在；活数据源 = InfluxDB localhost:8086 bucket monitoring-data（config.py:47-52），由数据感知子智能体拉取（subagents/…/get_data.py 引用 influxdb） | ❌ 偏差（推流→拉取，双流向单源） |
@@ -298,7 +298,7 @@ flowchart TD
 | 改动（#） | 动机可推断性 | 正确性风险 | 上游同步冲突面 | 松耦合替代方案（本可用 X 而不必改源码） |
 |---|---|---|---|---|
 | 身份扩展链 #1-#4 | ✅ 高：PATCHES :90-92 与代码注释自证（主 7/子 3 文件、双路径探测） | 🟢 低：try/except 包裹 + `_identity_path` 缺省回落 HERMES_HOME；活链路证据 = import 边 + pyc（身份内容实际落入 prompt 的直接观测归 §4 E1；try/except 静默失败 ⇒ 非硬依赖，身份缺失时退回原生 SOUL.md 行为） | 🟡 中：system_prompt 补丁锚定上游 17 行文本（改写法则 no-match，脚本 :123 有告警防护不炸）；**run_agent/agent_init 以整文件 overlay 锁死**（5358+1763 行，上游任何演进全部丢失，且 overlays 版与精简包版三份一致性靠手工维护） | 🟡 部分：上游 system_prompt 无身份扩展点（仅 SOUL.md :88-100 + DEFAULT_AGENT_IDENTITY 回落），确需改源或**部署期把 7 文件合并生成 SOUL.md**（数据级替代，代价失文件粒度、子智能体目录同理）；更优路径是给上游提 feature/PR |
-| #7 stream_options 移除 | ✅ 高：注释「removed for vLLM compatibility」 | 🟡 中：按代码注释与 usage_obj=None 路径**推断**流式 usage 缺失（vLLM 是否真不发 usage chunk 未直接观测），usage_obj=None 传入 mock response（chat_completion_helpers.py:2038/:2062）——不炸但**流式路径 token 计量退化为空**（account_usage/上下文预算拿不到服务端数据）；活路径（/query/stream） | 🟡 中：该文件是上游高频改动区（基线后上游已多次演进该函数），行级手工改动每次 re-vendor 都要对齐 | 🟡 存在模式不存在开关：上游有 per-provider extra_body 机制先例（:656 github_reasoning_extra、:1377 reasoning 分支）——**本可按 provider 条件分支**（vLLM 才不带 stream_options）而非全局删除；升级 vLLM 版本可能根本不需要此改动（待查：172.16.12.41 vLLM 版本——归属 §4 E 系实证或 §3 项目适配盘点处理） |
+| #7 stream_options 移除 | ✅ 高：注释「removed for vLLM compatibility」 | 🟡 中：按代码注释与 usage_obj=None 路径**推断**流式 usage 缺失（vLLM 是否真不发 usage chunk 未直接观测），usage_obj=None 传入 mock response（chat_completion_helpers.py:2038/:2062）——不炸但**流式路径 token 计量退化为空**（account_usage/上下文预算拿不到服务端数据）；活路径（/query/stream） | 🟡 中：该文件是上游高频改动区（基线后上游已多次演进该函数），行级手工改动每次 re-vendor 都要对齐 | 🟡 存在模式不存在开关：上游有 per-provider extra_body 机制先例（:656 github_reasoning_extra、:1377 reasoning 分支）——**本可按 provider 条件分支**（vLLM 才不带 stream_options）而非全局删除；升级 vLLM 版本可能根本不需要此改动（待查：172.xx.xx.xx vLLM 版本——归属 §4 E 系实证或 §3 项目适配盘点处理） |
 | #8 OpenRouter timeout | ✅ 高：注释自证（内网不可达、阻塞 ~12s、已由 vLLM /v1/models 提供） | 🟢 低：超时→静态回退（上游 :234 自带 offline fallback），语义无损 | 🟢 小：锚定单行 | ❌ 无：OPENROUTER_MODELS_URL 是编译期常量（hermes_constants.py:496），无 env/config 开关——**四类改动中最正当的一处**；但现 PATCHES 文本已漂移成重跑即产出语法错误文件（🔴，2.6），须先修声明再谈复现 |
 | #9 去 jiter 预载 | ❌ 低：无注释；对照 jiter_preload.py docstring（Windows 专用 import-order workaround）推测为「清理无关代码」，但项目恰从 Windows 开发（D:\Hermes） | 🟢 低（Linux 部署无影响）/ Windows 开发机理论风险 | 🟢 小 | ✅ 本可不改：`# noqa: F401` 的预载无害；如要移除也应记入 overlays 而非只改 vendored 树 |
 | #5 hermes_constants 死扩展 | ✅ 高（身份扩展配套）但**从未接线** | 🟢 无（零调用） | 🟢 小 | 应删除（活链路用 identity_loader 那份） |
@@ -344,7 +344,7 @@ flowchart TD
 | 异常处理 | 🟢 无裸 except；process_query broad-except 记日志返 500（:344-351）；流式 worker except→error 事件（:481-483）。🟡 工具注册失败仅 `logger.warning` 后照常 serve（:123-126），/health 仍报 healthy（:395-401 只看 master_agent 非空）——注册一坏，业务全降级为纯聊天而健康检查全绿 | 🟢 import 失败 sys.exit(1) 快速失败（:39-41）；LLM 块 broad-except 带 exc_info 落盘（:204-207）；结果文件缺失/无效诚实标 failed（:86-108, :190-200，注释自证旧版曾用 glob 顶替伪装成功，已修） | 🟡 :12-22 三级 import 降级链，末级静默 fallback 裸 `from run_agent import AIAgent`——实现被静默换掉无告警（运行时若 venv editable 缺失则 AIAgent=None，:84-85 才报） |
 | 超时与重试 | 🟡 **超时体系无端到端 deadline**：锁排队 300s（:82-83, :265）+ 后端转发 600s（backend/core/config.py:29 AGENT_TIMEOUT，query.py:77-84 透传）+ 子进程默认 600s/个（call_subagent.py:289 SUBAGENT_TIMEOUT）×最多 4 子智能体 + 主智能体 max_iterations=15（:106-108）——各层独立，最坏叠加远超任何外层上限。🔴 **HERMES_TOTAL_TIMEOUT 是死旋钮**【子类型：假声明/保障失效——宣称的服务级上限不存在】：start_agent.py:34-36 注释宣称"服务级上限 300s"并 setdefault，但全 vendored 树 grep 零消费者（仅 auxiliary_client.py:774 的 Codex 专用局部参数撞名）——宣称的整体超时不存在 | 🟢 外层 subprocess timeout 硬杀（call_subagent.py:291-299, 335-342 TimeoutExpired 处理完备）；内层仅 max_iterations=6（:177）兜底。🟡 :169 LLM_MODEL 默认值仍是 `LongCat-2.0`（退役端点遗物，仅 .env 缺失时触发） | 🟡 run_conversation 无任何 timeout（:163-166），仅 max_iterations=10（:117）；无重试（LLM 重试全靠框架内建 jittered_backoff，vendored run_agent.py:145，本层不配置） |
 | 同步阻塞 | 🟢 /query 用 sync def 走 FastAPI 线程池（:415-421，注释自证若 async 会冻事件循环）；master_agent 共享单例用 threading.Lock 串行化 + 排队超时拒"忙"（:80-83, :265-266）——正确的守门。🟡 /query/stream worker 为 daemon 线程持锁跑全程（:489），客户端断连后 SSE 生成器终止但 worker 不受影响、锁要占到跑完；`_tool_reg._current_progress_queue` 模块级全局靠锁保证安全（tool_registration.py:42-46，注释自证 contextvars 不透传 executor 线程） | 🟢 一次性 subprocess（同步等待），不占服务 worker；结尾 os._exit 跳过 bg-review 后台线程（:220-227，注释给出 ~20-30s/次 的省耗依据） | 🟡 **:39-44 `os.chdir` 进程级副作用**——backend 进程 cwd 被整体改到项目根，影响同进程一切相对路径假设；无锁（agent_cache 按 session 缓存实例，同 session 并发调 run_conversation 会串台）——现仅启动自检构造（不触 LLM、不触 chdir 路径外的逻辑），地雷属性 |
-| 配置硬编码 | 🟡 :89-91 LLM_BASE_URL/MODEL 硬编码回退值 `http://172.16.12.41:30000/v1`/`ctgu-vlm`（agent_service.py:95-97、call_subagent.py:245/258 同款）——.env 缺失时静默指向内网 IP 而非报错；:33 无条件覆盖系统 HERMES_HOME（有注释说明动机，🟢）；:508 端口默认 8642 可 env 覆盖 🟢；:51 `session_id: str = None` 类型不合法但 pydantic 默认不校验 default，能跑 | 🟢 LLM 配置全经 call_subagent.py:260-269 显式透传（含 OPENAI_* 映射）；:167-171 缺 API key 直接 raise（外层 :248-256 已先行拦截，双保险） | 同款硬编码回退（:95-97）；🟢 :36 项目根用 parents[2] 推导不写死绝对路径 |
+| 配置硬编码 | 🟡 :89-91 LLM_BASE_URL/MODEL 硬编码回退值 `http://172.xx.xx.xx:30000/v1`/`ctgu-vlm`（agent_service.py:95-97、call_subagent.py:245/258 同款）——.env 缺失时静默指向内网 IP 而非报错；:33 无条件覆盖系统 HERMES_HOME（有注释说明动机，🟢）；:508 端口默认 8642 可 env 覆盖 🟢；:51 `session_id: str = None` 类型不合法但 pydantic 默认不校验 default，能跑 | 🟢 LLM 配置全经 call_subagent.py:260-269 显式透传（含 OPENAI_* 映射）；:167-171 缺 API key 直接 raise（外层 :248-256 已先行拦截，双保险） | 同款硬编码回退（:95-97）；🟢 :36 项目根用 parents[2] 推导不写死绝对路径 |
 | 日志与可观测 | 🟢 分级清晰（初始化/查询耗时/消息数/子智能体计数 :322）；trace 队列让阻塞 /query 也回传 decision_path+subagent_calls（:267-319）→ backend 落审计表（query.py:120-140）；子智能体全量 stdout/stderr 落盘 sessions/_subagent_traces/（call_subagent.py:304-319，成败都写）——L3 实证全靠它 | 🟢 每步 [START]/[LLM]/[WRITE]/[WARN] 结构化日志，stderr 收 subprocess 全量 | 🟡 :46-69 `_check_identity_files`（检查 workspace 7 文件）**零调用方，死代码**——写了身份自检从未接上；:186-188 decision_path/sub_agent_calls 恒空（"可以后续实现"） |
 
 **3.1 补充裁决**：
@@ -385,7 +385,7 @@ flowchart TD
 | ④ 规则推理 | `run_rule_reasoning.py`：:61-126 读 SESSION_DIR/anomaly_result.json + data_result.json（含废弃绝对路径 fallback :83/:116），写 rule_reasoning_result.json。🟡 **知识库接缝是假的**：regulation_matcher.py:35 设 `regulations_dir = Path("E:/project/...")`（Windows 死路径，本机必不存在）但 `_load_regulations`（:43-79）根本不读它——法规全是内联硬编码 dict（GB 18918-2002/HJ 355-2019/水污染防治法）；**shared/knowledge/regulations/（排放标准.md、水污染防治法.md）零读取**，"数据支撑层"对规则推理未接线（E:/ 全仓扫描仅此一处功能性残留 + robust_estimator.py:11 一处 docstring 提及） | **零运行时证据**：sessions/ 全树检索 rule_reasoning_result.json = 0 份；_subagent_traces/ 5 份全量日志中 rule-reasoning 0 份 | 🔴 **业务断链**【业务断链·运行时口径】：代码链完整、**现存零执行记录**（记录缺失≠全称否定——sessions/ 是唯一证据留存地，更早记录若被清理则无法排除历史上曾跑通）。已搜：sessions/ 全树、_subagent_traces/ 全量、进程日志（agent.log/backend.log 未含子智能体调度明细） |
 | ⑤ 处置执行 | `run_disposition.py`：:58-126 读 anomaly_result + rule_reasoning_result（:91 因④现存零执行记录而必空），融合/分级/工单接 shared/configs/*（untracked 新文件 consensus/disposition/rule_config.yaml），写 disposition_result.json | **零运行时证据**：disposition_result.json = 0 份；trace 0 份 | 🔴 **业务断链**【业务断链·运行时口径】，同上 |
 
-**断链定性**：④⑤的"断"按现存证据口径是**零执行记录**而非"接不上"——每次查询是否走到④⑤由主智能体 LLM 即兴决定（无强制 pipeline 编排；tool_registration 只给工具不给顺序，顺序引导在 workspace/AGENTS.md:99-135 的任务链描述里，且 :135 指向的还是退役路径 workspace/skills/orchestrator-core/）。sessions/ 里唯一有完整多环节的会话（session_20260804_151448：data+anomaly）也止步于③。结论：**五环节代码全通、运行时通 3 断 2**；"influxdb→感知→异常检测"闭环成立（含数据新鲜度保留意见），"→规则推理→处置执行"后两环在活框架链路上零执行记录，专利叙事的完整违规判定-预警闭环（根 CLAUDE.md"4 类违规/预警分级"）在现运行时没有一次完整走通的实证。
+**断链定性**：④⑤的"断"按现存证据口径是**零执行记录**而非"接不上"——每次查询是否走到④⑤由主智能体 LLM 即兴决定（无强制 pipeline 编排；tool_registration 只给工具不给顺序，顺序引导在 workspace/AGENTS.md:99-135 的任务链描述里，且 :135 指向的还是退役路径 workspace/skills/orchestrator-core/）。sessions/ 里唯一有完整多环节的会话（session_20260804_151448：data+anomaly）也止步于③。结论：**五环节代码全通、运行时通 3 断 2**；"influxdb→感知→异常检测"闭环成立（含数据新鲜度保留意见），"→规则推理→处置执行"后两环在活框架链路上零执行记录，项目叙事的完整违规判定-预警闭环（根 CLAUDE.md"4 类违规/预警分级"）在现运行时没有一次完整走通的实证。
 
 **依赖接缝补充**：🟡 influxdb-client **未声明依赖**（requirements.txt/pyproject.toml 均无，venv 实装 1.50.0 系 LLM 运行时 pip install 所致——trace 实证两次安装，且装进了 `~/.local/lib/python3.10`（terminal 裸 `python` 解析到 3.10 用户环境，与服务 venv 3.12 不是一个解释器）；15:33 轮崩溃正因解释器解析不稳定）。归级说明：此条曾是 🔴 断链候选，因环节①已有 InfluxDB 直连跑通的 trace 实证（链路本身通）降为 🟡——风险是环境脆弱性（venv 重建后 get_data.py 必然 ModuleNotFoundError，直到 LLM 再自己 pip install 一次）叠加①行数据新鲜度存疑，而非当前断链。修法一行：requirements.txt 加 influxdb-client。
 
@@ -420,7 +420,7 @@ tests/ 共 28 个 .py（含 2 个 `__init__.py`）。关键词 `agent_service|st
 
 **对 §4/E1 的预警（L3 证据边界向实证环节传递）**：
 
-- (a) **证据窗距今约 6 周，当前存活状态未探测**：全部运行时证据止于 2026-08-04；本审计**未探测** agent 服务（:8642）、LLM 端点（172.16.12.41:30000）、InfluxDB（:8086）三者当前是否存活——E1 执行前应先做存活探测，否则实证对象可能已不是 §3 描述的形态。
+- (a) **证据窗距今约 6 周，当前存活状态未探测**：全部运行时证据止于 2026-08-04；本审计**未探测** agent 服务（:8642）、LLM 端点（172.xx.xx.xx:30000）、InfluxDB（:8086）三者当前是否存活——E1 执行前应先做存活探测，否则实证对象可能已不是 §3 描述的形态。
 - (b) **InfluxDB 数据停滞风险**：证据窗内最新数据止于 2026-07-25（§3.3① 新鲜度保留意见向 §4 传递）——若 E1 时仍停滞，"最近 N 小时"类活查询会取回陈数据或空结果；E1 判读须校验返回数据的时间戳，不能只看查询成败。
 - (c) **续传污染**：E1 协议若含同会话追问轮，§3.1 🔴 续传重标会把上一轮 `*_result.json` 伪装成本轮产出，污染一切基于结果文件的观察——E1 观察须以 `sessions/_subagent_traces/` 日志为准，结果文件只作交叉验证。
 
@@ -428,7 +428,7 @@ tests/ 共 28 个 .py（含 2 个 `__init__.py`）。关键词 `agent_service|st
 
 <!-- 覆盖设计文档 §3 E 最小实证 E1–E4（E1 计数 wrapper 仅注入 /tmp；E4 降级时本节须显著标注「未实证」）；对照 CLAUDE.md「~12 次调用/流程」口径 -->
 
-**裁决：全活实证（未触发降级链）**。2026-09-14 14:25 对活链路完成一轮带计数插桩的真实运行，LLM 端点（172.16.12.41:30000，ctgu-vlm/vLLM）、agent 服务（:8642）、InfluxDB（:8086）三项存活探测全绿后才执行（L3 预警 a 落实）。核心数字：**最小监测任务（单子智能体即可满足的 pH 查询）全程 37 次 LLM 调用**（主智能体 9 + 子智能体 4 个会话×7），墙钟 79.7s，任务成功。
+**裁决：全活实证（未触发降级链）**。2026-09-14 14:25 对活链路完成一轮带计数插桩的真实运行，LLM 端点（172.xx.xx.xx:30000，ctgu-vlm/vLLM）、agent 服务（:8642）、InfluxDB（:8086）三项存活探测全绿后才执行（L3 预警 a 落实）。核心数字：**最小监测任务（单子智能体即可满足的 pH 查询）全程 37 次 LLM 调用**（主智能体 9 + 子智能体 4 个会话×7），墙钟 79.7s，任务成功。
 
 ### E1 方法：计数 wrapper（仅注入 /tmp，零源码改动）
 
@@ -473,7 +473,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 <!-- 覆盖设计文档 §3 L4 检查项 4.1–4.4（4.4 终审三选一，不许和稀泥；含过渡步骤与被裁一方处置） -->
 
-**决策输入（用户立场，不预设结论）**：①废水监测研究项目（非生产，无外部用户/SLA 压力）；②专利六层架构是初始构想、可演进（§1.7 总判定：3/5 两层成立、1/2 两层叙事已不存在、4/6 两层偏差）；③作者懂业务不懂框架内部（框架维护动作须可由业务视角验收）；④团队规模=1 人。**取证方法**：git 时间线命令按计划 Step 1 原文执行（全部 commit hash 可在仓库复验）；旧链路侧行号来自 workspace/skills/orchestrator-core/ 残存代码实测（4 文件共 3772 行：execution_control.py 2281 / resource_matching.py 899 / task_structuring.py 334 / dynamic_orchestrator.py 258）；外部参照只取本机材料机制，不引入任何新依赖。
+**决策输入（用户立场，不预设结论）**：①废水监测研究项目（非生产，无外部用户/SLA 压力）；②六层架构是初始构想、可演进（§1.7 总判定：3/5 两层成立、1/2 两层叙事已不存在、4/6 两层偏差）；③作者懂业务不懂框架内部（框架维护动作须可由业务视角验收）；④团队规模=1 人。**取证方法**：git 时间线命令按计划 Step 1 原文执行（全部 commit hash 可在仓库复验）；旧链路侧行号来自 workspace/skills/orchestrator-core/ 残存代码实测（4 文件共 3772 行：execution_control.py 2281 / resource_matching.py 899 / task_structuring.py 334 / dynamic_orchestrator.py 258）；外部参照只取本机材料机制，不引入任何新依赖。
 
 ### 5.0 git 时间线取证（检查项 4.1·前半）
 
@@ -547,7 +547,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 
 **结论：继续用并加固。** hermes 框架链路保留为唯一编排路线；「收缩框架为库」与「替换路线」否决；被裁方=旧 orchestrator-core 套件，按「先拆弹→归档→抽取→删除」顺序处置（过渡步骤见后）。
 
-**论据一（架构收益）——三条路线中唯一有活实证的。** E1 端到端跑通（§4：最小任务 79.7s 成功返回、未降级）与业务闭环①②③代码+运行时双证（§3.3）都发生在框架链路上；旧套件则无一次完整运行记录（§5.0 裁决 3）；替换=用一个从未被实证的实现换掉一个刚被实证的实现。框架扩展点使用正确（registry override=True 系上游官方插件机制，§2.4；身份注入锚定于 PATCHES，§2.1 #4），最重耦合面（run_agent/agent_init 整文件 overlay，§2.5）有已列明的松耦合降级路径。专利六层的 3/5 两层以 hermes 为载体成立（§1.7 ✅）——保框架=保专利叙事的载体连续性（该架构是「可演进的初始构想」，载体不变时演进成本最低）。框架承担的会话循环/流式/工具注册/技能发现/上下文压缩若自建，量级不少于旧套件 3772 行，且旧套件只覆盖其中「调度」一职（5.1 矩阵）。
+**论据一（架构收益）——三条路线中唯一有活实证的。** E1 端到端跑通（§4：最小任务 79.7s 成功返回、未降级）与业务闭环①②③代码+运行时双证（§3.3）都发生在框架链路上；旧套件则无一次完整运行记录（§5.0 裁决 3）；替换=用一个从未被实证的实现换掉一个刚被实证的实现。框架扩展点使用正确（registry override=True 系上游官方插件机制，§2.4；身份注入锚定于 PATCHES，§2.1 #4），最重耦合面（run_agent/agent_init 整文件 overlay，§2.5）有已列明的松耦合降级路径。项目六层的 3/5 两层以 hermes 为载体成立（§1.7 ✅）——保框架=保项目叙事的载体连续性（该架构是「可演进的初始构想」，载体不变时演进成本最低）。框架承担的会话循环/流式/工具注册/技能发现/上下文压缩若自建，量级不少于旧套件 3772 行，且旧套件只覆盖其中「调度」一职（5.1 矩阵）。
 
 **论据二（实证数据）——8 个红项无一落在 vendored 框架本体上。** 红项归属盘点（§3 共 6 红：死旋钮、续传重标、④⑤断链、活链路零测试、退役测试必炸；§4 新增 2 红：两表别名漂移、陈数据当「最近 24 小时」）：**项目接缝代码/文档/环境 6 处**——死旋钮（start_agent.py:34-36 假声明）、续传重标（start_agent.py:187-223 + subagent_entry.py:182-216）、④⑤断链（编排顺序无强制 + 知识库假接缝 regulation_matcher.py:35 E:/ 死路径，§3.3）、两表漂移（call_subagent.py:26-51 + subagent_entry.py:52-57）、陈数据（InfluxDB 停更——环境侧，§3.3①/§4 发现 2；SKILL.md 漂移的影响计入浪费侧，见反论②）；**被裁方 1 处**——退役测试必炸（恰由过渡步骤 1 拆除）；**路线无关工程债 1 处**——零测试（§3.5）；**vendored 框架本体 0 处**。框架侧活改动全景=身份扩展链 #1-#4（四处声明齐、§2.5 评分正确性 🟢 低）+ 特化 #7/#8/#9（#7 未声明且已致流式 usage 退化——§4 实证 33/37 次无 usage；#8 声明文本漂移；#9 无注释），合计 11 文件 ≈1.8%（§2.6 表）。框架本体 88.5% 非死重量（执行覆盖口径下界 62.0%，两口径见 §1.3）——它是引擎不是行李。
 
@@ -558,7 +558,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 - **① vendor 管道坏了（§2.6 四断点）**：全盘承认——今日不可复现、重跑即坏（脚本语法错 + PATCHES 文本漂移 + overlays 不完整 + 排除集失真）。但定性是**构建期脚本缺陷**（1 个多余括号、2 条文本漂移、3 项未声明），不是架构死局，修复清单 §2.6 ①-⑥ 已逐项有锚。裁决是条件化的：**修复管道是路线 A 的准入 P0 而非可选项**——若明确不修，vendored 树将持续腐坏，届时结论翻向 B/C（敏感条件 1）。
 - **② 37 次/57% 浪费（§4）**：分解归属——9 次主智能体（框架决策循环，按设计运行）；每子会话 7 次=项目配置（max_iterations=6 + 摘要 1，subagent_entry.py:177）；57% 浪费=3 个失败子会话，其中 ≥1 个直接归因两表漂移误判（§4 发现 1）、「读 skill 未跑脚本」归因 SKILL.md 文档漂移（§3.3②③）——**主因可在不动框架架构的前提下降解**（两表合一 + 文档修正 + 迭代上限调低 + 技能预注入）。保留意见：n=1 样本（§4 样本限度）。
 - **③ 零测试（§3.5）**：承认，且是全路线等价负债——替换不继承任何保护（旧 10 测试押注退役链且 1 个收集即炸）。测试债与框架选型正交——全新薄协调器同样从零测试起步、且无 E1 探针基线可对照；路线 A 下首批接缝测试（续传语义/两表映射/注册覆盖）有 E1 探针基线可对照（§4 E1 方法可复用）。
-- **④ 上游落后 15 releases（§2.6）**：对内网冻结端点（.env 唯一真源 ctgu-vlm@172.16.12.41，§1.4）的研究项目，升级是低频事件；0.16.0 于 09-14 活实证通过（§4 E4）。处置=把「留在 0.16.0」写成显式决策（PROVENANCE 记基线 7df3aa34，§2.6 建议④）而非被动漂移；升级解锁条件=先修完 ①。
+- **④ 上游落后 15 releases（§2.6）**：对内网冻结端点（.env 唯一真源 ctgu-vlm@172.xx.xx.xx，§1.4）的研究项目，升级是低频事件；0.16.0 于 09-14 活实证通过（§4 E4）。处置=把「留在 0.16.0」写成显式决策（PROVENANCE 记基线 7df3aa34，§2.6 建议④）而非被动漂移；升级解锁条件=先修完 ①。
 
 **敏感条件（X 变了，结论会翻）**：
 
@@ -744,7 +744,7 @@ CLAUDE.md 的 ~12 次属**已退役** orchestrator-core 链路（1 计划 + 4 �
 - 解锁条件：P0-6 完成（管道可复现）之前不启动任何上游升级；
 - 整文件 overlay（run_agent/agent_init，5358+1763 行）降级为最小 patch 或上游 PR——身份扩展向上游提 feature 是最优路径（§2.5 冲突面评估）；
 - 升级评估：vendored 0.16.0 → 0.21.x（落后 16 tag）diff 审阅，重点 system_prompt / conversation_loop / chat_completion_helpers（#7 冲突面）；
-- V9：#7 stream_options 改 provider 条件分支（vLLM 才去除，恢复其余 provider 流式 usage 计量）；先查 172.16.12.41 vLLM 版本是否已原生兼容（§2.5 待查项）；
+- V9：#7 stream_options 改 provider 条件分支（vLLM 才去除，恢复其余 provider 流式 usage 计量）；先查 172.xx.xx.xx vLLM 版本是否已原生兼容（§2.5 待查项）；
 - 常态机制：PROVENANCE 随每次 re-vendor 更新；上游 release 巡检关注 §6.4 触发器 5。
 
 **P2-2 调用经济学研究（§5.4 过渡步骤 3 设计件 + 触发器 2 监测）**

@@ -169,7 +169,7 @@ wc -l /tmp/hermes-audit/touched-l1.txt
 
 - [ ] **Step 6: 画真实架构图并写入报告 §1**
 
-在报告 §1 插入 mermaid：`query.py → agent_service → (overlay 机制标注) → 框架核心模块 → LLM 端点`，节点标注真实文件路径。附「与专利六层架构的映射/偏差」小节（对照 CLAUDE.md 的六层描述逐层标 ✅对应/⚠️偏差/❌缺失）。
+在报告 §1 插入 mermaid：`query.py → agent_service → (overlay 机制标注) → 框架核心模块 → LLM 端点`，节点标注真实文件路径。附「与六层架构的映射/偏差」小节（对照 CLAUDE.md 的六层描述逐层标 ✅对应/⚠️偏差/❌缺失）。
 
 - [ ] **Step 7: 提交**
 
