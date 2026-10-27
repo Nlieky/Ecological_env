@@ -25,6 +25,9 @@ from dotenv import load_dotenv
 # 添加项目根目录到路径
 project_root = Path(__file__).parents[1]
 sys.path.insert(0, str(project_root))
+from shared.data.query_evidence import append_evidence
+from shared.assistant.master_turn import SystemInteractionRuntime
+from backend.models.assistant import RespondRequest
 
 # 加载环境变量
 load_dotenv()
@@ -56,6 +59,7 @@ from shared.framework.hermes_agent.run_agent import AIAgent
 # 此时 HERMES_HOME/HERMES_TOTAL_TIMEOUT 已设、AIAgent 已加载(sys.modules 缓存命中)，
 # 不破坏上方"先设 env 再 import AIAgent"的时序。
 from backend.services.agent_strategy import get_strategy as _gst
+from backend.services.agent_turn_guard import AgentTurnGuard
 from backend.services import llm_providers as _lp
 
 # 配置日志
@@ -111,41 +115,58 @@ class AgentService:
         # master_agent 是单例共享，run_conversation 会改它的内部状态（messages/session_id），
         # 并发查询会串台。用锁串行化对 master_agent 的访问（配合 /query 走线程池）。
         self._agent_lock = threading.Lock()
+        self._turn_guard = AgentTurnGuard()
         # 排队超时直接返回"忙"（2026-09-10 对齐墙钟 900：排队窗口 ≥ 一轮研判时长，
         # 排在第二位的用户等第一位跑完还能轮到，而不是 5 分钟就被拒）
         self._agent_lock_timeout = int(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=900))
+        self.system_interaction = SystemInteractionRuntime(
+            lambda session_id: self._create_main_agent(system_interaction=True, session_id=session_id),
+            self.project_root / 'skills' / 'system-interaction-core' / 'SKILL.md',
+            ready=lambda: self.master_agent is not None)
+
+    def _create_main_agent(self, system_interaction=False, session_id=None):
+        """One provider resolution and workspace identity for both execution modes."""
+        model = _gp('llm_model', env_key='LLM_MODEL', default='ctgu-vlm')
+        base_url = _gp('llm_base_url', env_key='LLM_BASE_URL', default='http://172.xx.xx.xx:30000/v1')
+        api_key = _gp('llm_api_key', env_key='LLM_API_KEY', default='')
+        try:
+            _lp.seed_defaults()
+            provider = _lp.resolve_default()
+            if provider:
+                model, base_url, api_key = provider['model'], provider['base_url'], provider['api_key']
+        except Exception:
+            logger.warning('provider resolution unavailable; using runtime parameters')
+        options = dict(model=model, base_url=base_url, api_key=api_key,
+                       identity_path='workspace', load_soul_identity=True,
+                       disabled_toolsets=['terminal', 'browser', 'filesystem', 'process',
+                                          'cronjob', 'memory', 'todo', 'code', 'web'])
+        if system_interaction:
+            options.update(enabled_toolsets=[], skip_context_files=True, skip_memory=True,
+                           checkpoints_enabled=False, session_db=None, save_trajectories=False,
+                           max_iterations=2, session_id=session_id, quiet_mode=True, max_tokens=1600)
+        agent = AIAgent(**options)
+        if system_interaction and getattr(agent, 'api_mode', None) == 'chat_completions':
+            # Use the existing transport's structured-output option, not a
+            # separate model client or heuristically inferred prose actions.
+            agent.request_overrides = {**(agent.request_overrides or {}),
+                                       'response_format': {'type': 'json_object'}}
+        return agent
+
+    def _begin_agent_turn(self) -> bool:
+        """Reject overlap with an orphaned timed-out worker and recover safely."""
+        if self._turn_guard.state == "quarantined":
+            if not self._turn_guard.wait_for_recovery(timeout=0):
+                return False
+            logger.warning("上一轮超时工作线程已退出，重建主智能体后恢复服务")
+            if not self.initialize():
+                return False
+            self._turn_guard.mark_agent_rebuilt()
+        return self._turn_guard.try_begin()
 
     def initialize(self):
         """初始化主智能体实例"""
         try:
-            # LLM 读取链:策略 default_llm_provider → providers 表行 → get_param/env 兜底
-            model = _gp("llm_model", env_key="LLM_MODEL", default="ctgu-vlm")
-            base_url = _gp("llm_base_url", env_key="LLM_BASE_URL", default="http://172.16.12.41:30000/v1")
-            api_key = _gp("llm_api_key", env_key="LLM_API_KEY", default="")
-            try:
-                _lp.seed_defaults()
-                _prov = _lp.resolve_default()
-                if _prov:
-                    model, base_url, api_key = _prov["model"], _prov["base_url"], _prov["api_key"]
-                    logger.info(f"使用默认供应商: {_prov['name']}")
-            except Exception as _e:
-                logger.warning(f"provider 解析失败,走 env/get_param 兜底: {_e}")
-
-            logger.info(f"初始化主智能体: model={model}, base_url={base_url}")
-
-            # 创建主智能体AIAgent实例
-            # 关键：使用identity_path="workspace"加载主智能体身份文件
-            # disabled_toolsets: 排除 terminal/browser/filesystem 等——registry 层砍掉
-            # LLM 绕过 run_detector 直跑脚本的歪路(executor 从 registry 解析,白名单拦不住)
-            self.master_agent = AIAgent(
-                model=model,
-                base_url=base_url,
-                api_key=api_key,
-                identity_path="workspace",  # 关键参数：加载主智能体身份文件
-                load_soul_identity=True,
-                disabled_toolsets=["terminal", "browser", "filesystem", "process",
-                                   "cronjob", "memory", "todo", "code", "web"],
-            )
+            self.master_agent = self._create_main_agent()
 
             # 设置最大迭代次数（4子智能体pipeline需要更多轮次；参数中心可调）
             if hasattr(self.master_agent, 'max_iterations'):
@@ -289,7 +310,7 @@ class AgentService:
             prev = Path(self._session_dirs[session_id])
             if prev.exists() and prev.resolve() != sd.resolve():
                 carried = []
-                for fname in ("data_result.json", "anomaly_result.json",
+                for fname in ("data_result.json", "data_result_plants.json", "anomaly_result.json",
                               "rule_reasoning_result.json", "disposition_result.json"):
                     src = prev / fname
                     if src.exists():
@@ -307,7 +328,7 @@ class AgentService:
         d = self._session_dirs.get(session_id) if session_id else None
         return Path(d).name if d else None
 
-    def process_query(self, query: str, session_id: str = None) -> Dict[str, Any]:
+    def process_query(self, query: str, session_id: str = None, view_context: str = None) -> Dict[str, Any]:
         """处理查询请求 - 性能优化版"""
         import time
         from datetime import datetime
@@ -349,6 +370,10 @@ class AgentService:
             # 调用主智能体（加锁串行化，避免并发查询串台；排队超时直接返回"忙"）
             if not self._agent_lock.acquire(timeout=self._agent_lock_timeout):
                 return {"success": False, "error": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"}
+            if not self._begin_agent_turn():
+                self._agent_lock.release()
+                return {"success": False,
+                        "error": "服务隔离中：上一轮超时任务尚未完全退出，请稍后重试"}
             # 挂进度队列收集 call_subagent 调用（让阻塞 /query 也能回传子智能体 trace，供审计）
             import queue as _q
             _trace_q = _q.Queue()
@@ -356,6 +381,12 @@ class AgentService:
             if _tool_reg is not None:
                 _tool_reg._current_progress_queue = _trace_q
             try:
+                if view_context is not None:
+                    context, query = _query_view_context(QueryRequest(query=query, view_context=view_context))
+                else:
+                    context = {}
+                if _tool_reg is not None:
+                    _tool_reg._run_detector_handler._view_context = context
                 self._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
                 _apply_style_strategy(self.master_agent)   # /query 路径:风格策略即时生效
                 # ── 单轮研判墙钟（2026-09-10 修层级倒挂）──────────────────
@@ -367,6 +398,7 @@ class AgentService:
                 _wall = int(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT",
                                 default=900))
                 _conv_result: dict = {}
+                _worker_done = threading.Event()
 
                 def _run_conv():
                     try:
@@ -377,12 +409,15 @@ class AgentService:
                         )
                     except Exception as _e:  # 工作线程异常带回主线程
                         _conv_result["err"] = _e
+                    finally:
+                        _worker_done.set()
 
                 import threading as _th
                 _wt = _th.Thread(target=_run_conv, daemon=True, name="conv-wall")
                 _wt.start()
                 _wt.join(timeout=_wall)
                 if _wt.is_alive():
+                    self._turn_guard.mark_timed_out(_worker_done)
                     logger.error(f"研判墙钟超时(>{_wall}s): session={session_id} query={query[:40]}")
                     result = {"success": False,
                               "error": (f"研判总超时（>{_wall}s）——主智能体本轮未完成。"
@@ -392,7 +427,10 @@ class AgentService:
                     raise _conv_result["err"]
                 else:
                     result = _conv_result.get("r") or {"success": False, "error": "研判无返回"}
+                    self._turn_guard.finish()
             finally:
+                if self._turn_guard.state == "running":
+                    self._turn_guard.finish()
                 if _tool_reg is not None:
                     _tool_reg._current_progress_queue = None
                 self._agent_lock.release()
@@ -435,6 +473,7 @@ class AgentService:
                     })
 
             elapsed = time.time() - start_time
+            content = append_evidence(content, self._session_dirs.get(session_id))
             logger.info(f"查询完成: session={session_id}, 耗时={elapsed:.2f}s, 消息数={len(result.get('messages', []))}, 子智能体={len(_subagent_calls)}")
 
             # 构建响应（含 trace，供后端记录到审计）
@@ -532,6 +571,29 @@ async def root():
     }
 
 
+def _query_view_context(request):
+    """Read the injection strategy for each turn, for both tools and user text."""
+    context = {}
+    message = request.query
+    if not _gst("action_inject_view_context", True) or not request.view_context:
+        return context, message
+    try:
+        parsed = json.loads(request.view_context)
+        if not isinstance(parsed, dict):
+            return context, message
+        context = parsed
+        parts = [f"{label}={parsed[key]}" for key, label in
+                 (("anchor", "锚点日期"), ("segmentStart", "段起"), ("segmentEnd", "段止"))
+                 if parsed.get(key)]
+        if parts:
+            message += (f"\n\n[大屏当前观看窗口] {'; '.join(parts)}"
+                        "（动作指令如检测/标注,未明确指定时间时优先对这段窗口执行,"
+                        "run_detector 传 start/end 用这段的起止时间）")
+    except (ValueError, TypeError):
+        pass
+    return context, message
+
+
 @app.get("/health")
 async def health():
     """健康检查"""
@@ -589,6 +651,16 @@ def _try_shortcircuit(request: "QueryRequest", exclusive: bool = False) -> str |
         return None
 
 
+def _reject_reserved_session(session_id):
+    if session_id and session_id.startswith('system-assistant:'):
+        raise HTTPException(409, 'Reserved session namespace')
+
+
+@app.post('/system-assistant/respond')
+def system_assistant_respond(request: RespondRequest):
+    return agent_service.system_interaction.respond(request.model_dump())
+
+
 @app.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest):
     """执行查询
@@ -601,6 +673,7 @@ def query(request: QueryRequest):
     不进主智能体 agentic 循环(实测 3 分钟);未命中/失败落回原管线(它擅长问答与研判)。
     mode=action(AI 助手动作通道)时短路独占:非动作回引导语,不落回管线。
     """
+    _reject_reserved_session(request.session_id)
     short = _try_shortcircuit(request, exclusive=(getattr(request, "mode", None) == "action"))
     if short is not None:
         return QueryResponse(
@@ -609,7 +682,8 @@ def query(request: QueryRequest):
         )
     result = agent_service.process_query(
         query=request.query,
-        session_id=request.session_id
+        session_id=request.session_id,
+        view_context=request.view_context,
     )
 
     if result.get("success"):
@@ -640,6 +714,7 @@ def query_stream(request: QueryRequest):
     保留 /query（阻塞）向后兼容；进度经 tool_registration 模块级 _current_progress_queue
     （靠 _agent_lock 串行化保证安全），逐字经 run_conversation 的 stream_callback。
     """
+    _reject_reserved_session(request.session_id)
     import queue as _q
     import json as _json
     q = _q.Queue()
@@ -667,54 +742,78 @@ def query_stream(request: QueryRequest):
             q.put({"type": "done", "content": short, "session_id": session_id,
                    "session_dir": agent_service._cur_session_dir(session_id)})
             return
-        # 挂队列到 tool_registration 模块全局，让 call_subagent handler（在 executor 线程）吐进度
-        if tool_reg is not None:
-            tool_reg._current_progress_queue = q
-            # 大屏观看窗口挂给 run_detector handler:LLM 不传时间时兜底检测"正在看的时段"
-            try:
-                tool_reg._run_detector_handler._view_context = (
-                    _json.loads(request.view_context) if request.view_context else {})
-            except Exception:
-                tool_reg._run_detector_handler._view_context = {}
+        queue_started = time.monotonic()
         if not agent_service._agent_lock.acquire(timeout=agent_service._agent_lock_timeout):
-            q.put({"type": "error", "message": "服务繁忙：主智能体正被占用（排队超时），请稍后重试"})
+            q.put({"type": "error", "message": "服务繁忙：主智能体正被占用（排队超时），请稍后重试",
+                   "queue_elapsed_ms": max(0, (time.monotonic() - queue_started) * 1000)})
+            return
+        queue_elapsed_ms = max(0, (time.monotonic() - queue_started) * 1000)
+        if not agent_service._begin_agent_turn():
+            agent_service._agent_lock.release()
+            q.put({"type": "error", "message": "服务隔离中：上一轮超时任务尚未完全退出，请稍后重试"})
             return
         try:
+            turn_started = time.monotonic()
+            context, user_msg = _query_view_context(request)
+            # Publish routing only after ownership of the shared Agent is established.
+            if tool_reg is not None:
+                tool_reg._current_progress_queue = q
+                tool_reg._run_detector_handler._view_context = context
             agent_service._fresh_session_dir(session_id)  # 同一会话续传上轮结果文件，跨会话隔离
             _apply_style_strategy(agent_service.master_agent)   # /query/stream 路径:风格策略即时生效
             history = agent_service.session_histories.get(session_id)
             # 大屏观看窗口注入用户消息:动作指令(如"检测pH平稳异常")按正在看的时段执行
             # (只注入事实性上下文;语言/技能等行为要求放身份文件与技能里,不硬塞用户消息)
-            user_msg = request.query
-            if request.view_context:
+            _stream_result = {}
+            _stream_done = threading.Event()
+
+            def _run_stream_turn():
                 try:
-                    import json as _j
-                    vc = _j.loads(request.view_context)
-                    parts = []
-                    if vc.get("anchor"): parts.append(f"锚点日期={vc['anchor']}")
-                    if vc.get("segmentStart"): parts.append(f"段起={vc['segmentStart']}")
-                    if vc.get("segmentEnd"): parts.append(f"段止={vc['segmentEnd']}")
-                    if parts:
-                        user_msg = (f"{request.query}\n\n[大屏当前观看窗口] {'; '.join(parts)}"
-                                    f"（动作指令如检测/标注,未明确指定时间时优先对这段窗口执行,"
-                                    f"run_detector 传 start/end 用这段的起止时间）")
-                except Exception:
-                    pass
-            result = agent_service.master_agent.run_conversation(
-                user_message=user_msg,
-                conversation_history=history,
-                task_id=session_id,
-                stream_callback=lambda text: q.put({"type": "delta", "text": text}),
+                    _stream_result["result"] = agent_service.master_agent.run_conversation(
+                        user_message=user_msg,
+                        conversation_history=history,
+                        task_id=session_id,
+                        stream_callback=lambda text: q.put({"type": "delta", "text": text}),
+                    )
+                except Exception as exc:
+                    _stream_result["error"] = exc
+                finally:
+                    _stream_done.set()
+
+            _stream_thread = threading.Thread(
+                target=_run_stream_turn, daemon=True, name="stream-conv-wall"
             )
+            _stream_thread.start()
+            _wall = int(_gp("hermes_total_timeout", env_key="HERMES_TOTAL_TIMEOUT", default=900))
+            _stream_thread.join(timeout=_wall)
+            if _stream_thread.is_alive():
+                agent_service._turn_guard.mark_timed_out(_stream_done)
+                q.put({"type": "error", "message": (
+                    f"研判总超时（>{_wall}s）——后台任务正在隔离退出，服务恢复前拒绝新查询"
+                ), "queue_elapsed_ms": queue_elapsed_ms,
+                    "turn_elapsed_ms": max(0, (time.monotonic() - turn_started) * 1000)})
+                return
+            if "error" in _stream_result:
+                raise _stream_result["error"]
+            result = _stream_result.get("result") or {
+                "success": False, "error": "研判无返回"
+            }
+            if isinstance(result, dict) and result.get("success") is False:
+                raise RuntimeError(result.get("error") or "研判失败")
             if isinstance(result, dict) and "messages" in result:
                 agent_service.session_histories[session_id] = result["messages"]
             content = (result.get("final_response") or "（智能体未产出文本回复，请重试或换种问法）") if isinstance(result, dict) else (str(result) if result else "（智能体未产出文本回复）")
+            content = append_evidence(content, agent_service._session_dirs.get(session_id))
             q.put({"type": "done", "content": content, "session_id": session_id,
+                   "queue_elapsed_ms": queue_elapsed_ms,
+                   "turn_elapsed_ms": max(0, (time.monotonic() - turn_started) * 1000),
                    "session_dir": agent_service._cur_session_dir(session_id)})
         except Exception as e:
             logger.error(f"流式查询失败: {e}")
-            q.put({"type": "error", "message": str(e)})
+            q.put({"type": "error", "message": str(e), "queue_elapsed_ms": queue_elapsed_ms,
+                   "turn_elapsed_ms": max(0, (time.monotonic() - turn_started) * 1000)})
         finally:
+            agent_service._turn_guard.finish()
             if tool_reg is not None:
                 tool_reg._current_progress_queue = None
             agent_service._agent_lock.release()

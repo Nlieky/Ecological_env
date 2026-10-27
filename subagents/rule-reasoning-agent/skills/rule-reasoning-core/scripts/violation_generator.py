@@ -4,7 +4,7 @@
 违规结论生成模块
 功能：生成完整的违规语义判定结果
 
-基于专利文档：违规结论生成模块
+违规结论生成模块
 """
 
 import logging
@@ -122,9 +122,9 @@ class ViolationGenerator:
     def _determine_suspicion_level(self, expert_reasoning: Dict[str, Any],
                                   regulation_matches: Dict[str, Any]) -> str:
         """
-        确定嫌疑等级（专利要求规则）
+        确定嫌疑等级
 
-        专利要求判定规则：
+        判定规则：
         - 高风险（critical/high）：异常模式匹配数量≥2 且 存在工艺机理违背
         - 中风险（medium）：异常模式匹配数量=1 且 存在工艺机理违背
         - 低风险（low）：仅存在异常模式匹配但无机理违背
@@ -136,15 +136,15 @@ class ViolationGenerator:
         # 注意：这里需要通过expert_reasoning传递process_validation的信息
         has_mechanism_violation = expert_reasoning.get("has_mechanism_violation", False)
 
-        # 专利要求：高风险（异常模式匹配数量≥2 且 存在工艺机理违背）
+        # 高风险（异常模式匹配数量≥2 且 存在工艺机理违背）
         if pattern_count >= 2 and has_mechanism_violation:
             return "critical"
 
-        # 专利要求：中风险（异常模式匹配数量=1 且 存在工艺机理违背）
+        # 中风险（异常模式匹配数量=1 且 存在工艺机理违背）
         if pattern_count == 1 and has_mechanism_violation:
             return "medium"
 
-        # 专利要求：低风险（仅存在异常模式匹配但无机理违背）
+        # 低风险（仅存在异常模式匹配但无机理违背）
         if pattern_count > 0 and not has_mechanism_violation:
             return "low"
 

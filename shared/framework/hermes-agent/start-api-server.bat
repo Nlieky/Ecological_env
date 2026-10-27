@@ -8,7 +8,7 @@ set API_SERVER_HOST=127.0.0.1
 set API_SERVER_CORS_ORIGINS=*
 
 REM Set LLM Configuration
-set LLM_BASE_URL=http://172.16.12.41:30000/v1
+set LLM_BASE_URL=http://172.xx.xx.xx:30000/v1
 set LLM_API_KEY=sk-test
 set LLM_MODEL=ctgu-vlm
 

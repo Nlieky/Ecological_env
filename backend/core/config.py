@@ -1,10 +1,12 @@
 """
 核心配置模块 - 从环境变量加载配置
 """
+import json
 import os
 from pathlib import Path
-from typing import List
-from pydantic_settings import BaseSettings
+from typing import Annotated, List
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode
 from dotenv import load_dotenv
 
 # 确定项目根目录
@@ -19,8 +21,24 @@ class Settings(BaseSettings):
     FASTAPI_HOST: str = "0.0.0.0"
     FASTAPI_PORT: int = 8000
 
-    # CORS 配置
-    CORS_ORIGINS: List[str] = ["*"]
+    # CORS 配置(NoDecode+校验器:pydantic-settings 对 list 字段默认 json.loads,裸 '*' 会让后端启动即崩)
+    CORS_ORIGINS: Annotated[List[str], NoDecode] = ["*"]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value):
+        """兼容三种 .env 写法:JSON 数组 / 裸 * / 逗号分隔。"""
+        if isinstance(value, str):
+            value = value.strip()
+            if value == "*":
+                return ["*"]
+            if value.startswith("["):
+                try:
+                    return json.loads(value)
+                except ValueError:
+                    pass
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
     # AgentService 配置
     # AgentService 封装了对 Hermes 智能体的调用，通过 HTTP 与 Hermes API 通信
@@ -46,13 +64,13 @@ class Settings(BaseSettings):
     DATA_SOURCE_PATH: str = "./shared/data"
     AGENT_SERVICE_SYNC_INTERVAL: int = 300  # 秒
 
-    # 监测数据后端: influxdb(读 InfluxDB monitoring-data)或 csv(读 shared/data/*.csv)
+    # 监测数据后端: influxdb(读 InfluxDB 真实数据 bucket)或 csv(读 shared/data/*.csv)
     MONITORING_DATA_SOURCE: str = "influxdb"
     # InfluxDB v2.7 配置(工业时序数据源,原生 Windows 二进制)
     INFLUXDB_URL: str = "http://localhost:8086"
     INFLUXDB_TOKEN: str = ""
     INFLUXDB_ORG: str = "ecological_env"
-    INFLUXDB_BUCKET: str = "monitoring-data"
+    INFLUXDB_BUCKET: str = "monitoring-real"
 
     # API配置
     API_V1_PREFIX: str = "/api/v1"

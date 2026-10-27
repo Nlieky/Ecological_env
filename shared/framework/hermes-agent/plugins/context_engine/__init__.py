@@ -81,6 +81,9 @@ def load_context_engine(name: str) -> Optional["ContextEngine"]:
 
     Returns None if the engine is not found or fails to load.
     """
+    from hermes_cli.plugins import hooks_suppressed
+    if hooks_suppressed():
+        return None
     engine_dir = _CONTEXT_ENGINE_PLUGINS_DIR / name
     if not engine_dir.is_dir():
         logger.debug("Context engine '%s' not found in %s", name, _CONTEXT_ENGINE_PLUGINS_DIR)

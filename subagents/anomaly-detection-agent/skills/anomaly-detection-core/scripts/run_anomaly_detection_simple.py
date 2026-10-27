@@ -7,6 +7,7 @@
 """
 
 import json
+import argparse
 import logging
 import os
 import sys
@@ -67,9 +68,11 @@ def _load_influx_env() -> None:
 def _fetch_influx_cn(client, bucket: str, data_type: str, plant: str | None = None):
     """从 InfluxDB 查一侧(委托共享模块)+ 重命名为中文列名(对齐原 CSV,detect_anomalies 零改动)。
 
-    plant: 厂过滤(多厂库必传;None=全库混合,单厂遗留)。
+    plant: 必须明确指定厂过滤，禁止跨厂混合。
     """
     from shared.data.influxdb_query import fetch_wastewater_df, CANONICAL_FIELDS
+    if not plant:
+        raise ValueError("必须指定 plant，禁止跨厂混合")
     df = fetch_wastewater_df(client, bucket, data_type, CANONICAL_FIELDS, plant_id=plant)
     if df.empty:
         return df
@@ -142,13 +145,13 @@ def load_recent_data(hours: int = 24) -> dict:
 
     返回结构与旧 CSV 版完全一致(influent_df/effluent_df/time_col_*),
     列名为中文(对齐原 CSV),detect_anomalies 零改动。
-    旧版按 now-cutoff 过滤后 tail(24) 兜底,会取到 2024 末尾;新版直接取 InfluxDB 最新 N 条。
+    进出水共享最新采样时间，按实际经过的小时数过滤，保留缺失侧。
     """
     _load_influx_env()
     url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
     token = os.environ.get("INFLUXDB_TOKEN")
     org = os.environ.get("INFLUXDB_ORG", "ecological_env")
-    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-real")
 
     logger.info(f"加载最近{hours}小时数据(InfluxDB bucket={bucket})...")
 
@@ -157,6 +160,7 @@ def load_recent_data(hours: int = 24) -> dict:
         return {"influent_df": pd.DataFrame(), "effluent_df": pd.DataFrame(),
                 "time_col_in": "监测时间", "time_col_out": "监测时间"}
 
+    client = None
     try:
         from influxdb_client import InfluxDBClient
         client = InfluxDBClient(url=url, token=token, org=org, timeout=30_000)
@@ -173,17 +177,34 @@ def load_recent_data(hours: int = 24) -> dict:
             pass
         if not plant:
             plant = os.environ.get('DETECTOR_PLANT') or None
+        if not plant:
+            raise ValueError("必须指定 DETECTOR_PLANT 或消费带 plant 的数据感知快照")
         df_in = _fetch_influx_cn(client, bucket, "influent", plant)
         df_out = _fetch_influx_cn(client, bucket, "effluent", plant)
-        client.close()
         logger.info(f"读取数据成功(plant={plant or '全库'})：进水{len(df_in)}条，出水{len(df_out)}条")
     except Exception as e:
         logger.error(f"InfluxDB 读取失败：{e}")
         return {"influent_df": pd.DataFrame(), "effluent_df": pd.DataFrame(),
                 "time_col_in": "监测时间", "time_col_out": "监测时间"}
+    finally:
+        if client is not None:
+            client.close()
 
-    df_in_recent = df_in.tail(hours).copy() if len(df_in) else df_in.copy()
-    df_out_recent = df_out.tail(hours).copy() if len(df_out) else df_out.copy()
+    from backend.services.monitoring_data_loader import parse_window_endpoints
+    from shared.data.source_context import sampling_timestamp
+    for frame in (df_in, df_out):
+        if not frame.empty:
+            frame["监测时间"] = frame["监测时间"].map(lambda value: sampling_timestamp(value).tz_localize(None))
+    latest = max((frame["监测时间"].max() for frame in (df_in, df_out) if not frame.empty), default=None)
+    bounds = parse_window_endpoints(latest, f"{hours}h") if latest is not None else (None, None)
+    window = meta.get("query_window") if 'meta' in locals() else None
+    if window and window.get("start") and window.get("end"):
+        bounds = tuple(sampling_timestamp(window[key]).tz_localize(None) for key in ("start", "end"))
+    def select(frame):
+        if frame.empty or bounds[0] is None:
+            return frame.copy()
+        return frame.loc[frame["监测时间"].between(*bounds)].copy()
+    df_in_recent, df_out_recent = select(df_in), select(df_out)
 
     logger.info(f"进水数据：{len(df_in_recent)} 条记录")
     logger.info(f"出水数据：{len(df_out_recent)} 条记录")
@@ -478,6 +499,14 @@ def detect_anomalies(data: dict) -> dict:
 
 def main():
     """主函数"""
+    parser = argparse.ArgumentParser(description="按采样窗口执行异常检测")
+    parser.add_argument("--hours", type=int, default=24)
+    parser.add_argument("--data-dir", type=str, help="会话数据结果目录")
+    args = parser.parse_args()
+    if args.hours <= 0:
+        parser.error("--hours 必须大于零")
+    if args.data_dir:
+        os.environ["SESSION_DIR"] = args.data_dir
     logger.info("=" * 60)
     logger.info("异常检测任务启动")
     logger.info("=" * 60)
@@ -490,8 +519,8 @@ def main():
         data = load_data_from_result()
         _data_source = "data_result(链式消费数据感知)"
         if data is None:
-            data = load_recent_data(hours=24)
-            _data_source = "influxdb_recent_24h(fallback)"
+            data = load_recent_data(hours=args.hours)
+            _data_source = f"influxdb_recent_{args.hours}h(fallback)"
 
         if data['influent_df'] is None or len(data['influent_df']) == 0:
             if data['effluent_df'] is None or len(data['effluent_df']) == 0:

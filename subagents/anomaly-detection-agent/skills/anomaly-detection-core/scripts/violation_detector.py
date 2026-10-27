@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-违规模式检测模块（专利4类违规模式）
+违规模式检测模块（4类违规模式）
 
-基于专利文档：违规判定双层逻辑 - 业务层
+违规判定双层逻辑 - 业务层
 
 4类违规模式：
 1. 插瓶干扰：使用标准溶液模拟达标排放
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class ViolationDetector:
     """
-    违规模式检测器（专利4类违规模式）
+    违规模式检测器（4类违规模式）
 
     功能：基于异常检测结果，识别具体的违规行为模式
 
@@ -50,7 +50,7 @@ class ViolationDetector:
             "SS": 10          # 一级A标
         }
 
-        # 专利参数配置
+        # 参数配置
         self.params = {
             "bottle_interference": {
                 "proximity_ratio": 0.8,      # 接近标准限值的比例

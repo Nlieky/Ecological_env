@@ -14,13 +14,13 @@ data_service = DataService()
 
 
 @router.get("/monitoring/realtime", response_model=StandardResponse)
-async def get_realtime_data():
+async def get_realtime_data(plant_id: str = Query(..., min_length=1)):
     """获取实时监测数据
 
     返回最新的进水、出水监测数据，包括pH、COD、TN、TP等指标。
     """
     try:
-        data = data_service.get_realtime_data()
+        data = DataService(plant_id).get_realtime_data()
         return StandardResponse(
             success=True,
             data=data,
@@ -46,14 +46,15 @@ async def get_realtime_data():
 
 @router.get("/monitoring/quality", response_model=StandardResponse)
 async def get_data_quality(
-    time_range: str = Query(default="24h", description="时间范围")
+    time_range: str = Query(default="24h", description="时间范围"),
+    plant_id: str = Query(..., min_length=1)
 ):
     """获取数据质量指标
 
     返回数据完整率、缺失数据数量、异常数据数量等质量指标。
     """
     try:
-        data = data_service.get_data_quality(time_range)
+        data = DataService(plant_id).get_data_quality(time_range)
         return StandardResponse(
             success=True,
             data=data

@@ -161,7 +161,7 @@ SERVICES: List[Dict] = [
     {"id": "service:sqlite_logs", "label": "SQLite 日志库",
      "props": {"db": "ecological_logs.db"}},
     {"id": "service:llm", "label": "LLM ctgu-vlm",
-     "props": {"endpoint": "http://172.16.12.41:30000/v1"}},
+     "props": {"endpoint": "http://172.xx.xx.xx:30000/v1"}},
 ]
 _ORCHESTRATES = [
     ("agent:master", "agent:multi-dimensional-data-perception"),
@@ -287,10 +287,10 @@ def _discover_indicators() -> List[Dict]:
 def _import_indicators(g: GraphStore, indicators: List[Dict],
                        plant_ids: List[str]) -> int:
     # 数据库（三库一体的第三库）：时序监测数据库 → 指标归属
-    # （InfluxDB monitoring-data bucket；指标是库里的 fields）
+    # （InfluxDB monitoring-real bucket；指标是库里的 fields）
     g.upsert_node("library:database", "library", "时序监测数据库",
                   {"path": "shared/data", "engine": "InfluxDB 2.7",
-                   "bucket": "monitoring-data", "measurement": "wastewater",
+                   "bucket": "monitoring-real", "measurement": "wastewater",
                    "desc": "三库一体之一——真实报表导入的时序监测数据"})
     for ind in indicators:
         g.upsert_node(f"indicator:{ind['field']}", "indicator",

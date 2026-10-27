@@ -8,24 +8,27 @@
   INFLUXDB_TOKEN   InfluxDB all-access token   （必填）
   INFLUXDB_URL     默认 http://localhost:8086
   INFLUXDB_ORG     默认 ecological_env
-  INFLUXDB_BUCKET  默认 monitoring-data
+  INFLUXDB_REAL_BUCKET  --bucket 默认值(默认 monitoring-real,可 --bucket 覆盖)
 
 Schema:
   measurement = wastewater
   tags        = data_type (influent/effluent), plant_id
   fields      = pH, COD, TN, AN, TP, flow, discharge, suspended_solids
                 + 各污染物排放量 *_mass (pH_mass/COD_mass/TN_mass/AN_mass/TP_mass/suspended_solids_mass)
-  time        = 报表小时,按 UTC 写入(naive 视作 UTC,与 CSV loader 时区语义一致)
+  time        = 报表小时,按 DATA_TIMEZONE(默认北京时间)解释后转 UTC 写入
 
 幂等: 同 measurement+tags+time+field 写入覆盖,可重复运行。
 """
 from __future__ import annotations
 
 import glob
+import argparse
+import hashlib
 import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -61,16 +64,22 @@ def _load_dotenv() -> None:
 
 
 def _to_utc(t_iso: str) -> datetime:
-    """'2026-01-01T00:00:00' → aware UTC datetime(naive 视作 UTC)。"""
-    return datetime.strptime(t_iso, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    """Naive report time is a local sampling time, not a UTC instant."""
+    value = datetime.fromisoformat(t_iso)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=ZoneInfo(os.environ.get('DATA_TIMEZONE', 'Asia/Shanghai')))
+    return value.astimezone(timezone.utc)
 
 
 def build_points(path: str) -> tuple[str, str, list[Point]]:
     """解析一份 xls,返回 (data_type, plant_id, points)。"""
     plant, dtype, recs = parse_xls_report(path)
+    source_hash = hashlib.sha256(Path(path).read_bytes()).hexdigest()
     pts: list[Point] = []
     for r in recs:
-        p = Point("wastewater").tag("data_type", dtype).tag("plant_id", plant or "unknown")
+        p = Point("wastewater").tag("data_type", dtype).tag("plant_id", plant or "unknown").tag('data_origin', 'real')
+        p = p.field('_source_file', Path(path).name).field('_source_sha256', source_hash).field('_ingestion_method', 'file')
+        p = p.field('_source_timezone', os.environ.get('DATA_TIMEZONE', 'Asia/Shanghai'))
         for src, dst in FIELD_MAP.items():
             v = r.get(src)
             if v is not None:
@@ -82,13 +91,20 @@ def build_points(path: str) -> tuple[str, str, list[Point]]:
 
 def main() -> int:
     _load_dotenv()
+    parser = argparse.ArgumentParser(description='导入监管下载报表；默认独立真实 bucket，支持只读预检')
+    parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--create-bucket', action='store_true')
+    parser.add_argument('--bucket', default=os.environ.get('INFLUXDB_REAL_BUCKET', 'monitoring-real'))
+    args = parser.parse_args()
     token = os.environ.get("INFLUXDB_TOKEN")
-    if not token:
+    if not token and not args.dry_run:
         print("ERROR: INFLUXDB_TOKEN 未设置(环境变量或项目根 .env)", file=sys.stderr)
         return 2
     url = os.environ.get("INFLUXDB_URL", "http://localhost:8086")
     org = os.environ.get("INFLUXDB_ORG", "ecological_env")
-    bucket = os.environ.get("INFLUXDB_BUCKET", "monitoring-data")
+    bucket = args.bucket
+    if bucket == os.environ.get('INFLUXDB_SIMULATION_BUCKET', 'monitoring-simulation'):
+        raise ValueError('不能把真实报表导入模拟 bucket')
 
     files = sorted(glob.glob(DATA_GLOB))
     if not files:
@@ -101,8 +117,14 @@ def main() -> int:
         print(f"{Path(f).name}\n  data_type={dtype} plant_id={plant} points={len(pts)}")
         all_points.extend(pts)
 
+    if args.dry_run:
+        print(f'DRY RUN: {len(files)} files, {len(all_points)} points; timezone={os.environ.get("DATA_TIMEZONE", "Asia/Shanghai")}; target={bucket}; no database writes')
+        return 0
+
     print(f"\n写入 {len(all_points)} points → bucket '{bucket}' (org={org}, url={url}) ...")
     client = InfluxDBClient(url=url, token=token, org=org, timeout=120000)  # 120s,默认10s写大批量会超时
+    if args.create_bucket and client.buckets_api().find_bucket_by_name(bucket) is None:
+        client.buckets_api().create_bucket(bucket_name=bucket, org=org)
     write_api = client.write_api(write_options=SYNCHRONOUS)
     for i in range(0, len(all_points), BATCH):
         write_api.write(bucket=bucket, record=all_points[i:i + BATCH])

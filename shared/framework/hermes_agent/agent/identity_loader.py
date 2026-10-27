@@ -21,7 +21,7 @@ IDENTITY_FILES = [
 ]
 
 
-def load_identity_files_from_path(identity_path: Path) -> Optional[str]:
+def load_identity_files_from_path(identity_path: Path, filenames=None) -> Optional[str]:
     """从指定路径加载所有身份文件并组合成提示
 
     Args:
@@ -35,7 +35,7 @@ def load_identity_files_from_path(identity_path: Path) -> Optional[str]:
         return None
 
     parts = []
-    for filename in IDENTITY_FILES:
+    for filename in (IDENTITY_FILES if filenames is None else filenames):
         file_path = identity_path / filename
         if not file_path.exists():
             logger.debug(f"Identity file not found: {file_path}")

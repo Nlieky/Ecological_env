@@ -4,7 +4,7 @@
 
 ## 编排工具
 
-主智能体运行时挂载编排工具（详见 `skills/orchestrator-core/SKILL.md` 与 `tool_registration.py`）：
+主智能体运行时挂载项目根 `skills/orchestrator-core/` 的编排工具（详见其 `SKILL.md` 与 `scripts/tool_registration.py`）：
 
 - `call_subagent(subagent_name, task, context?)` — 调用子智能体（主要工具）
 - `list_subagents()` — 列出可用子智能体
@@ -21,7 +21,7 @@
 
 | 数据 | 真实路径 |
 |------|---------|
-| 时序监测数据 | InfluxDB 2.7（bucket=`monitoring-data`, org=`ecological_env`） |
+| 时序监测数据 | InfluxDB 2.7（bucket=`monitoring-real`, org=`ecological_env`） |
 | 日志库 | `shared/data/ecological_logs.db`（SQLite） |
 | 算子库 | `shared/operators/`（`machine_learning/` · `specialized/` · `deep_learning/`） |
 | 知识库 | `shared/knowledge/`（法规 / 工艺 / 违规模式 / 专家经验） |

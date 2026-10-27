@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { knowledgeService } from '@/api/modules/knowledge'
+import { SILENT } from '@/api/client'
 import type { KGNode, KGEdge, KGStats, ImpactEntry, ImpactResp } from '@/api/modules/knowledge'
 
 // 节点类型元数据：中文标签/颜色/tab 归属（domain=领域知识 / topology=服务拓扑）。
@@ -215,25 +216,47 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
 
   const selectedNode = ref<KGNode | null>(null)
   const selectedNeighbors = ref<Record<string, KGNode[]>>({})
+  const selectedNodeId = ref('')
+  const selectedNodeLoading = ref(false)
+  const selectedNodeError = ref<string | null>(null)
+  const selectedNodeNotFound = ref(false)
+  let selectionGeneration = 0
   async function selectNode(id: string) {
+    const generation = ++selectionGeneration
+    selectedNodeId.value = id
+    selectedNode.value = null
+    selectedNeighbors.value = {}
+    selectedNodeLoading.value = true
+    selectedNodeError.value = null
+    selectedNodeNotFound.value = false
     try {
-      const resp = await knowledgeService.node(id)
+      const resp = await knowledgeService.node(id, SILENT)
+      if (generation !== selectionGeneration) return
       selectedNode.value = resp.node
       selectedNeighbors.value = resp.neighbors
     } catch (e: any) {
+      if (generation !== selectionGeneration) return
       selectedNode.value = null
       selectedNeighbors.value = {} // 失败对称清空——不留上一节的过期邻居
-      error.value = e?.message || '节点详情加载失败'
+      selectedNodeNotFound.value = e?.response?.status === 404
+      selectedNodeError.value = selectedNodeNotFound.value ? null : e?.message || '节点详情加载失败'
+    } finally {
+      if (generation === selectionGeneration) selectedNodeLoading.value = false
     }
   }
   function clearSelection() {
+    ++selectionGeneration
+    selectedNodeId.value = ''
+    selectedNodeLoading.value = false
+    selectedNodeError.value = null
+    selectedNodeNotFound.value = false
     selectedNode.value = null
     selectedNeighbors.value = {}
   }
 
   return { allNodes, allEdges, stats, seeded, loading, error,
            activeTab, hiddenTypes, visibleTypes, toggleType, setTab,
-           selectedNode, selectedNeighbors, selectNode, clearSelection, loadGraph,
+           selectedNode, selectedNeighbors, selectedNodeId, selectedNodeLoading, selectedNodeError, selectedNodeNotFound, selectNode, clearSelection, loadGraph,
            impactMode, impactResult, _impactApi, runImpact, clearImpact,
            toggleImpactMode, refreshHealth,
            caseLinkNodes, caseLinkLabel, highlightCase, clearCaseLink }

@@ -56,7 +56,9 @@ def _summary(log_type: str, log: Any) -> str:
 
 @router.get("/logs", response_model=LogListResponse)
 async def query_logs(
-    log_type: str = Query(..., pattern="^(api|master|subagent|operator|llm|error)$"),
+    log_type: str = Query("all", pattern="^(all|api|master|subagent|operator|llm|error)$"),
+    search: Optional[str] = None,
+    level: Optional[str] = Query(None, pattern="^(info|warning|error|slow)$"),
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     page: int = Query(1, ge=1),
@@ -74,6 +76,25 @@ async def query_logs(
         "llm": LLMCallLog,
         "error": SystemErrorLog
     }
+    if log_type == "all":
+        merged = []
+        for kind, model in table_map.items():
+            q = db.query(model)
+            if start_time: q = q.filter(model.timestamp >= datetime.fromisoformat(start_time))
+            if end_time: q = q.filter(model.timestamp <= datetime.fromisoformat(end_time))
+            for log in q.all():
+                latency = getattr(log, 'latency_ms', None) or getattr(log, 'execution_time_ms', None)
+                details = _details(log); summary = _summary(kind, log)
+                severity = "error" if kind == "error" or str(details.get("status", "")).lower() in {"failed", "error"} else "warning" if latency and latency >= 30000 else "info"
+                slow = bool(latency and latency >= 30000)
+                if search and search.lower() not in (summary + " " + json.dumps(details, ensure_ascii=False, default=str)).lower(): continue
+                if level == "slow" and not slow: continue
+                if level and level != "slow" and severity != level: continue
+                merged.append(LogEntry(id=log.id, timestamp=log.timestamp.isoformat(), module=kind, content=summary, details=details, latency_ms=latency, level=severity, slow=slow, session_id=details.get("session_id")))
+        merged.sort(key=lambda item: item.timestamp, reverse=True)
+        total = len(merged); offset = (page - 1) * page_size
+        return LogListResponse(data=merged[offset:offset + page_size], total=total)
+
     model = table_map[log_type]
 
     # 构建查询
@@ -101,7 +122,10 @@ async def query_logs(
             module=log_type,
             content=_summary(log_type, log),
             details=_details(log),
-            latency_ms=getattr(log, 'latency_ms', None) or getattr(log, 'execution_time_ms', None)
+            latency_ms=getattr(log, 'latency_ms', None) or getattr(log, 'execution_time_ms', None),
+            level="error" if log_type == "error" else "info",
+            slow=bool((getattr(log, 'latency_ms', None) or getattr(log, 'execution_time_ms', None) or 0) >= 30000),
+            session_id=_details(log).get("session_id"),
         )
         data.append(entry)
 

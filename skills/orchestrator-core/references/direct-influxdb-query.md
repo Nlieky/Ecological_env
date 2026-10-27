@@ -71,7 +71,7 @@ client.close()
 
 ```python
 flux = '''
-from(bucket: "monitoring-data")
+from(bucket: "monitoring-real")
   |> range(start: 0)
   |> filter(fn: (r) => r._measurement == "wastewater")
   |> distinct(column: "plant_id")

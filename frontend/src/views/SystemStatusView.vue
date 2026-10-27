@@ -1,10 +1,12 @@
 <template>
   <div class="sys">
     <div class="hd">
-      <span class="sub">生成于 {{ status?.generated_at || '—' }} · {{ polling ? `${POLL_MS / 1000}s 自动刷新` : '已暂停' }}</span>
+      <span class="sub">生成于 {{ shanghaiTime(status?.generated_at) }} · Asia/Shanghai · {{ polling ? `${POLL_MS / 1000}s 自动刷新` : '已暂停' }}</span>
       <button class="pause" :class="{ on: !polling }" @click="togglePolling">{{ polling ? '⏸ 暂停' : '▶ 恢复' }}</button>
     </div>
 
+    <PageState :state="viewState" :preserve-content="!!status" :message="error ? (status ? '刷新失败，保留上次加载的数据。' : '系统态势加载失败，请重试。') : undefined" @retry="load">
+    <p v-if="error" role="alert">{{ error }}</p>
     <template v-if="status">
       <!-- 服务健康 -->
       <div class="sec-ttl">服务状态</div>
@@ -24,7 +26,7 @@
         <div class="cnt"><div class="n">{{ fmt(status.counters?.data_processed_total) }}</div><div class="k">累计处理数据点</div></div>
         <div class="cnt"><div class="n">{{ fmt(status.counters?.anomaly_detected_total) }}</div><div class="k">累计检出超标点</div></div>
         <div class="cnt"><div class="n">{{ status.plants.length }}</div><div class="k">接入厂数</div></div>
-        <div class="cnt"><div class="n">{{ onlineCount }}</div><div class="k">在线厂数</div></div>
+        <div class="cnt"><div class="n">{{ onlineCount }}</div><div class="k">有数据厂数</div></div>
       </div>
 
       <!-- 各厂态势 -->
@@ -35,16 +37,16 @@
         </div>
         <div v-for="p in status.plants" :key="p.plant_id" class="tr">
           <span class="pid">{{ p.plant_id }}</span>
-          <span><i class="dot sm" :class="p.status" />{{ p.status === 'online' ? '在线' : '离线' }}</span>
+          <span><i class="dot sm" :class="p.status" />{{ plantStatusLabel(p.status) }}<small class="types"> · {{ contextLabel(p.data_context) }} · {{ p.data_context?.bucket || '数据库未核验' }}<template v-if="p.data_context?.warning"> · {{ p.data_context.warning }}</template></small></span>
           <span class="types">{{ p.data_types.join(' / ') || '—' }}</span>
-          <span>{{ p.latest_time || '—' }}</span>
+          <span>{{ formatSamplingTime(p.latest_time, p.data_context?.timezone) }}<small class="types"> · 时效 {{ plantStatusLabel(p.data_context?.freshness || 'unverified') }} · 最新采样 {{ formatSamplingTime(p.data_context?.latest_sample_at, p.data_context?.timezone) }}</small></span>
           <span><button class="lnk" @click="router.push(`/plants/${encodeURIComponent(p.plant_id)}`)">查看看板 →</button></span>
         </div>
       </div>
       <div v-else class="empty">暂无厂站接入（导入报表后自动出现）</div>
     </template>
 
-    <div v-else class="loading">{{ loading ? '加载系统态势…' : '⚠ 获取失败，请确认后端与 InfluxDB 已启动' }}</div>
+    </PageState>
   </div>
 </template>
 
@@ -52,36 +54,46 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api/client'
+import PageState from '@/components/common/PageState.vue'
+import { formatDataContext as contextLabel } from '@/utils/displayFormat'
 import { usePolling } from '@/composables/usePolling'
+import { plantStatusLabel, requestGate, shanghaiTime, formatSamplingTime } from '@/composables/dashboardData'
+import type { DataContext } from '@/api/types/api.types'
 
 interface SysStatus {
   generated_at: string
   services: { name: string; title: string; status: 'up' | 'down' }[]
-  plants: { plant_id: string; status: string; latest_time: string; data_types: string[] }[]
+  plants: { plant_id: string; status: string; latest_time: string; data_types: string[]; data_context?: DataContext }[]
   counters: Record<string, number>
 }
 
 const router = useRouter()
 const status = ref<SysStatus | null>(null)
 const loading = ref(false)
-const onlineCount = computed(() => status.value?.plants.filter((p) => p.status === 'online').length ?? 0)
+const error = ref('')
+const viewState = computed(() => loading.value ? (status.value ? 'refreshing' : 'initial-loading') : error.value ? 'error' : status.value ? 'ready' : 'empty')
+const onlineCount = computed(() => status.value?.plants.filter((p) => !['offline', 'missing'].includes(p.status) && !!p.latest_time).length ?? 0)
+const gate = requestGate()
 const fmt = (n?: number) => (n === undefined || n === null ? '—' : n.toLocaleString())
 
 const POLL_MS = 15_000
 async function load() {
+  const request = gate.begin()
+  if (request === null) return
   loading.value = true
+  error.value = ''
   try {
     const r = await api.get<unknown, { data: SysStatus }>('/v1/system/status')
-    status.value = r.data
-  } catch { status.value = null } finally { loading.value = false }
+    if (gate.current(request)) status.value = r.data
+  } catch (e) { if (gate.current(request)) error.value = e instanceof Error ? e.message : '系统态势加载失败' } finally { if (gate.current(request)) loading.value = false }
 }
 const { start, stop } = usePolling(load, POLL_MS)
 const polling = ref(true)
 function togglePolling() {
   if (polling.value) { stop(); polling.value = false } else { start(); polling.value = true }
 }
-onMounted(() => { void load(); start() })
-onBeforeUnmount(stop)
+onMounted(start)
+onBeforeUnmount(() => { gate.dispose(); stop() })
 </script>
 
 <style scoped>

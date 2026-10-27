@@ -123,7 +123,8 @@ async def get_params():
         v = get_param(key, env_key=spec.get("env_key"), default=spec.get("default"))
         out.append({"key": key, "value": mask_secret(v) if spec["type"] == "secret" else v,
                     "default": spec.get("default"), "type": spec["type"],
-                    "effect": spec["effect"], "reader": spec["reader"], "desc": spec.get("desc", "")})
+                    "effect": spec["effect"], "reader": spec["reader"], "desc": spec.get("desc", ""),
+                    "read_timing": spec.get("read_timing", "重启服务后初始化客户端时读取")})
     return {"success": True, "data": out}
 
 
@@ -141,9 +142,10 @@ async def put_params(body: ParamsBody):
     for k, v in body.params.items():
         if PARAM_REGISTRY[k]["type"] == "int":
             try:
-                int(v)
-            except (TypeError, ValueError):
-                errors.append(f"{k} 必须是整数")
+                if isinstance(v, bool) or int(v) < 1 or float(v) != int(v):
+                    raise ValueError()
+            except (TypeError, ValueError, OverflowError):
+                errors.append(f"{k} 必须是大于等于 1 的整数")
         if v is None and PARAM_REGISTRY[k]["type"] != "secret":
             errors.append(f"{k} 不接受 null")
     if errors:
@@ -152,10 +154,11 @@ async def put_params(body: ParamsBody):
     for k, v in body.params.items():
         if PARAM_REGISTRY[k]["type"] == "secret" and (v is None or v == ""):
             continue  # 密钥空=不改（防清库）
-        set_param(k, str(v))
+        set_param(k, str(int(v)) if PARAM_REGISTRY[k]["type"] == "int" else str(v))
         applied.append(k)
     restart_needed = any(PARAM_REGISTRY[k]["effect"] == "restart" for k in applied)
-    return {"success": True, "restart_needed": restart_needed}
+    return {"success": True, "restart_needed": restart_needed,
+            "applied_keys": applied, "effects": {k: PARAM_REGISTRY[k]["effect"] for k in applied}}
 
 
 # ── LLM 测试连接 ────────────────────────────────────────────────
@@ -220,7 +223,8 @@ async def get_strategy_all():
         params.append({"key": key,
                        "value": mask_secret(v) if spec["type"] == "secret" else v,
                        "default": spec.get("default"), "type": spec["type"],
-                       "effect": spec["effect"], "desc": spec.get("desc", "")})
+                       "effect": spec["effect"], "desc": spec.get("desc", ""),
+                       "read_timing": spec.get("read_timing", "重启服务后初始化客户端时读取")})
     return {"success": True, "data": {"groups": list_grouped(), "params": params}}
 
 
@@ -244,19 +248,23 @@ async def put_strategy(body: StrategyBody):
             errors.append(f"{k} 必须是 {spec['choices']} 之一")
         if spec["type"] == "int":
             try:
-                int(v)
-            except (TypeError, ValueError):
-                errors.append(f"{k} 必须是整数")
+                if isinstance(v, bool) or int(v) < 1 or float(v) != int(v):
+                    raise ValueError()
+            except (TypeError, ValueError, OverflowError):
+                errors.append(f"{k} 必须是大于等于 1 的整数")
         if k == "default_llm_provider" and v and v not in eligible_default_providers():
             errors.append(f"供应商 {v} 未通过测试连接,不能设为默认")
     if errors:
         raise HTTPException(400, detail={"message": "策略校验失败", "errors": errors})
+    applied = []
     for k, v in body.items.items():
         if v is None or v == "":
             continue
-        set_strategy(k, str(v))
-    restart_needed = any(STRATEGY_REGISTRY[k]["effect"] == "restart" for k in body.items)
-    return {"success": True, "restart_needed": restart_needed}
+        set_strategy(k, str(int(v)) if STRATEGY_REGISTRY[k]["type"] == "int" else str(v))
+        applied.append(k)
+    restart_needed = any(STRATEGY_REGISTRY[k]["effect"] == "restart" for k in applied)
+    return {"success": True, "restart_needed": restart_needed,
+            "applied_keys": applied, "effects": {k: STRATEGY_REGISTRY[k]["effect"] for k in applied}}
 
 
 # ══════════ V2: 技能管理 ══════════

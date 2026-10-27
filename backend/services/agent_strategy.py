@@ -35,7 +35,8 @@ STRATEGY_REGISTRY: dict = {
     "action_guide_text": {"default": "", "type": "str",
         "effect": "immediate", "group": "action", "desc": "动作通道非动作引导语（空=用内置默认文案）"},
     "action_shortcircuit_timeout": {"default": 30, "type": "int",
-        "effect": "restart", "group": "action", "desc": "动作分类器超时(秒)"},
+        "effect": "immediate", "group": "action", "desc": "动作分类器超时(秒)",
+        "read_timing": "每次分类读取并设置该次 HTTP 请求超时"},
     "action_inject_view_context": {"default": True, "type": "bool",
         "effect": "immediate", "group": "action", "desc": "是否向主智能体注入大屏观看窗口上下文"},
     # ── 默认供应商 ──
@@ -113,11 +114,12 @@ def set_strategy(key: str, value) -> None:
 
 
 def list_grouped() -> dict:
-    """按注册表 group 返回全部策略（当前生效值），供 GET 接口/页面渲染。"""
+    """按注册表 group 返回保存值/默认值，不证明运行进程已加载。"""
     groups: dict = {}
     for key, spec in STRATEGY_REGISTRY.items():
         item = {"key": key, "value": get_strategy(key), "default": spec["default"],
                 "type": spec["type"], "effect": spec["effect"], "desc": spec.get("desc", ""),
                 "choices": spec.get("choices")}
+        item["read_timing"] = spec.get("read_timing", "重启服务后读取" if spec["effect"] == "restart" else "下次相关操作读取")
         groups.setdefault(spec["group"], []).append(item)
     return groups

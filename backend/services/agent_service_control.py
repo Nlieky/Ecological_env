@@ -1,8 +1,7 @@
 # backend/services/agent_service_control.py
 """agent 服务(8642)生命周期：kill + detached 重启 + health 轮询。
 
-Windows：CREATE_NEW_CONSOLE 开独立控制台窗口（日志可见）——只此一个 flag，
-DETACHED_PROCESS 与它互斥并用会让 CreateProcess 直接抛 WinError 87。venv
+Windows：CREATE_NO_WINDOW 在后台启动，不打开控制台窗口。venv
 python 跑 scripts/start_agent.py。绝不 kill backend 自身。
 """
 import os
@@ -48,8 +47,10 @@ def get_status() -> dict:
         alive, detail = False, str(e)[:120]
     pids = _pids_by_port(AGENT_PORT)
     from backend.services.agent_params import get_param
+    ready = alive and isinstance(detail, dict) and detail.get("agent_initialized") is True
+    saved_model = get_param("llm_model", env_key="LLM_MODEL", default="")
     return {"alive": alive, "port": AGENT_PORT, "pids": pids, "detail": detail,
-            "model": get_param("llm_model", env_key="LLM_MODEL", default="")}
+            "ready": ready, "model": saved_model, "saved_model": saved_model}
 
 
 def restart_agent(confirm: bool) -> dict:
@@ -69,13 +70,11 @@ def restart_agent(confirm: bool) -> dict:
             # psutil 未装/进程已消失等：taskkill 兜底。单个 PID 失败不中断其余。
             subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
     time.sleep(1)
-    # detached 新进程：独立控制台窗口，继承当前 env（含 .env 变量）。
-    # 只用 CREATE_NEW_CONSOLE——DETACHED_PROCESS 与它互斥并用会让
-    # CreateProcess 直接抛 WinError 87（参数错误），旧进程已杀、新进程起不来。
+    # 后台新进程，继承当前 env（含 .env 变量），不创建可见控制台。
     env = dict(os.environ)
     flags = 0
     if os.name == "nt":
-        flags = 0x00000010  # CREATE_NEW_CONSOLE
+        flags = 0x08000000  # CREATE_NO_WINDOW
     try:
         subprocess.Popen([str(VENV_PY), str(PROJECT_ROOT / "scripts" / "start_agent.py")],
                          cwd=str(PROJECT_ROOT), env=env, creationflags=flags)
@@ -83,13 +82,16 @@ def restart_agent(confirm: bool) -> dict:
         return {"ok": False, "error": f"启动 agent 进程失败: {exc}",
                 "old_pids": old_pids}
     # 轮询 health 最多 60s（LLM 客户端初始化要几秒）
+    new_alive = False
     for _ in range(60):
         time.sleep(1)
         try:
             import httpx
-            if httpx.get(f"http://localhost:{AGENT_PORT}/health", timeout=2).status_code == 200:
-                return {"ok": True, "old_pids": old_pids, "new_alive": True}
+            response = httpx.get(f"http://localhost:{AGENT_PORT}/health", timeout=2)
+            new_alive = response.status_code == 200
+            if new_alive and response.json().get("agent_initialized") is True:
+                return {"ok": True, "old_pids": old_pids, "new_alive": True, "new_ready": True}
         except Exception:
-            pass
-    return {"ok": True, "old_pids": old_pids, "new_alive": False,
-            "warn": "进程已启动但 60s 内 health 未就绪——请看 agent 控制台窗口日志"}
+            new_alive = False
+    return {"ok": False, "old_pids": old_pids, "new_alive": new_alive, "new_ready": False,
+            "warn": "进程已启动但 60s 内智能体未就绪，请检查 agent 服务日志"}

@@ -283,8 +283,8 @@ async def query_stream(request: QueryRequest):
 
     事件同 agent 服务：progress（子智能体调用进度）/ delta（最终回答逐字）/ done / error。
     用 httpx.AsyncClient 流式转发（async，不阻塞后端事件循环）。
-    透传的同时缓冲解析 SSE，捕获 done 事件的完整回答；流结束后调 record_exchange
-    落库（与 /query 行为一致），使 /api/v1/conversations 能展示流式问答。落库失败仅告警。
+    按 SSE 帧转发进度；先落库问答与追踪，再发送 done，避免客户端完成后断开
+    或刷新历史列表时丢失本轮记录。落库失败仅告警。
     """
     session_id = request.session_id or generate_session_id()
     start_time = time.time()
@@ -294,67 +294,94 @@ async def query_stream(request: QueryRequest):
         final_content = ""
         final_session_id = session_id
         had_done = False
+        done_event = None
         last_session_dir = None   # done 事件带的 session 目录（backend 采集事件用）
         sub_starts = {}            # subagent -> 开始时间
         subagent_executions = []   # [{subagent_name, execution_time_ms, status, summary}]
         decision_order = []        # 按调用顺序去重的子智能体名
         stream_chart_data = None  # 收集 chartData（落对话历史供历史会话恢复）
-        buf = ""
         timeout = httpx.Timeout(_agent_timeout(), connect=10.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            async with client.stream(
-                "POST",
-                f"{AGENT_SERVICE_URL}/query/stream",
-                json={"query": request.query, "session_id": session_id,
-                      "view_context": request.view_context or "",
-                      "mode": request.mode or ""},
-            ) as resp:
-                if resp.status_code != 200:
-                    yield 'data: {"type":"error","message":"Agent服务返回 %d"}\n\n' % resp.status_code
+        async def upstream_events():
+            import re
+            buf = ""
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    async with client.stream(
+                        "POST",
+                        f"{AGENT_SERVICE_URL}/query/stream",
+                        json={"query": request.query, "session_id": session_id,
+                              "view_context": request.view_context or "",
+                              "mode": request.mode or ""},
+                    ) as resp:
+                        if resp.status_code != 200:
+                            yield {"type": "error", "message": f"Agent服务返回 {resp.status_code}"}
+                            return
+                        async for chunk in resp.aiter_text():
+                            buf += chunk
+                            while (boundary := re.search(r"\r?\n\r?\n", buf)) is not None:
+                                frame, buf = buf[:boundary.start()], buf[boundary.end():]
+                                data = "\n".join(line[5:].lstrip(" ") for line in frame.splitlines() if line.startswith("data:"))
+                                if not data:
+                                    yield None  # keepalive
+                                    continue
+                                try:
+                                    evt = json.loads(data)
+                                except (ValueError, TypeError):
+                                    continue
+                                if not isinstance(evt, dict):
+                                    continue
+                                yield evt
+                                if evt.get("type") in ("done", "error"):
+                                    return
+                        yield {"type": "error", "message": "Agent连接结束，未收到完成事件"}
+            except Exception as exc:
+                logger.warning(f"Agent stream connection failed: {exc}")
+                yield {"type": "error", "message": "Agent流式连接失败"}
+
+        events = upstream_events()
+        try:
+            async for evt in events:
+                if evt is None:
+                    yield ": keepalive\n\n"
+                    continue
+                etype = evt.get("type")
+                if etype == "error":
+                    yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
                     return
-                async for chunk in resp.aiter_text():
-                    yield chunk  # 透传给前端
-                    # 同时缓冲、按行解析 SSE，提取最终回答
-                    buf += chunk
-                    while "\n" in buf:
-                        line, buf = buf.split("\n", 1)
-                        line = line.strip()
-                        if not line.startswith("data:"):
-                            continue
-                        payload = line[len("data:"):].strip()
-                        if not payload:
-                            continue
-                        try:
-                            evt = json.loads(payload)
-                        except Exception:
-                            continue
-                        etype = evt.get("type")
-                        if etype == "progress":
-                            sub = evt.get("subagent")
-                            stage = evt.get("stage")
-                            if sub and stage == "start":
-                                sub_starts[sub] = time.time()
-                                if sub not in decision_order:
-                                    decision_order.append(sub)
-                            elif sub and stage == "done":
-                                start_ts = sub_starts.pop(sub, None)
-                                latency = (time.time() - start_ts) * 1000 if start_ts else None
-                                subagent_executions.append({
-                                    "subagent_name": sub,
-                                    "execution_time_ms": latency,
-                                    "status": "success",
-                                    "summary": evt.get("summary", ""),
-                                    "skill_calls": evt.get("skill_calls") or [],
-                                    "evidence": evt.get("evidence") or {},
-                                })
-                                # 收集 chartData（异常检测优先带标注，否则数据感知）
-                                if evt.get("chartData"):
-                                    stream_chart_data = evt["chartData"]
-                        elif etype == "done":
-                            final_content = evt.get("content", "")
-                            final_session_id = evt.get("session_id", session_id)
-                            last_session_dir = evt.get("session_dir")
-                            had_done = True
+                if etype == "progress":
+                    sub = evt.get("subagent")
+                    stage = evt.get("stage")
+                    if sub and stage == "start":
+                        sub_starts[sub] = time.monotonic()
+                        if sub not in decision_order:
+                            decision_order.append(sub)
+                    elif sub and stage == "done":
+                        start_ts = sub_starts.pop(sub, None)
+                        latency = max(0, (time.monotonic() - start_ts) * 1000) if start_ts is not None else None
+                        measured = evt.get("elapsed_ms")
+                        if isinstance(measured, (int, float)) and measured >= 0:
+                            latency = measured
+                        subagent_executions.append({
+                            "subagent_name": sub,
+                            "execution_time_ms": latency,
+                            "status": "success",
+                            "summary": evt.get("summary", ""),
+                            "skill_calls": evt.get("skill_calls") or [],
+                            "evidence": evt.get("evidence") or {},
+                        })
+                        # 收集 chartData（异常检测优先带标注，否则数据感知）
+                        if evt.get("chartData"):
+                            stream_chart_data = evt["chartData"]
+                elif etype == "done":
+                    final_content = evt.get("content", "")
+                    final_session_id = evt.get("session_id", session_id)
+                    last_session_dir = evt.get("session_dir")
+                    had_done = True
+                    done_event = evt
+                    break
+                yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+        finally:
+            await events.aclose()
         # 流结束：落对话历史 + 追踪明细（与 /query 一致，失败仅告警）
         if had_done:
             total_latency_ms = (time.time() - start_time) * 1000
@@ -417,12 +444,13 @@ async def query_stream(request: QueryRequest):
                         subagent_name=ex["subagent_name"],
                         input_params={},
                         output_result={"summary": ex.get("summary", ""), "skill_calls": ex.get("skill_calls", []), "evidence": ex.get("evidence", {})},
-                        execution_time_ms=ex.get("execution_time_ms") or 0.0,
+                        execution_time_ms=ex.get("execution_time_ms"),
                         status=ex.get("status", "success"),
                         turn_id=turn_id,
                     )
                 except Exception as e:
                     logger.warning(f"Failed to log subagent execution: {e}")
+            yield f"data: {json.dumps(done_event, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(proxy(), media_type="text/event-stream")
 

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AdminShell from '@/layout/AdminShell.vue'
+import { featureMeta } from '@/config/featureRegistry'
 
 // 占位页懒加载（所有 Phase B 占位路由共用，props 由 route.meta 注入）
 const Placeholder = () => import('@/views/PlaceholderView.vue')
@@ -14,45 +15,47 @@ const router = createRouter({
       children: [
         // ── 智能助手 ──
         { path: 'chat', component: () => import('@/views/AIOpsChatView.vue'),
-          meta: { title: 'AI 助手', group: '智能助手' } },
+          meta: featureMeta('/chat') },
         { path: 'agents/config', component: () => import('@/views/AgentConfigView.vue'),
-          meta: { title: '智能体配置', group: '智能助手' } },
+          meta: featureMeta('/agents/config') },
         { path: 'agents/audit', component: () => import('@/views/AgentAuditView.vue'),
-          meta: { title: '智能体审计', group: '智能助手' } },
+          meta: featureMeta('/agents/audit') },
         { path: 'agents/knowledge', component: () => import('@/views/KnowledgeGraphView.vue'),
-          meta: { title: '知识图谱', group: '智能助手' } },
+          meta: featureMeta('/agents/knowledge') },
         // ── 监控大屏 ──
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue'),
-          meta: { title: '监测大屏', group: '监控大屏' } },
+          meta: featureMeta('/dashboard') },
         // 旧单厂路由：已并入 /dashboard 仪表盘 tab（看板列表选厂），重定向兼容
-        { path: 'plants/:plantId', redirect: '/dashboard' },
+        { path: 'plants/:plantId', redirect: to => ({ path: '/dashboard', query: { plant: to.params.plantId } }) },
         // 厂区配置独立页（数据域配置，从智能体配置页拆出，归监控大屏组末位）
         { path: 'plants/config', component: () => import('@/views/PlantsConfigView.vue'),
-          meta: { title: '厂区配置', group: '监控大屏' } },
+          meta: featureMeta('/plants/config') },
         { path: 'metrics', component: () => import('@/views/MetricsView.vue'),
-          meta: { title: '指标查询', group: '监控大屏' } },
+          meta: featureMeta('/metrics') },
         { path: 'logs', component: () => import('@/views/LogsView.vue'),
-          meta: { title: '日志中心', group: '监控大屏' } },
+          meta: featureMeta('/logs') },
         { path: 'logs/trace/:id', component: () => import('@/views/TraceView.vue'),
           meta: { title: '会话追溯', group: '监控大屏' } },
         { path: 'tracing', component: () => import('@/views/TracingView.vue'),
-          meta: { title: '链路追踪', group: '监控大屏' } },
+          meta: featureMeta('/tracing') },
         { path: 'datasources', component: () => import('@/views/DatasourcesView.vue'),
-          meta: { title: '数据源', group: '监控大屏' } },
+          meta: featureMeta('/datasources') },
         { path: 'alerts', component: () => import('@/views/AlertCenterView.vue'),
-          meta: { title: '告警中心', group: '监控大屏' } },
+          meta: featureMeta('/alerts') },
         { path: 'grafana', component: () => import('@/views/GrafanaView.vue'),
-          meta: { title: 'Grafana 大屏', group: '监控大屏' } },
+          meta: featureMeta('/grafana') },
+        { path: 'experimental', component: () => import('@/views/ExperimentalFeaturesView.vue'),
+          meta: featureMeta('/experimental') },
         // ── 事件中心 ──
         { path: 'events', component: () => import('@/views/EventCenterView.vue'),
-          meta: { title: '事件中心', group: '事件中心' } },
+          meta: featureMeta('/events') },
         { path: 'event-sources', component: Placeholder,
-          meta: { title: '事件源', group: '事件中心', phTitle: '事件源',
+          meta: { ...featureMeta('/event-sources'), phTitle: '事件源',
             phDesc: '事件来源（双数据流等）配置',
             phHint: 'Phase B' } },
         // ── 设置 ──
         { path: 'settings', component: Placeholder,
-          meta: { title: '系统设置', group: '设置', phTitle: '系统设置',
+          meta: { ...featureMeta('/settings'), phTitle: '系统设置',
             phDesc: '系统与 LLM 配置',
             phHint: 'Phase B' } },
       ],

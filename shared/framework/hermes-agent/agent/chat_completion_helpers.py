@@ -28,6 +28,7 @@ from typing import Any, Dict, Optional
 from hermes_cli.timeouts import get_provider_request_timeout, get_provider_stale_timeout
 from hermes_constants import PARTIAL_STREAM_STUB_ID, FINISH_REASON_LENGTH
 from agent.error_classifier import FailoverReason
+from agent.request_threads import start_owned_thread
 from agent.model_metadata import is_local_endpoint
 from agent.message_sanitization import (
     _sanitize_surrogates,
@@ -356,7 +357,7 @@ def interruptible_api_call(agent, api_kwargs: dict):
     agent._touch_activity("waiting for non-streaming API response")
 
     t = threading.Thread(target=_call, daemon=True)
-    t.start()
+    start_owned_thread(t)
     _poll_count = 0
     while t.is_alive():
         t.join(timeout=0.3)
@@ -1641,7 +1642,7 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
                 result["error"] = e
 
         t = threading.Thread(target=_bedrock_call, daemon=True)
-        t.start()
+        start_owned_thread(t)
         while t.is_alive():
             t.join(timeout=0.3)
             if agent._interrupt_requested:
@@ -2441,7 +2442,7 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
             _stream_stale_timeout = _stream_stale_timeout_base
 
     t = threading.Thread(target=_call, daemon=True)
-    t.start()
+    start_owned_thread(t)
     _last_heartbeat = time.time()
     _HEARTBEAT_INTERVAL = 30.0  # seconds between gateway activity touches
     while t.is_alive():

@@ -1,7 +1,9 @@
 <template>
-  <div class="metrics">
+  <PageShell title="指标查询" subtitle="按采样窗口比较进水与出水指标" class="metrics">
+    <template #toolbar>
     <!-- 筛选条 -->
     <div class="bar">
+      <div class="grp"><label class="lbl" for="metrics-plant">厂站</label><select id="metrics-plant" :value="plants.activePlant" @change="plants.selectPlant(($event.target as HTMLSelectElement).value)"><option value="" disabled>选择厂站</option><option v-for="p in plantOptions" :key="p" :value="p">{{ p }}</option></select><span v-if="plants.treeError">{{ plants.treeError }}</span></div>
       <div class="grp">
         <span class="lbl">指标</span>
         <button v-for="i in INDICATORS" :key="i.key" class="chip" :class="{ on: indicator === i.key }" @click="indicator = i.key">
@@ -18,9 +20,17 @@
           <span class="dash">~</span>
           <input type="date" v-model="customRange.end" @change="loadCustom" />
           <button v-if="customRange.start" class="chip sm clear" @click="clearRange">✕ 清除</button>
+          <span class="lbl">含结束当天；未填结束日期时查询开始当天</span>
         </span>
       </div>
     </div>
+    <p v-if="rangeError" role="alert" class="range-error">{{ rangeError }}</p>
+    </template>
+    <PageState :state="viewState" :preserve-content="!!dashboard" :message="error ? (dashboard ? '刷新失败，保留上次加载的数据。' : '指标数据加载失败，请重试。') : undefined" @retry="load">
+    <p v-if="error" role="alert">{{ error }}</p>
+    <p v-if="missingSide" role="status">{{ missingSide }}</p>
+    <button v-if="viewState === 'empty'" type="button" @click="load">重新加载</button>
+    <div v-if="dashboard" class="lbl">{{ contextLabel(dashboard.data_context) }} · 数据库 {{ dashboard.data_context?.bucket || '未核验' }} · 时效 {{ plantStatusLabel(dashboard.data_context?.freshness || 'unverified') }} · 最新采样 {{ formatSamplingTime(dashboard.data_context?.latest_sample_at, dashboard.data_context?.timezone) }} · 数据截至 {{ formatSamplingTime(dashboard.latest_time, dashboard.data_context?.timezone) }} · 窗口 {{ formatSamplingTime(dashboard.segment_start, dashboard.data_context?.timezone) }} ~ {{ formatSamplingTime(dashboard.segment_end, dashboard.data_context?.timezone) }} <span v-if="dashboard.data_context?.warning">· {{ dashboard.data_context.warning }}</span></div>
 
     <!-- 统计卡片 -->
     <div class="stats" v-if="cur">
@@ -34,26 +44,43 @@
     <div class="chart-card">
       <div class="chart-head">
         <span class="ct">{{ curMeta.label }}（{{ curMeta.desc }}）趋势 · 进水 vs 出水</span>
-        <span class="cs">{{ customRange.start ? `自定义 ${customRange.start} ~ ${customRange.end || '今'}` : `${records.length} 个采样点` }}</span>
+        <span class="cs">{{ customRange.start ? `自定义 ${customRange.start} ~ ${customRange.end || customRange.start}` : `${records.length} 个采样点` }}</span>
       </div>
       <div class="chart-wrap">
         <div ref="chartEl" class="chart"></div>
-        <div v-if="loading" class="loading">加载中…</div>
-        <div v-else-if="!records.length" class="loading">该时间窗口无数据</div>
       </div>
     </div>
-  </div>
+    </PageState>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import echarts from '@/lib/echarts'
-import { monitoringService } from '@/api/modules/monitoring'
+import PageShell from '@/components/common/PageShell.vue'
+import PageState from '@/components/common/PageState.vue'
 import { plantsService } from '@/api/modules/plants'
+import { usePlantsStore } from '@/stores/plants'
+import { dashboardSnapshot, latestValues, finiteStats, dateRange, requestGate, formatSamplingTime, plantStatusLabel, initializeMetrics } from '@/composables/dashboardData'
+import { formatDataContext as contextLabel } from '@/utils/displayFormat'
 import { useActionStore } from '@/stores/action'
-import type { HistoryRecord } from '@/api/types/api.types'
+import type { PlantDashboard } from '@/api/types/api.types'
+import type { DashboardRecord } from '@/composables/dashboardData'
+import { useAssistantContext } from '@/composables/useAssistantContext'
+import { useAssistantContextStore } from '@/stores/assistantContext'
+import { contextPolicy } from '@/assistant/contextPolicy'
 
 const actionStore = useActionStore()
+const plants = usePlantsStore()
+const route = useRoute()
+const assistantContext = useAssistantContextStore()
+const plantOptions = computed(() => [...new Set([...(plants.tree?.cities.flatMap(c => c.districts.flatMap(d => d.plants.map(p => p.plant_id))) ?? []), ...(plants.tree?.ungrouped.map(p => p.plant_id) ?? [])])])
+const dashboard = ref<PlantDashboard | null>(null)
+const error = ref('')
+const rangeError = ref('')
+let loadedQuery = ''
+const gate = requestGate()
 
 const INDICATORS = [
   { key: 'pH', label: 'pH', desc: '酸碱度', unit: '' },
@@ -67,69 +94,61 @@ const WINDOWS = [{ t: '1H', v: '1h' }, { t: '6H', v: '6h' }, { t: '24H', v: '24h
 type IndKey = typeof INDICATORS[number]['key']
 const indicator = ref<IndKey>('COD')
 const timeWindow = ref<'1h' | '6h' | '24h'>('24h')
-const records = ref<HistoryRecord[]>([])
+const records = ref<DashboardRecord[]>([])
 const loading = ref(false)
+const missingSide = computed(() => {
+  if (!records.value.length) return ''
+  const has = (side: 'influent' | 'effluent') => records.value.some(r => typeof r[side]?.[indicator.value] === 'number')
+  return !has('influent') ? '当前指标缺少进水数据' : !has('effluent') ? '当前指标缺少出水数据' : ''
+})
+const viewState = computed(() => {
+  if (loading.value) return dashboard.value ? 'refreshing' : 'initial-loading'
+  if (error.value) return 'error'
+  if (!records.value.length) return 'empty'
+  return missingSide.value ? 'partial' : dashboard.value?.data_context?.freshness === 'stale' ? 'stale' : 'ready'
+})
 
 // 自定义日期范围(长时段查询;归本页,大屏流式看板保持固定滑窗)
 const customRange = ref<{ start: string; end: string }>({ start: '', end: '' })
+useAssistantContext(() => ({ pageId: 'metrics', plant: plants.activePlant || null, indicator: indicator.value, range: customRange.value.start ? { ...customRange.value } : timeWindow.value, source: dashboard.value?.data_context?.bucket || '指标查询接口（来源未核验）', freshness: dashboard.value?.data_context?.freshness || null, status: loading.value ? 'loading' : error.value ? 'error' : records.value.length ? 'ready' : 'empty', actions: ['navigate', 'metrics.filter'] }), async action => {
+  if (action.capability !== 'metrics.filter') return { success: false, message: '指标页不支持该操作' }
+  const p = action.parameters
+  if (typeof p.plant === 'string') {
+    const lease = assistantContext.snapshot()
+    const plant = plants.activePlant
+    await plants.fetchTree()
+    const changed = contextPolicy(action, lease as unknown as Record<string, unknown>, assistantContext.current as unknown as Record<string, unknown>)
+    if (!gate.alive() || route.path !== '/metrics' || changed || plants.activePlant !== plant) return { success: false, code: 'stale_context', message: changed || '页面或厂站已变化，未应用旧操作' }
+    if (!plantOptions.value.includes(p.plant)) return { success: false, message: '厂站不在已加载目录中' }
+    plants.selectPlant(p.plant)
+  }
+  if (p.indicator) indicator.value = p.indicator as IndKey
+  if (p.range) { customRange.value = { start: '', end: '' }; timeWindow.value = p.range as '1h' | '6h' | '24h' }
+  await load()
+  return { success: !error.value && !!dashboard.value, message: error.value || (dashboard.value ? '指标查询已加载' : '未获得指标数据') }
+})
 function pickWindow(v: '1h' | '6h' | '24h') {
   customRange.value = { start: '', end: '' }
   timeWindow.value = v
+  void load()
 }
 function clearRange() {
   customRange.value = { start: '', end: '' }
   void load()
 }
 async function loadCustom() {
-  const { start, end } = customRange.value
-  if (!start) return
-  // 复用 dashboard 段查询:起止日期(堆叠全量展示,自适应点距)
-  try {
-    const r = await plantsService.dashboard(PLANT, 24, start)
-    const d = r.data
-    // dashboard anchor 模式=该日起7天;不足/超出由 end 截断
-    const inRange = (t: string) => (!end || t.slice(0, 10) <= end)
-    const rs: HistoryRecord[] = (d.indicators?.pH?.series?.effluent ?? [])
-      .filter((p) => inRange(p.time))
-      .map((p) => ({ timestamp: p.time.replace(' ', 'T'),
-        influent: {}, effluent: {} } as unknown as HistoryRecord))
-    // 把全部指标塞进对应时间戳
-    for (const [field, ind] of Object.entries(d.indicators ?? {})) {
-      const key = field === 'suspended_solids' ? 'SS' : field
-      for (const side of ['influent', 'effluent'] as const) {
-        for (const p of ind.series[side]) {
-          if (!inRange(p.time)) continue
-          const rec = rs.find((x) => x.timestamp === p.time.replace(' ', 'T'))
-          if (rec) (rec[side] as any)[key] = p.value
-        }
-      }
-    }
-    records.value = rs
-  } catch { records.value = [] }
-  await nextTick()
-  renderChart()
+  await load()
 }
-const PLANT = '当阳市金桥污水处理厂一期'
 
 const curMeta = computed(() => INDICATORS.find((i) => i.key === indicator.value)!)
 const curUnit = computed(() => curMeta.value.unit)
 
-const cur = computed(() => {
-  const last = records.value[records.value.length - 1]
-  if (!last) return null
-  return {
-    influent: last.influent?.[indicator.value] ?? null,
-    effluent: last.effluent?.[indicator.value] ?? null,
-  }
-})
+const cur = computed(() => records.value.length ? latestValues(records.value, indicator.value) : null)
 const stat = computed(() => stats(indicator.value))
 
 function stats(key: IndKey) {
   const calc = (side: 'influent' | 'effluent') => {
-    const vs = records.value.map((r) => r[side]?.[key]).filter((v): v is number => typeof v === 'number')
-    if (!vs.length) return { mean: null, min: null, max: null } as const
-    const mean = vs.reduce((a, b) => a + b, 0) / vs.length
-    return { mean, min: Math.min(...vs), max: Math.max(...vs) } as const
+    return finiteStats(records.value.map((r) => r[side]?.[key]))
   }
   return { influent: calc('influent'), effluent: calc('effluent') }
 }
@@ -139,7 +158,8 @@ const chartEl = ref<HTMLDivElement>()
 let chart: ReturnType<typeof echarts.init> | null = null
 
 function renderChart() {
-  if (!chart || !records.value.length) return
+  if (!chart) return
+  if (!records.value.length) { chart.clear(); return }
   const xs = records.value.map((r) => r.timestamp.replace('T', ' ').slice(5, 16)) // MM-DD HH:mm
   const infl = records.value.map((r) => r.influent?.[indicator.value] ?? null)
   const effl = records.value.map((r) => r.effluent?.[indicator.value] ?? null)
@@ -173,18 +193,34 @@ function renderChart() {
 }
 
 async function load() {
+  let range: ReturnType<typeof dateRange> | undefined
+  rangeError.value = ''
+  try { range = customRange.value.start ? dateRange(customRange.value.start, customRange.value.end) : undefined }
+  catch (e) { rangeError.value = e instanceof Error ? e.message : '请输入有效日期'; gate.begin(); loading.value = false; return }
+  const request = gate.begin()
+  if (request === null) return
   loading.value = true
+  const query = JSON.stringify([plants.activePlant, timeWindow.value, range])
+  error.value = ''
+  if (query !== loadedQuery) { records.value = []; dashboard.value = null; renderChart() }
   try {
-    const r = await monitoringService.history({ time_range: timeWindow.value, page_size: 500 })
-    records.value = r.records
-  } catch { records.value = [] }
-  finally { loading.value = false }
+    if (!plants.activePlant) { loading.value = false; return }
+    const r = await plantsService.dashboard(plants.activePlant, parseInt(timeWindow.value), range?.anchor, range?.endDate)
+    if (!gate.current(request)) return
+    const snapshot = dashboardSnapshot(r.data)
+    dashboard.value = snapshot.dashboard
+    records.value = snapshot.records
+    loadedQuery = query
+  } catch (e: unknown) {
+    if (!gate.current(request)) return
+    error.value = e instanceof Error ? e.message : '指标数据加载失败'
+  } finally { if (gate.current(request)) loading.value = false }
   await nextTick()
-  renderChart()
+  if (gate.current(request)) renderChart()
 }
 
 watch(indicator, renderChart)
-watch(timeWindow, load)
+watch(() => plants.activePlant, load)
 
 // ── AI 助手动作指令响应 ──────────────────────────────────────
 // action store 的状态由 chat store 的 onAction 回调 dispatch（AI 助手说话 → 大屏变化）
@@ -202,27 +238,42 @@ watch(() => actionStore.indicators, (v) => {
 // 时间范围切换："看最近一周" → timeWindow 变化（7d/30d 超出本视图窗口，映射提示）
 watch(() => actionStore.timeRange, (v) => {
   if (!v) return
-  if (v === '1h' || v === '6h' || v === '24h') timeWindow.value = v
+  if (v === '1h' || v === '6h' || v === '24h') pickWindow(v)
   else console.info('[MetricsView] 时间范围', v, '超出本视图窗口(1h/6h/24h)，忽略')
 })
 
 // 算法标注：run_detector 结果 → 曲线上 markPoint 高亮异常点
 watch(() => actionStore.annotations, () => renderChart(), { deep: true })
 
+let resizeObserver: ResizeObserver | undefined
+function resizeChart() { chart?.resize() }
+watch(chartEl, (el, previous) => {
+  if (!gate.alive()) return
+  if (previous) resizeObserver?.unobserve(previous)
+  chart?.dispose()
+  chart = el ? echarts.init(el) : null
+  if (el) resizeObserver?.observe(el)
+  renderChart()
+}, { flush: 'post' })
 onMounted(async () => {
-  if (chartEl.value) chart = echarts.init(chartEl.value)
-  await load()
+  window.addEventListener('resize', resizeChart)
+  if (typeof ResizeObserver !== 'undefined') resizeObserver = new ResizeObserver(resizeChart)
+  await initializeMetrics(() => plants.fetchTree(), gate, () => {
+    if (!plants.activePlant && plantOptions.value.length) plants.selectPlant(plantOptions.value[0])
+  }, load)
 })
-onBeforeUnmount(() => { chart?.dispose(); chart = null })
+onBeforeUnmount(() => { gate.dispose(); window.removeEventListener('resize', resizeChart); resizeObserver?.disconnect(); chart?.dispose(); chart = null })
 </script>
 
 <style scoped>
-.metrics { display: flex; flex-direction: column; gap: 14px; max-width: 1100px }
+.metrics { width: 100%; min-width: 0 }
+.range-error { color: #dc2626; font-size: 13px; margin: 8px 0 0 }
+.range-box { flex-wrap: wrap; max-width: 100% }
 .bar { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; background: var(--card-bg);
   border: 1px solid var(--brd); border-radius: 13px; padding: 11px 14px }
 .grp { display: flex; align-items: center; gap: 7px; flex-wrap: wrap }
 .lbl { font-size: 11px; color: var(--text-muted); letter-spacing: .5px }
-.range-box { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px;
+.range-box { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; flex-wrap: wrap;
   border: 1px solid var(--brd); border-radius: 8px; background: #fff }
 .range-box input { border: 0; outline: none; font-size: 12px; color: var(--text-primary);
   font-family: inherit; cursor: pointer }

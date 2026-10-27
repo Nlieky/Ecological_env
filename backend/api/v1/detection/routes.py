@@ -9,7 +9,9 @@ import sys
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
+from backend.core.config import settings
 
 router = APIRouter(tags=["轻量检测"])
 
@@ -23,6 +25,7 @@ class DetectRequest(BaseModel):
     end: str = "now"
     side: str = "effluent"
     plant: str = ""                      # 厂(监测点);空=全库
+    source: str | None = Field(default=None, max_length=200)
 
 
 @router.post("/detection/run")
@@ -30,8 +33,10 @@ async def run_detection(req: DetectRequest):
     """跑一次异常检测算子,返回脚本 JSON(actionData.annotations 给前端标注)。"""
     if req.algorithm not in ("constant", "changepoint", "iforest"):
         raise HTTPException(400, "algorithm 必须是 constant/changepoint/iforest")
+    if req.source is not None and req.source != settings.INFLUXDB_BUCKET:
+        raise HTTPException(400, "检测数据来源与当前业务数据源不一致，未运行检测")
     try:
-        r = subprocess.run(
+        r = await run_in_threadpool(subprocess.run,
             [sys.executable, str(_SCRIPT),
              "--algorithm", req.algorithm, "--indicator", req.indicator,
              "--start", req.start, "--end", req.end, "--side", req.side,
@@ -43,6 +48,8 @@ async def run_detection(req: DetectRequest):
         data = json.loads(out) if out else {}
         if not isinstance(data, dict) or data.get("status") != "completed":
             return {"success": False, "error": (data or {}).get("error") or r.stderr[-300:]}
+        data['execution_context'] = {key: getattr(req, key) for key in ('algorithm', 'indicator', 'plant', 'start', 'end', 'side')}
+        data['execution_context']['source'] = settings.INFLUXDB_BUCKET
         return {"success": True, "data": data}
     except Exception as e:
         raise HTTPException(500, f"检测执行失败: {e}")

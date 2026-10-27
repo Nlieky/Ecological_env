@@ -8,10 +8,14 @@
       </div>
       <div class="pc-a">
         <span class="pc-stat" title="市/厂区/厂的数量">{{ statText }}</span>
+        <button class="btn" :disabled="loading || saving" @click="load">{{ loading ? '刷新中…' : '刷新' }}</button>
         <button class="btn" @click="validate" :disabled="saving">校验</button>
-        <button class="btn primary" @click="save" :disabled="saving || !loaded">{{ saving ? '保存中…' : '保存' }}</button>
+        <button class="btn primary" @click="save" :disabled="saving || loading || !loaded">{{ saving ? '保存中…' : '保存' }}</button>
       </div>
     </div>
+    <div v-if="loadError" class="pc-errs" role="alert">{{ loadError }} <button class="btn xs" :disabled="loading || saving" @click="load">重试</button></div>
+    <div class="pc-body" :aria-busy="loading">
+    <div v-if="loading && !loaded" class="pc-empty" role="status">正在加载厂区配置…</div>
     <div v-if="errors.length" class="pc-errs">
       <div v-for="(e, i) in errors" :key="i" class="pc-err">⚠ {{ e }}</div>
     </div>
@@ -97,6 +101,7 @@
         <button class="btn xs" @click="addPlantConfig" :disabled="!addPid">添加</button>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -105,7 +110,7 @@
 // 校验(POST validate, 不落盘) + 保存(PUT, 后端再校验+yaml 原子写+git 快照)。
 // 错误处理惯例同 IdentityFileEditor：axios 拦截器已弹通用错误，
 // 这里只把 400 校验的字段级 errors 渲染到页面错误区（不算双重提示）。
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentConfigService, type PlantConfig } from '@/api/modules/agentConfig'
 
@@ -116,6 +121,12 @@ const addPid = ref('')
 // 加载成功才允许保存：load 失败时 cfg 是空骨架，此时保存会把空配置写盘——
 // 整厂层级/别名/报表映射全被擦掉。拦截器只弹通用错误，这里补 disabled 硬闸。
 const loaded = ref(false)
+const loading = ref(false)
+const loadError = ref('')
+let disposed = false
+let generation = 0
+const savedSnapshot = ref(JSON.stringify(cfg))
+const dirty = computed(() => loaded.value && JSON.stringify(cfg) !== savedSnapshot.value)
 
 // 层级里出现过的所有厂（plant_configs 添加下拉的选项源）
 const allPlants = computed(() => {
@@ -125,14 +136,25 @@ const allPlants = computed(() => {
 })
 
 async function load() {
+  if (disposed || saving.value) return
+  if (dirty.value) {
+    try { await ElMessageBox.confirm('刷新将覆盖未保存的厂区配置，是否继续？', '未保存修改', { type: 'warning', confirmButtonText: '放弃修改并刷新', cancelButtonText: '保留修改' }) }
+    catch { return }
+    if (disposed) return
+  }
+  const request = ++generation
+  const draftAtRequest = JSON.stringify(cfg)
+  loading.value = true; loadError.value = ''
   try {
     const r: any = await agentConfigService.getPlants()
+    if (disposed || request !== generation) return
+    if (JSON.stringify(cfg) !== draftAtRequest) { loadError.value = '刷新期间存在新的未保存修改，已保留当前草稿，请确认后重试。'; return }
     Object.assign(cfg, (r as any).data ?? r)
+    savedSnapshot.value = JSON.stringify(cfg)
     loaded.value = true
   } catch (e: any) {
-    // 拦截器弹的是通用网络错误，这里明确告知"没加载到就不能保存"
-    ElMessage.error('厂区配置加载失败：保存已禁用（防误擦除）— ' + (e?.message || e))
-  }
+    if (!disposed && request === generation) loadError.value = `厂区配置加载失败：${e?.message || e}${loaded.value ? '；已保留当前配置' : '；保存已禁用'}`
+  } finally { if (!disposed && request === generation) loading.value = false }
 }
 
 async function validate() {
@@ -145,10 +167,13 @@ async function validate() {
 }
 
 async function save() {
+  if (!loaded.value || saving.value || loading.value) return
+  ++generation
   saving.value = true
   try {
     const r: any = await agentConfigService.savePlants({ ...cfg })
     Object.assign(cfg, (r as any).data ?? r)
+    savedSnapshot.value = JSON.stringify(cfg)
     errors.value = [] // 保存通过=校验已过，清掉旧错误
     ElMessage.success('厂区配置已保存（自动 git 快照）')
   } catch (e: any) {
@@ -238,17 +263,20 @@ function addPlantConfig() {
 }
 
 onMounted(load)
+onBeforeUnmount(() => { disposed = true; ++generation })
 </script>
 
 <style scoped>
-.pc { max-width: 960px }
+.pc { max-width: 960px; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden }
+.pc-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden }
+.pc-h, .pc > .pc-errs { flex-shrink: 0 }
 /* 页头 */
 .pc-h { display: flex; justify-content: space-between; align-items: center; gap: 14px;
-  padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--brd) }
+  padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--brd); flex-wrap: wrap }
 .pc-hl { min-width: 0 }
 .pc-t { font-size: 17px; font-weight: 700; color: var(--text-primary) }
 .pc-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px }
-.pc-a { display: flex; align-items: center; gap: 9px; flex-shrink: 0 }
+.pc-a { display: flex; align-items: center; gap: 9px; flex-shrink: 0; flex-wrap: wrap }
 .pc-stat { font-size: 11.5px; color: var(--primary); background: var(--primary-soft, #eef2ff);
   padding: 4px 11px; border-radius: 999px; font-weight: 600; white-space: nowrap }
 .pc-errs { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px }

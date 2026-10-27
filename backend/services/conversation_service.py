@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from backend.database.session import SessionLocal
 from backend.models.conversation import Conversation, ConversationMessage, ConversationStatus, MessageRole
@@ -109,7 +110,7 @@ class ConversationService:
             db.close()
     
     def list_conversations(self, page: int = 1, page_size: int = 20, 
-                          status: Optional[str] = None) -> Dict[str, Any]:
+                          status: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
         """列出对话
         
         Args:
@@ -126,11 +127,19 @@ class ConversationService:
             
             if status:
                 query = query.filter(Conversation.status == status)
+            if search:
+                # 空白分词后逐词匹配：支持“金桥 历史”这类不连续标题片段，
+                # 同时保留 autoescape，避免 %, _ 被解释为 SQL LIKE 通配符。
+                for term in search.strip().split():
+                    query = query.filter(or_(
+                        Conversation.title.contains(term, autoescape=True),
+                        Conversation.id.contains(term, autoescape=True),
+                    ))
             
             total_count = query.count()
             # 按开始时间倒序（最新对话在前），保证分页结果确定性
             conversations = query.order_by(
-                Conversation.started_at.desc()
+                Conversation.started_at.desc(), Conversation.id.desc()
             ).offset((page - 1) * page_size).limit(page_size).all()
             
             return {

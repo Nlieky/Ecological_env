@@ -3,7 +3,7 @@
 """
 异常检测模型算子库
 
-基于专利文档：异常检测模型算子库
+异常检测模型算子库
 
 算子分类：
 1. 统计类（statistical）：zscore、iqr、grubbs、moving_average

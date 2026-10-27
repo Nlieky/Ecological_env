@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 from backend.exceptions import BackendException
 from backend.api.routes import health, query, logs, realtime, events, tracing
+from backend.api.routes import assistant
 from backend.api.v1 import data as v1_data
 from backend.api.v1 import conversations as v1_conversations
 from backend.core.config import settings
@@ -124,6 +125,15 @@ app.include_router(logs.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(tracing.router, prefix="/api")
+app.include_router(assistant.router, prefix="/api")
+
+
+@app.on_event("startup")
+async def _initialize_assistant_tables():
+    from backend.database.base import engine
+    from backend.models.assistant_event import AssistantEventProposal, AssistantEventOperation
+    AssistantEventProposal.__table__.create(bind=engine, checkfirst=True)
+    AssistantEventOperation.__table__.create(bind=engine, checkfirst=True)
 
 # 注册v1路由
 app.include_router(v1_data.realtime.router, prefix="/api/v1")
@@ -196,6 +206,13 @@ async def root():
 @app.on_event("startup")
 async def startup():
     """启动时初始化"""
+    # 幂等自动建表：fresh clone 首启即建日志/配置中心表（等价手工跑 backend/database/init_db.py，
+    # 已存在则 no-op）。没有它，新环境 agent 服务的 llm_providers 表不存在 → LLM provider 解析失败 → 启动即崩。
+    try:
+        from backend.database.init_db import init_db
+        init_db()
+    except Exception as e:
+        print(f"[WARN] 数据库自动初始化失败(不阻断启动,可手工运行 python backend/database/init_db.py): {e}")
     # 验证 AgentService 可用
     try:
         from backend.services.agent_service import AgentService

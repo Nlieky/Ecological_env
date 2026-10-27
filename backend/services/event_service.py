@@ -252,7 +252,7 @@ class EventService:
             for c in conds:
                 q = q.filter(c)
             total = q.count()
-            rows = (q.order_by(AlertEvent.timestamp.desc())
+            rows = (q.order_by(AlertEvent.timestamp.desc(), AlertEvent.id.desc())
                      .offset((page - 1) * page_size).limit(page_size).all())
             return {"data": [self._to_dict(r) for r in rows], "total": total}
         finally:

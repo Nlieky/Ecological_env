@@ -36,7 +36,7 @@
 
 ## Project Overview
 
-Wastewater false discharge monitoring system based on a patent architecture using 6 layers: human-computer interaction, data collection, master agent, task orchestration, sub-agent, and data support layers. The system uses a Large Language Model (LLM) as a core coordinator that reads master/sub-agent identity files and calls pre-developed scripts from four sub-agents.
+Wastewater false discharge monitoring system using 6 layers: human-computer interaction, data collection, master agent, task orchestration, sub-agent, and data support layers. The system uses a Large Language Model (LLM) as a core coordinator that reads master/sub-agent identity files and calls pre-developed scripts from four sub-agents.
 
 **当前状态**：后端 API 完成；前端框架完成(Phase 0-3A)，部分页面待填充(Phase B)；智能体 pipeline 已跑通(2026-07-23)。
 
@@ -229,7 +229,7 @@ curl http://localhost:8000/api/health
 
 ```bash
 # .env 文件配置（当前实际使用：本地部署的 ctgu-vlm）
-LLM_BASE_URL=http://172.16.12.41:30000/v1
+LLM_BASE_URL=http://172.xx.xx.xx:30000/v1
 LLM_API_KEY=sk-xxx  # 由部署方提供
 LLM_MODEL=ctgu-vlm
 
@@ -359,7 +359,7 @@ The system detects 4 types of violations:
 
 - **Python**: 3.12.12
 - **虚拟环境**: `ecological_env` (通过 uv 创建)
-- **LLM**: ctgu-vlm (本地部署 @ http://172.16.12.41:30000/v1，OpenAI 兼容 API；备用 LongCat-2.0 美团)
+- **LLM**: ctgu-vlm (本地部署 @ http://172.xx.xx.xx:30000/v1，OpenAI 兼容 API；备用 LongCat-2.0 美团)
 - **后端端口**: 8000 (FastAPI), 5000 (简单包装器)
 - **Hermes API**: 8642
 
@@ -370,7 +370,7 @@ The system detects 4 types of violations:
 - Path resolution uses multiple strategies to find workspace/ and subagents/ directories dynamically
 - IntentResult is a dataclass - access attributes via dot notation, not `.get()` method
 - Prometheus metrics expose influent/effluent pH, COD, TN, AN, TP, flow rate, and counters for data processed, anomalies detected, and alerts
-- **实时数据 = InfluxDB 真实数据（2026-07-26 接入，属第⑥层数据支撑层）**：监测数据存于本地 InfluxDB 2.7（原生 Windows 二进制 `D:\influxdb2-2.7.12-windows`，端口 8086；org=`ecological_env`、bucket=`monitoring-data`、measurement=`wastewater`），数据源是 `shared/data/real-time/*.xls` 真实报表（当阳市金桥污水处理厂，2026-01-01~07-25 逐小时，进水/出水各 ~4900 条）。`backend/services/influxdb_data_loader.py` 的 `InfluxDBMonitoringDataset` 鸭子兼容旧 CSV loader 接口，`get_monitoring_data()` 按 `settings.MONITORING_DATA_SOURCE`（默认 `influxdb`）选后端，`data_service` / `metrics.updater` 零改动。导入新报表：`ecological_env\Scripts\python.exe shared/data/import_to_influxdb.py`（经 `parse_report_xls` 解析写入，幂等覆盖）。回退 CSV：`.env` 设 `MONITORING_DATA_SOURCE=csv`。详见 auto-memory `influxdb-data-source`。
+- **实时数据 = InfluxDB 真实数据（2026-07-26 接入，属第⑥层数据支撑层）**：监测数据存于本地 InfluxDB 2.7（原生 Windows 二进制 `D:\influxdb2-2.7.12-windows`，端口 8086；org=`ecological_env`、bucket=`monitoring-real`（2026-10 起真实/模拟分桶：`monitoring-real` / `monitoring-simulation`，另有旧 `monitoring-data` 作为"未核实来源"兼容读路径，见 `.env.example`）、measurement=`wastewater`），数据源是 `shared/data/real-time/*.xls` 真实报表（当阳市金桥污水处理厂，2026-01-01~07-25 逐小时，进水/出水各 ~4900 条）。`backend/services/influxdb_data_loader.py` 的 `InfluxDBMonitoringDataset` 鸭子兼容旧 CSV loader 接口，`get_monitoring_data()` 按 `settings.MONITORING_DATA_SOURCE`（默认 `influxdb`）选后端，`data_service` / `metrics.updater` 零改动。导入新报表：`ecological_env\Scripts\python.exe shared/data/import_to_influxdb.py`（经 `parse_report_xls` 解析写入，幂等覆盖）。回退 CSV：`.env` 设 `MONITORING_DATA_SOURCE=csv`。详见 auto-memory `influxdb-data-source`。
 - **对话历史持久化**：`/api/query` 在拿到 Agent 响应后，会把用户提问 + Agent 回答写入 `conversations` / `conversation_messages` 表（以 `session_id` 作为 `conversation_id`，同一 session 的多轮问答追加到同一条对话）。前端可通过 `/api/v1/conversations` 及 `/api/v1/conversations/{id}`（含 messages）读取真实问答。Hermes 框架自身另有 session DB（`_persist_session`）与 `workspace/MEMORY.md`（长期领域知识），与本表的对话历史是分离的存储。
 - **前端界面**：已开发（Phase 0-3A 框架完成：AI 助手页 / 监测大屏 / 日志 / 链路追踪等；Phase B 部分占位页待填充）。AI 助手页支持流式（见下）。
 - **流式+进度反馈 + 服务/后端非阻塞（2026-07-23）**：

@@ -42,6 +42,8 @@ import os
 import sys
 import threading
 import types
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Union
@@ -70,6 +72,23 @@ except ImportError:  # pragma: no cover – yaml is optional at import time
     yaml = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+# Request-scoped opt-out for restricted turns; never mutate global registrations.
+_hooks_suppressed = ContextVar('hermes_hooks_suppressed', default=False)
+
+
+def hooks_suppressed() -> bool:
+    return _hooks_suppressed.get()
+
+
+@contextmanager
+def suppress_hooks():
+    """Disable hooks, middleware and plugin context engines in this context only."""
+    token = _hooks_suppressed.set(True)
+    try:
+        yield
+    finally:
+        _hooks_suppressed.reset(token)
 
 
 # ---------------------------------------------------------------------------
@@ -1717,6 +1736,8 @@ def invoke_hook(hook_name: str, **kwargs: Any) -> List[Any]:
 
     Returns a list of non-``None`` return values from plugin callbacks.
     """
+    if hooks_suppressed():
+        return []
     return get_plugin_manager().invoke_hook(hook_name, **kwargs)
 
 
@@ -1725,11 +1746,15 @@ def invoke_middleware(kind: str, **kwargs: Any) -> List[Any]:
 
     Returns a list of non-``None`` return values from middleware callbacks.
     """
+    if hooks_suppressed():
+        return []
     return get_plugin_manager().invoke_middleware(kind, **kwargs)
 
 
 def has_middleware(kind: str) -> bool:
     """Return True when middleware callbacks are registered for ``kind``."""
+    if hooks_suppressed():
+        return False
     manager = get_plugin_manager()
     method = getattr(manager, "has_middleware", None)
     if callable(method):
@@ -1739,6 +1764,8 @@ def has_middleware(kind: str) -> bool:
 
 def has_hook(hook_name: str) -> bool:
     """Return True when a hook has registered callbacks."""
+    if hooks_suppressed():
+        return False
     return get_plugin_manager().has_hook(hook_name)
 
 
@@ -1819,6 +1846,8 @@ def _ensure_plugins_discovered(force: bool = False) -> PluginManager:
 
 def get_plugin_context_engine():
     """Return the plugin-registered context engine, or None."""
+    if hooks_suppressed():
+        return None
     return _ensure_plugins_discovered()._context_engine
 
 

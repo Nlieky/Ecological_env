@@ -1785,6 +1785,9 @@ def set_runtime_main(
     """
     global _RUNTIME_MAIN_PROVIDER, _RUNTIME_MAIN_MODEL
     global _RUNTIME_MAIN_BASE_URL, _RUNTIME_MAIN_API_KEY, _RUNTIME_MAIN_API_MODE
+    from hermes_cli.plugins import hooks_suppressed
+    if hooks_suppressed():
+        return
     _RUNTIME_MAIN_PROVIDER = (provider or "").strip().lower()
     _RUNTIME_MAIN_MODEL = (model or "").strip()
     _RUNTIME_MAIN_BASE_URL = (base_url or "").strip()

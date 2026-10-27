@@ -25,6 +25,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+from subagent_registry import filter_subagent_tools, resolve_subagent
+
 # === 步骤 1: 子智能体目录由 call_subagent 通过 HERMES_HOME 传入 ===
 AGENT_DIR = Path(os.environ.get("HERMES_HOME", ".")).resolve()
 os.environ['HERMES_HOME'] = str(AGENT_DIR)
@@ -49,12 +54,8 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 logger = logging.getLogger(__name__)
 
 # === 步骤 4: 结果文件名（与 call_subagent.py 一致） ===
-RESULT_FILE_NAMES = {
-    "anomaly-detection": "anomaly_result.json",
-    "multi-dimensional-data-perception": "data_result.json",
-    "rule-reasoning": "rule_reasoning_result.json",
-    "disposition-execution": "disposition_result.json",
-}
+def _result_file_for(name: str) -> str:
+    return resolve_subagent(name).result_file
 
 
 def load_task(session_dir: Optional[str]) -> Optional[Dict[str, Any]]:
@@ -235,7 +236,7 @@ def run_subagent() -> Dict[str, Any]:
         error_result = {"task_id": "unknown", "status": "failed",
                         "error": "Failed to load task", "timestamp": datetime.now().isoformat()}
         if session_dir:
-            write_result(session_dir, error_result, RESULT_FILE_NAMES.get(subagent_name, "result.json"))
+            write_result(session_dir, error_result, _result_file_for(subagent_name))
         return error_result
     task_id = task.get('task_id', 'unknown')
 
@@ -278,10 +279,15 @@ def run_subagent() -> Dict[str, Any]:
             load_soul_identity=True, skip_context_files=False, skip_memory=False,
             enabled_toolsets=["skills", "terminal"], session_id=task_id, max_iterations=_smi,
         )
+        agent.tools = filter_subagent_tools(agent.tools)
+        if hasattr(agent, "valid_tool_names"):
+            agent.valid_tool_names = {
+                (tool.get("function") or {}).get("name") for tool in agent.tools
+            }
         response = agent.run_conversation(user_message)
         logger.info(f"[LLM] 任务完成")
 
-        result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
+        result_filename = _result_file_for(subagent_name)
         result = _read_script_result(session_dir, result_filename)
 
         # 自愈(2026-08-27 强化):ctgu-vlm 偶发"读完 skill 不执行脚本"(onboarding 就 finish)。
@@ -318,7 +324,7 @@ def run_subagent() -> Dict[str, Any]:
                   "timestamp": datetime.now().isoformat()}
 
     if session_dir:
-        result_filename = RESULT_FILE_NAMES.get(subagent_name, "result.json")
+        result_filename = _result_file_for(subagent_name)
         if not isinstance(result, dict):
             result = {"task_id": task_id, "status": "completed", "result": result,
                       "timestamp": datetime.now().isoformat()}

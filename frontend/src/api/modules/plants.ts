@@ -9,8 +9,8 @@ export const plantsService = {
   tree: () => api.get<unknown, { success: boolean; data: PlantTree }>('/v1/plants/tree'),
 
   /** 单厂看板数据(真实数据): 指标当前值+趋势+状态;anchor=YYYY-MM-DD 任意时间点开播取段 */
-  dashboard: (plantId: string, hours = 24, anchor?: string) =>
+  dashboard: (plantId: string, hours = 24, anchor?: string, endDate?: string) =>
     api.get<unknown, { success: boolean; data: PlantDashboard }>(
-      `/v1/plants/${encodeURIComponent(plantId)}/dashboard`, { params: { hours, ...(anchor ? { anchor } : {}) } },
+      `/v1/plants/${encodeURIComponent(plantId)}/dashboard`, { params: { hours, ...(anchor ? { anchor } : {}), ...(endDate ? { end_date: endDate } : {}) } },
     ),
 }

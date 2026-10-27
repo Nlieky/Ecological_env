@@ -9,6 +9,7 @@
 import os
 import sys
 import json
+import time
 from pathlib import Path
 from typing import Dict, Any
 
@@ -57,7 +58,7 @@ read_result = bridge_module.read_result
 _current_progress_queue = None
 
 
-def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=None, evidence=None, chartData=None, action=None):
+def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=None, evidence=None, chartData=None, action=None, elapsed_ms=None):
     """向当前请求的队列 push 进度事件（非流式时队列为 None，no-op）。
 
     evidence: 结构化证据（异常前几条/违规判定/预警级别），供审计证据链展示；
@@ -67,6 +68,8 @@ def _emit_progress(subagent: str, stage: str, summary: str = None, skill_calls=N
     if _current_progress_queue is None:
         return
     evt = {"type": "progress", "subagent": subagent, "stage": stage}
+    if elapsed_ms is not None:
+        evt['elapsed_ms'] = max(0, elapsed_ms)
     if summary:
         evt["summary"] = summary
     if skill_calls:
@@ -177,6 +180,7 @@ def _compact_result_for_master(result):
         effl = effl if isinstance(effl, list) else []
         if not infl and not effl:
             infl = None  # 双侧都空才走"无数据"路径
+            effl = None
     if isinstance(infl, list) or isinstance(effl, list):
         n_in = len(infl)
         n_out = len(effl)
@@ -204,6 +208,12 @@ def _compact_result_for_master(result):
                 compact["time_range"] = md["time_range"]
             if md.get("plant"):
                 compact["plant"] = md["plant"]  # 多厂:标明本结果是哪个厂
+            for key in ('data_context', 'sampling_range', 'query_window'):
+                if isinstance(md.get(key), dict):
+                    compact[key] = md[key]
+            freshness = md.get("freshness")
+            if isinstance(freshness, dict):
+                compact["freshness"] = freshness
         # ★ summary 头条区分"有进水"和"仅出水"(无进水厂),主智能体不再误判"无数据"
         ind_list = ", ".join(stats.keys()) if stats else "各指标"
         if n_in > 0:
@@ -216,6 +226,12 @@ def _compact_result_for_master(result):
             f"时序曲线 chartData 已生成，前端自动渲染。"
             f"用户要的'曲线/图'已包含——不要为画曲线再调本子智能体。"
         )
+        if compact.get("freshness", {}).get("is_stale"):
+            compact["summary"] = (
+                "⚠️ 数据已停更，不能称为实时或最近数据："
+                + str(compact["freshness"].get("warning") or "数据新鲜度校验未通过")
+                + " " + compact["summary"]
+            )
         # ★ 多厂归档透传(2026-08-27):子智能体一次调用可能跑了多个厂(data_result.json
         # 只留最后一个厂,主智能体会漏看其他厂)。data_result_plants.json 是逐厂累积统计,
         # 附进 compact.all_plants_stats——主智能体不用再调①就能拿到本会话全部厂的数字。
@@ -537,6 +553,7 @@ def _call_subagent_handler(*args, **kwargs) -> str:
 
         # 调用原始函数（向流式队列吐进度）
         subagent_name = params.get('subagent_name') or params.get('name') or 'unknown'
+        started = time.monotonic()
         _emit_progress(subagent_name, 'start')
         result = call_subagent(**params)
         # 感知①结果守卫:LLM 丢参(混库/时间回退)→确定性重跑修正。
@@ -551,7 +568,8 @@ def _call_subagent_handler(*args, **kwargs) -> str:
         # .get("result",{}) 默认值不生效,.get("chartData") 直接崩——真实错误被吞
         _r = result.get("result") if isinstance(result, dict) else None
         _cd = _r.get("chartData") if isinstance(_r, dict) else None
-        _emit_progress(subagent_name, 'done', _summarize_result(result), skill_calls=_sc, evidence=_ev, chartData=_cd)
+        _emit_progress(subagent_name, 'done', _summarize_result(result), skill_calls=_sc, evidence=_ev, chartData=_cd,
+                       elapsed_ms=(time.monotonic() - started) * 1000)
         # 给主智能体回传精简版：去掉大数据数组（进/出水原始行），只留摘要+关键字段。
         # 完整结果已在 session 文件，下游子智能体从文件读；主智能体不该背原始数据
         # （一周 53K 会撑爆上下文/迭代预算）。需要细节时用 read_result 取。

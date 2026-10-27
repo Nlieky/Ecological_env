@@ -4,7 +4,7 @@
 专家经验推理模块
 功能：应用专家经验规则进行推理和嫌疑判定
 
-基于专利文档：专家经验推理模块
+专家经验推理模块
 """
 
 import logging
@@ -260,11 +260,11 @@ class ExpertReasoner:
             process_validation: 工艺校验结果
 
         Returns:
-            推理结果（包含has_mechanism_violation用于专利要求的嫌疑等级判定）
+            推理结果（包含has_mechanism_violation用于要求的嫌疑等级判定）
         """
         logger.info(f"[EXPERT] 专家经验推理")
 
-        # 检查是否存在工艺机理违背（专利要求）
+        # 检查是否存在工艺机理违背
         has_mechanism_violation = (
             process_validation.get("violations_count", 0) > 0 or
             process_validation.get("mechanism_compliance") == "non_compliant"
@@ -276,7 +276,7 @@ class ExpertReasoner:
             "confidence": 0.0,
             "reasoning_path": [],
             "matched_cases": [],
-            "has_mechanism_violation": has_mechanism_violation  # 专利要求
+            "has_mechanism_violation": has_mechanism_violation  # 要求
         }
 
         if not anomalies:
@@ -315,7 +315,7 @@ class ExpertReasoner:
         results["suspicion_level"] = suspicion_result["level"]
         results["confidence"] = suspicion_result["confidence"]
 
-        # 5. 案例匹配（专利要求：相似度≥0.8时判定为同类违规）
+        # 5. 案例匹配（相似度≥0.8时判定为同类违规）
         matched_cases = self._match_cases(features, matched_patterns)
         results["matched_cases"] = matched_cases
 
@@ -463,7 +463,7 @@ class ExpertReasoner:
     def _match_cases(self, features: Dict[str, Any],
                     matched_patterns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        匹配案例（专利要求：相似度≥0.8时判定为同类违规）
+        匹配案例（相似度≥0.8时判定为同类违规）
 
         通过相似度匹配算法计算当前异常与历史案例的相似度，
         当相似度≥0.8时判定为同类违规。
@@ -482,13 +482,13 @@ class ExpertReasoner:
                         match_count += 1
                         break  # 每个特征只匹配一次
 
-            # 计算相似度（专利要求）
+            # 计算相似度
             if len(case_features) > 0:
                 similarity = match_count / len(case_features)
             else:
                 similarity = 0.0
 
-            # 专利要求：相似度≥0.8时判定为同类违规
+            # 相似度≥0.8时判定为同类违规
             if similarity >= 0.8:
                 matched.append({
                     "case_id": case["case_id"],

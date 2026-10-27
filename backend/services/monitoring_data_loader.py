@@ -227,7 +227,7 @@ _SINGLETON: Optional[MonitoringDataset] = None
 _SINGLETON_LOCK = threading.Lock()
 
 
-def get_monitoring_data():
+def get_monitoring_data(plant_id=None):
     """返回进程级单例数据集。
 
     按 ``settings.MONITORING_DATA_SOURCE`` 选择后端:
@@ -238,6 +238,11 @@ def get_monitoring_data():
     :mod:`backend.metrics.updater`)无需改动。
     """
     global _SINGLETON
+    if plant_id:
+        from backend.core.config import settings
+        if settings.MONITORING_DATA_SOURCE.lower() == 'influxdb':
+            return _get_plant_dataset(plant_id)
+        raise DataUnavailableException('CSV 数据没有厂区映射，不能用于指定厂区的查询；请配置 InfluxDB')
     if _SINGLETON is None:
         with _SINGLETON_LOCK:
             if _SINGLETON is None:
@@ -260,3 +265,14 @@ def get_monitoring_data():
                         data_dir = project_root / "data"
                     _SINGLETON = MonitoringDataset(data_dir)
     return _SINGLETON
+
+
+from functools import lru_cache
+
+
+@lru_cache(maxsize=64)
+def _get_plant_dataset(plant_id):
+    from backend.core.config import settings
+    from backend.services.influxdb_data_loader import InfluxDBMonitoringDataset
+    return InfluxDBMonitoringDataset(settings.INFLUXDB_URL, settings.INFLUXDB_TOKEN,
+                                     settings.INFLUXDB_ORG, settings.INFLUXDB_BUCKET, plant_id=plant_id)

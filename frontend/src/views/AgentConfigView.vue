@@ -1,6 +1,9 @@
 <!-- frontend/src/views/AgentConfigView.vue -->
 <template>
-  <div class="cfg">
+  <PageShell title="智能体配置" subtitle="管理身份、策略和服务；保存配置后，请核验服务实际生效状态" scroll="contained">
+    <template #actions><el-button size="small" :loading="loading" @click="loadEntities">重新加载配置目录</el-button></template>
+    <PageState :state="configState" :message="loadError || undefined" :preserve-content="entities.length > 0" @retry="loadEntities">
+    <div class="cfg">
     <!-- 第一级导航：药丸标签（前 5 项=智能体实体 ｜ 后 4 项=全局能力，竖线分组） -->
     <div class="nav-entities">
       <template v-for="(e, i) in navItems" :key="e.name">
@@ -24,19 +27,23 @@
       <div v-else-if="isEntity && tab === 'files'" class="files-wrap">
         <IdentityFileEditor v-if="currentEntity" :entity="currentEntity" ref="editorRef" />
       </div>
-      <SkillsPanel v-else-if="isEntity && tab === 'skills'" :entity="activeEntity" />
-      <StrategyPanel v-else-if="isEntity && tab === 'strategy'" @restart="goRestart" />
-      <McpPanel v-else-if="activeEntity === '__mcp__'" @restart="goRestart" />
-      <ProvidersPanel v-else-if="activeEntity === '__providers__'" @restart="goRestart" />
+      <SkillsPanel v-else-if="isEntity && tab === 'skills'" ref="skillsRef" :entity="activeEntity" />
+      <StrategyPanel v-else-if="isEntity && tab === 'strategy'" ref="strategyRef" @restart="goRestart" />
+      <McpPanel v-else-if="activeEntity === '__mcp__'" ref="mcpRef" @restart="goRestart" />
+      <ProvidersPanel v-else-if="activeEntity === '__providers__'" ref="providersRef" @restart="goRestart" />
       <ServiceControl v-else-if="activeEntity === '__service__'" />
       <div v-else class="loading">加载中…</div>
     </div>
-  </div>
+    </div>
+    </PageState>
+  </PageShell>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import PageShell from '@/components/common/PageShell.vue'
+import PageState from '@/components/common/PageState.vue'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { agentConfigService, type AgentEntity } from '@/api/modules/agentConfig'
 import EntityOverview from '@/components/agents/config/EntityOverview.vue'
 import IdentityFileEditor from '@/components/agents/config/IdentityFileEditor.vue'
@@ -45,6 +52,7 @@ import StrategyPanel from '@/components/agents/config/StrategyPanel.vue'
 import McpPanel from '@/components/agents/config/McpPanel.vue'
 import ProvidersPanel from '@/components/agents/config/ProvidersPanel.vue'
 import ServiceControl from '@/components/agents/config/ServiceControl.vue'
+import { useAssistantContext } from '@/composables/useAssistantContext'
 
 const TAB_LABELS: Record<string, string> = {
   overview: '概览', files: '身份文件', skills: '技能',
@@ -54,9 +62,38 @@ const route = useRoute()
 const router = useRouter()
 
 const entities = ref<AgentEntity[]>([])
+const loading = ref(true)
+const loadError = ref('')
+let disposed = false
+let loadSequence = 0
+const configState = computed(() => loading.value ? (entities.value.length ? 'refreshing' : 'initial-loading') : loadError.value ? (entities.value.length ? 'stale' : 'error') : entities.value.length ? 'ready' : 'empty')
 const activeEntity = ref('master')
 const tab = ref('overview')
 const editorRef = ref()
+const skillsRef = ref()
+const strategyRef = ref()
+const mcpRef = ref()
+const providersRef = ref()
+const dirty = computed(() => !!(editorRef.value?.dirty || skillsRef.value?.dirty || strategyRef.value?.dirty || mcpRef.value?.dirty || providersRef.value?.dirty))
+function allowTransition() { return !dirty.value || window.confirm('有未保存的编辑，离开将丢失，确定？') }
+useAssistantContext(() => ({ pageId: 'config', objectId: activeEntity.value, source: '配置目录（未包含配置正文或凭据）', filters: { entity: activeEntity.value, tab: tab.value, dirty: dirty.value }, status: loading.value ? 'loading' : loadError.value ? 'error' : 'ready', actions: ['navigate', 'strategy.draft'] }), async action => {
+  if (action.capability !== 'strategy.draft') return { success: false, message: '配置页不支持该操作' }
+  if (loading.value || loadError.value) return { success: false, message: '配置目录尚未就绪' }
+  if (!isEntity.value || tab.value !== 'strategy') {
+    if (!allowTransition()) return { success: false, message: '已保留当前未保存编辑，未切换策略表单' }
+    activeEntity.value = 'master'; tab.value = 'strategy'
+    await nextTick()
+  }
+  if (!strategyRef.value?.prepareAssistantDraft) return { success: false, message: '策略编辑器尚未就绪' }
+  return await strategyRef.value.prepareAssistantDraft(action.parameters)
+})
+onBeforeRouteLeave(() => allowTransition())
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (!dirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+onBeforeUnmount(() => { disposed = true; loadSequence++; window.removeEventListener('beforeunload', beforeUnload) })
 
 const isEntity = computed(() => entities.value.some(e => e.name === activeEntity.value))
 const currentEntity = computed(() => entities.value.find(e => e.name === activeEntity.value))
@@ -80,16 +117,12 @@ const DIRECT_ENTITIES = ['__mcp__', '__providers__', '__service__']
 
 function switchEntity(name: string) {
   if (activeEntity.value === name) return
-  if (tab.value === 'files' && editorRef.value?.dirty) {
-    if (!confirm('有未保存的编辑，切换将丢失，确定？')) return
-  }
+  if (!allowTransition()) return
   activeEntity.value = name
 }
 
 function switchTab(t: string) {
-  if (tab.value === 'files' && t !== 'files' && editorRef.value?.dirty) {
-    if (!confirm('有未保存的编辑，切换将丢失，确定？')) return
-  }
+  if (t === tab.value || !allowTransition()) return
   tab.value = t
   router.replace({ query: { ...route.query, tab: t } })
 }
@@ -102,22 +135,35 @@ async function openFileFromOverview(f: string) {
   editorRef.value?.openFile(f)
 }
 
-function goRestart() { activeEntity.value = '__service__' }
+function goRestart() { switchEntity('__service__') }
 
 // URL → 状态（首载/刷新/分享链接保形）
-onMounted(async () => {
+async function loadEntities() {
+  const sequence = ++loadSequence
+  loading.value = true
+  loadError.value = ''
   const q = route.query as Record<string, string>
-  if (q.entity) activeEntity.value = q.entity
-  if (q.tab) tab.value = q.tab
   try {
     const r: any = await agentConfigService.entities()
+    if (disposed || sequence !== loadSequence) return
     entities.value = (r.data ?? r) as AgentEntity[]
     if (!isEntity.value && q.entity && !DIRECT_ENTITIES.includes(q.entity)) {
       activeEntity.value = 'master'   // 非法 entity 回落
     }
     // tab 与实体不匹配（如子智能体选了 mcp）回落 overview
     if (isEntity.value && !tabsFor.value.includes(tab.value)) tab.value = 'overview'
-  } catch { /* 各面板自行处理 */ }
+  } catch {
+    if (!disposed && sequence === loadSequence) loadError.value = '配置初始化失败，请重试'
+  } finally {
+    if (!disposed && sequence === loadSequence) loading.value = false
+  }
+}
+onMounted(() => {
+  const q = route.query as Record<string, string>
+  if (q.entity) activeEntity.value = q.entity
+  if (q.tab) tab.value = q.tab
+  window.addEventListener('beforeunload', beforeUnload)
+  void loadEntities()
 })
 
 // 实体切换 → URL 同步 + tab 合法性
@@ -128,7 +174,7 @@ watch(activeEntity, (v) => {
 </script>
 
 <style scoped>
-.cfg { display: flex; flex-direction: column; height: calc(100vh - 110px);
+.cfg { display: flex; flex: 1; min-height: 0; flex-direction: column;
   background: var(--card-bg); border: 1px solid var(--brd); border-radius: 13px;
   overflow: hidden; box-shadow: var(--card-shadow) }
 /* ── 一级：药丸标签导航（智能体组 ｜ 全局能力组）── */
@@ -155,7 +201,8 @@ watch(activeEntity, (v) => {
 .tab:hover { color: var(--primary); background: var(--primary-soft, #eef2ff) }
 .tab.active { color: var(--primary); font-weight: 600;
   background: var(--primary-soft, #eef2ff) }
-.cfg-body { flex: 1; overflow: auto; padding: 18px }
+.cfg-body { flex: 1; min-height: 0; overflow: auto; padding: 18px }
+.nav-entities, .tabs { flex-shrink: 0 }
 .cfg-body.no-tab { border-top: none }
 .files-wrap { height: 100% }
 .loading { color: var(--text-muted); padding: 40px; text-align: center }

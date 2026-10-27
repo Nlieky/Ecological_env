@@ -1,5 +1,6 @@
 <template>
   <div class="pp">
+    <p class="pp-desc">保存的配置不等于正在运行的配置；需重启项在明确重启后加载。</p>
     <div v-if="restartHint" class="pp-hint">
       ⚠ 有「需重启」参数已保存。<button class="btn primary" @click="$emit('restart')">一键重启 agent</button>
     </div>
@@ -8,13 +9,13 @@
       <div v-for="p in params" :key="p.key" class="pp-row">
         <div class="pp-k">
           <div class="pp-key">{{ p.key }}</div>
-          <div class="pp-desc">{{ p.desc }} · 读取方 {{ p.reader }}</div>
+          <div class="pp-desc">{{ p.desc }} · 读取方 {{ p.reader }} · {{ p.read_timing }}</div>
         </div>
         <div class="pp-v">
           <input v-model="draft[p.key]" :type="p.type === 'secret' ? 'password' : 'text'"
                  class="pp-in" :placeholder="`默认 ${p.default}`" />
         </div>
-        <span class="pp-eff" :class="p.effect">{{ p.effect === 'restart' ? '需重启' : '立即生效' }}</span>
+        <span class="pp-eff" :class="p.effect">{{ p.effect === 'restart' ? '需重启' : '下一次适用读取' }}</span>
       </div>
     </div>
     <div class="pp-foot">
@@ -49,14 +50,16 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { agentConfigService, type ParamItem } from '@/api/modules/agentConfig'
+import { useConfigDraft, requireSuccess } from '@/composables/useConfigDraft'
 
 defineEmits<{ (e: 'restart'): void }>()
 
 const params = ref<ParamItem[]>([])
-const draft = ref<Record<string, string>>({})
+const state = useConfigDraft()
+const { draft, dirty, restartHint } = state
+defineExpose({ dirty })
 const loading = ref(false)
 const saving = ref(false)
-const restartHint = ref(false)
 const testing = ref(false)
 const llmResult = ref<{ ok: boolean; latency_ms?: number; error?: string | null } | null>(null)
 const llmDraft = ref({ base_url: '', model: '', api_key: '' })
@@ -65,8 +68,9 @@ async function load() {
   loading.value = true
   try {
     const r: any = await agentConfigService.getParams()
+    requireSuccess(r)
     params.value = (r?.data ?? r) as ParamItem[]
-    params.value.forEach(p => { draft.value[p.key] = String(p.value ?? '') })
+    state.initialize(params.value.map(p => ({ ...p, value: p.type === 'secret' ? '' : String(p.value ?? '') })))
   } catch (e: any) {
     ElMessage.error('参数读取失败：' + (e?.message || e))
   } finally { loading.value = false }
@@ -78,16 +82,11 @@ async function save() {
   try {
     // 只提交有变化的（GET 回的 secret 已是脱敏值，用户不动即字符串相等不提交；
     // 改动了则提交明文；改回空串也不提交——后端把 secret 空值跳过，防误清库）
-    const payload: Record<string, string> = {}
-    params.value.forEach(p => {
-      const v = draft.value[p.key] ?? ''
-      if (v !== String(p.value ?? '')) payload[p.key] = v
-    })
+    const payload = state.payload() as Record<string, string>
     if (!Object.keys(payload).length) { ElMessage.info('无改动'); return }
     const r: any = await agentConfigService.saveParams(payload)
-    restartHint.value = !!r?.restart_needed
-    ElMessage.success(r?.restart_needed ? '已保存——部分参数需重启 agent 生效' : '已保存（立即生效）')
-    await load() // 重拉：重建 diff 基线（secret 换成新脱敏值）
+    state.acknowledge(payload, r)
+    ElMessage.success(r?.restart_needed ? '已保存——部分参数需重启 agent 生效' : '已保存，下一次适用读取时使用；未保存项仍保留')
   } catch (e: any) {
     ElMessage.error('保存失败：' + (e?.message || JSON.stringify(e?.response?.data) || e))
   } finally { saving.value = false }

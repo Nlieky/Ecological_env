@@ -50,7 +50,7 @@ def seed_defaults() -> None:
             pass
     with _open_session() as s:
         for name, base_url, model, enabled, key in [
-            ("ctgu-vlm", "http://172.16.12.41:30000/v1", "ctgu-vlm", True, env_key),
+            ("ctgu-vlm", "http://172.xx.xx.xx:30000/v1", "ctgu-vlm", True, env_key),
             ("LongCat-2.0", "https://api.longcat.chat/openai/v1", "LongCat-2.0", False, ""),
         ]:
             row = s.get(LLMProvider, name)
@@ -63,6 +63,14 @@ def seed_defaults() -> None:
                 s.commit()
             except IntegrityError:
                 s.rollback()
+    # 默认策略也种上：fresh DB 的 agent_strategy 为空 → resolve_default() 恒 None
+    # → agent 服务回落 runtime params(空 api_key)被框架拒收,启动即崩。幂等：已有值不覆盖。
+    try:
+        from backend.services.agent_strategy import get_strategy, set_strategy
+        if not get_strategy("default_llm_provider"):
+            set_strategy("default_llm_provider", "ctgu-vlm")
+    except Exception:
+        pass
 
 
 def _mask(v: str) -> str:

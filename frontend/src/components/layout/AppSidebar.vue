@@ -9,7 +9,7 @@
     </div>
     <el-scrollbar class="nav-scroll">
       <el-menu :default-active="route.path" :default-openeds="openGroups" :collapse="app.sidebarCollapsed" router class="nav">
-        <el-sub-menu v-for="g in GROUPS" :key="g.title" :index="g.title">
+        <el-sub-menu v-for="g in groups" :key="g.title" :index="g.title">
           <template #title>
             <el-icon><component :is="g.icon"/></el-icon>
             <span>{{ g.title }}</span>
@@ -21,50 +21,49 @@
         </el-sub-menu>
       </el-menu>
     </el-scrollbar>
+    <ExperimentalMenu :collapsed="app.sidebarCollapsed" />
   </aside>
 </template>
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import ExperimentalMenu from './ExperimentalMenu.vue'
 import { useAppStore } from '@/stores/app'
-import {
-  ChatDotRound, Setting, Document, Monitor, DataAnalysis, Notebook,
-  Connection, Coin, Bell, DataLine, Tickets, Tools, OfficeBuilding, Share,
-} from '@element-plus/icons-vue'
+import { ChatDotRound, Setting, Document, Monitor, DataAnalysis, Notebook, Tickets, OfficeBuilding, Share, Menu } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
+import { stableNavigation } from '@/config/featureRegistry'
+import type { FeaturePath } from '@/config/featureRegistry'
 
-interface NavItem { path: string; title: string; icon: Component }
-interface NavGroup { title: string; icon: Component; items: NavItem[] }
-
-const GROUPS: NavGroup[] = [
-  { title: '智能助手', icon: ChatDotRound, items: [
-    { path: '/chat', title: 'AI 助手', icon: ChatDotRound },
-    { path: '/agents/config', title: '智能体配置', icon: Setting },
-    { path: '/agents/audit', title: '智能体审计', icon: Document },
-    { path: '/agents/knowledge', title: '知识图谱', icon: Share },
-  ]},
-  { title: '监控大屏', icon: Monitor, items: [
-    { path: '/dashboard', title: '监测大屏', icon: Monitor },
-    { path: '/metrics', title: '指标查询', icon: DataAnalysis },
-    { path: '/logs', title: '日志中心', icon: Notebook },
-    { path: '/tracing', title: '链路追踪', icon: Connection },
-    { path: '/datasources', title: '数据源', icon: Coin },
-    { path: '/alerts', title: '告警中心', icon: Bell },
-    { path: '/grafana', title: 'Grafana 大屏', icon: DataLine },
-    { path: '/plants/config', title: '厂区配置', icon: OfficeBuilding },
-  ]},
-  { title: '事件中心', icon: Tickets, items: [
-    { path: '/events', title: '事件中心', icon: Tickets },
-    { path: '/event-sources', title: '事件源', icon: Connection },
-  ]},
-  { title: '设置', icon: Tools, items: [
-    { path: '/settings', title: '系统设置', icon: Tools },
-  ]},
-]
+const groupIcons: Record<string, Component> = {
+  智能助手: ChatDotRound,
+  监测分析: Monitor,
+  事件处置: Tickets,
+  系统运维: Notebook,
+}
+const itemIcons: Partial<Record<FeaturePath, Component>> = {
+  '/chat': ChatDotRound,
+  '/agents/audit': Document,
+  '/agents/knowledge': Share,
+  '/agents/config': Setting,
+  '/dashboard': Monitor,
+  '/metrics': DataAnalysis,
+  '/plants/config': OfficeBuilding,
+  '/events': Tickets,
+  '/logs': Notebook,
+}
+const defaultIcon = Menu
+const groups = stableNavigation().map(group => ({
+  ...group,
+  icon: groupIcons[group.title] ?? defaultIcon,
+  items: group.items.map(item => ({
+    ...item,
+    icon: itemIcons[item.path as FeaturePath] ?? defaultIcon,
+  })),
+}))
 
 const app = useAppStore()
 const route = useRoute()
-const openGroups = GROUPS.map((g) => g.title)
+const openGroups = groups.map(group => group.title)
 </script>
 
 <style scoped>

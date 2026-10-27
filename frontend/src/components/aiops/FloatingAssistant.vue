@@ -1,6 +1,6 @@
 <template>
   <!-- 固定胶囊按钮：图标+文字横排。点击开关助手面板。/chat 页隐藏 -->
-  <button v-if="route.path !== '/chat'" class="fab" @click="app.toggleAssistant" title="AIOps 智能助手">
+  <button ref="launcher" v-show="!assistant.open" class="fab" @click="assistant.open = true" title="AIOps 全系统助手" aria-controls="global-assistant" :aria-expanded="assistant.open">
     <svg class="robot" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <!-- 浅色背板圈 -->
@@ -26,31 +26,21 @@
 
   <!-- 玻璃浮窗：非模态（无遮罩），不挡大屏，大屏可同时查看/点击 -->
   <Transition name="pop">
-    <div v-if="app.assistantOpen" class="panel">
-      <div class="panel-head">
-        <span class="pt">⚡ 大屏动作助手</span>
-        <button class="close" @click="app.assistantOpen = false" title="收起">✕</button>
-      </div>
-      <div class="body">
-        <ChatMessage v-for="m in chat.messages" :key="m.id" :msg="m" />
-        <div v-if="chat.loading" class="thinking">执行动作中…</div>
-        <div v-if="!chat.messages.length" class="empty">对监测大屏下指令，例如：<br />检测 pH 平稳异常 / 只看 COD / 看最近一周<br /><br />研判分析请到「AI 助手」问答页</div>
-      </div>
-      <ChatComposer channel="action" />
+    <div v-show="assistant.open" id="global-assistant" class="panel" :class="{ docked }" :style="{ width: `${assistant.expanded ? 560 : 420}px` }">
+      <AssistantPanel :current-context="currentContext" @action="(action, message) => emit('action', action, message)" @handoff="(handoff, message) => emit('handoff', handoff, message)" />
     </div>
   </Transition>
 </template>
 
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
-import { useAppStore } from '@/stores/app'
-import { useChatStore } from '@/stores/chat'
-import ChatMessage from './ChatMessage.vue'
-import ChatComposer from './ChatComposer.vue'
-
-const route = useRoute()
-const app = useAppStore()
-const chat = useChatStore()
+import { nextTick, ref, watch } from 'vue'
+import { useAssistantStore, type AssistantMessage } from '@/stores/assistant'
+import type { AssistantAction, AssistantContext, AssistantHandoff } from '@/api/modules/assistant'
+import AssistantPanel from '@/components/assistant/AssistantPanel.vue'
+defineProps<{ docked: boolean; currentContext: AssistantContext }>()
+const emit = defineEmits<{ action: [action: AssistantAction, message: AssistantMessage]; handoff: [handoff: AssistantHandoff, message: AssistantMessage] }>()
+const assistant = useAssistantStore(), launcher = ref<HTMLButtonElement>()
+watch(() => assistant.open, async value => { if (!value) { await nextTick(); launcher.value?.focus() } })
 </script>
 
 <style scoped>
@@ -83,8 +73,8 @@ const chat = useChatStore()
 .t2 { font-size: 10px; font-weight: 500; margin-top: 1px; color: #334155 }
 
 /* 玻璃浮窗：非模态，无遮罩，不挡大屏 */
-.panel { position: fixed; right: 26px; bottom: 92px; width: 400px; max-width: calc(100vw - 52px);
-  height: 560px; max-height: calc(100vh - 130px); z-index: 199;
+.panel { position: fixed; right: 12px; top: 12px; bottom: 12px; max-width: calc(100vw - 24px);
+  z-index: 199;
   display: flex; flex-direction: column; overflow: hidden; border-radius: 16px;
   background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(18px) saturate(160%);
@@ -92,6 +82,8 @@ const chat = useChatStore()
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 12px 40px rgba(31, 38, 135, 0.22), 0 2px 8px rgba(99, 102, 241, 0.12);
 }
+.panel.docked { position:relative; inset:auto; height:100%; max-width:none; border-radius:16px 0 0 16px; flex-shrink:0 }
+@media (prefers-reduced-motion: reduce) { .fab, .pop-enter-active, .pop-leave-active { transition:none!important } }
 .panel-head { display: flex; align-items: center; justify-content: space-between;
   padding: 11px 14px; border-bottom: 1px solid rgba(99, 102, 241, 0.14) }
 .pt { font-size: 13px; font-weight: 700; color: var(--primary) }

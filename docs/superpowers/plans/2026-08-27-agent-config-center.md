@@ -196,7 +196,7 @@ PARAM_REGISTRY: dict = {
     "subagent_max_iterations": {"default": 8, "type": "int", "effect": "restart",
         "reader": "subagent_entry.py", "env_key": None,
         "desc": "子智能体最大迭代轮数"},
-    "llm_base_url": {"default": "http://172.16.12.41:30000/v1", "type": "str", "effect": "restart",
+    "llm_base_url": {"default": "http://172.xx.xx.xx:30000/v1", "type": "str", "effect": "restart",
         "reader": "start_agent + subagent_entry", "env_key": "LLM_BASE_URL",
         "desc": "LLM OpenAI 兼容 API 地址"},
     "llm_model": {"default": "ctgu-vlm", "type": "str", "effect": "restart",
@@ -320,7 +320,7 @@ L94-96 initialize() 内：
 
 ```python
             model = _gp("llm_model", env_key="LLM_MODEL", default="ctgu-vlm")
-            base_url = _gp("llm_base_url", env_key="LLM_BASE_URL", default="http://172.16.12.41:30000/v1")
+            base_url = _gp("llm_base_url", env_key="LLM_BASE_URL", default="http://172.xx.xx.xx:30000/v1")
             api_key = _gp("llm_api_key", env_key="LLM_API_KEY", default="")
 ```
 

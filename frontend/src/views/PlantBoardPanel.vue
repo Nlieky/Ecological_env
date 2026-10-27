@@ -1,23 +1,29 @@
 <template>
+  <PageState :state="boardState" :preserve-content="!!store.dashboard" :message="store.dashboardError ? (store.dashboard ? '刷新失败，保留上次加载的数据。' : '看板数据加载失败，请重试。') : undefined" @retry="retry">
+  <p v-if="store.dashboardError" role="alert">{{ store.dashboardError }}</p>
+  <p v-if="missingSide" role="status">{{ missingSide }}</p>
+  <button v-if="boardState === 'empty'" type="button" @click="retry">重新加载</button>
   <div class="board" v-if="store.dashboard">
+    <p v-if="annotationSummary" class="annotation-summary" role="status">{{ annotationSummary }} <button v-if="actionStore.annotationContext" @click="focusAnnotation">查看结果</button></p>
     <!-- 顶部：厂名 + 窗口 + 刷新状态 -->
     <div class="head">
       <div>
         <h2>{{ plantId }}</h2>
         <span class="sub">
-          <span class="live-dot" :class="{ on: replaying || !store.dashboardLoading }" />
+          <span class="live-dot" :class="{ on: !replaying && store.dashboard.data_context?.mode === 'live' && store.dashboard.data_context?.freshness === 'fresh' }" />
           <template v-if="replaying">
-            <b>流式输出</b> · {{ simTime }}
+            <b>历史回放</b> · {{ simTime }}
             <span class="mono">({{ Math.min(cursor, WINDOW_PTS) }}/{{ WINDOW_PTS }} 窗口 · 第 {{ cursor }}/{{ totalPts }} 点)</span>
             <template v-if="anchorDate"> · 段 {{ anchorDate }} 起</template>
             <span v-if="lastJump" class="jump">· ⤴ 已跳转至异常 {{ lastJump.slice(5, 16) }}</span>
           </template>
           <template v-else>
-            {{ store.dashboardLoading ? '刷新中…' : '实时监测中' }} ·
-            数据截至 {{ store.dashboard.latest_time || '—' }} ·
+            {{ store.dashboardLoading ? '刷新中…' : contextLabel(store.dashboard.data_context) }} ·
+            数据截至 {{ formatSamplingTime(store.dashboard.latest_time, store.dashboard.data_context?.timezone) }} ·
             进水 {{ store.dashboard.influent_points }} 点 · 出水 {{ store.dashboard.effluent_points }} 点
           </template>
         </span>
+        <div class="sub">{{ contextLabel(store.dashboard.data_context) }} · 数据库 {{ store.dashboard.data_context?.bucket || '未核验' }} · 时效 {{ plantStatusLabel(store.dashboard.data_context?.freshness || 'unverified') }} · 最新采样 {{ formatSamplingTime(store.dashboard.data_context?.latest_sample_at, store.dashboard.data_context?.timezone) }} · 窗口 {{ formatSamplingTime(store.dashboard.segment_start, store.dashboard.data_context?.timezone) }} ~ {{ formatSamplingTime(store.dashboard.segment_end, store.dashboard.data_context?.timezone) }} <span v-if="store.dashboard.data_context?.warning">· {{ store.dashboard.data_context.warning }}</span></div>
       </div>
       <div class="wins">
         <!-- 任意时间点开播:选日期 → 该日 00:00 起流式播放,播完自动续下一段 -->
@@ -25,10 +31,10 @@
           <span class="dp-lbl">开播</span>
           <input type="date" v-model="anchorDate" :min="DATA_MIN" :max="DATA_MAX" @change="onAnchorPick" />
         </span>
-        <button v-if="anchorDate" class="live-btn" @click="backToLive">● 实时</button>
+        <button v-if="anchorDate" class="live-btn" @click="backToLive">● 最新数据</button>
         <button v-for="w in WINDOWS" :key="w.v" :class="{ on: hours === w.v && !anchorDate }" @click="setWindow(w.v)">{{ w.t }}</button>
         <!-- 流式回放控制 -->
-        <button v-if="!replaying" class="replay" @click="startReplay()">▶ 流式回放</button>
+        <button v-if="!replaying" class="replay" @click="startReplay()">▶ 历史回放</button>
         <template v-else>
           <span class="speeds">
             <button v-for="(s, i) in SPEEDS" :key="s.t" :class="{ on: speedIdx === i }" @click="setSpeed(i)">{{ s.t }}</button>
@@ -41,7 +47,7 @@
     <!-- 全指标一页（Grafana 式）：每个指标一格，进水vs出水双曲线，同屏联动推进 -->
     <!-- visibleFields: AI set_view 指令可过滤只看指定指标面板 -->
     <div class="grid" :class="{ filtered: visibleFields.length < FIELDS.length }">
-      <div v-for="field in visibleFields" :key="field" class="panel"
+      <div v-for="field in visibleFields" :key="field" class="panel" :data-indicator="field"
         :class="{ warn: panelStatus(field) === 'warning', marked: hasAnnotations(field) }">
         <div class="p-hd">
           <div class="p-title">
@@ -70,7 +76,7 @@
     <div class="quality-card">
       <div class="ch-hd">数据质量</div>
       <div class="q-grid">
-        <div class="q-item"><span class="q-k">{{ anchorDate ? '播放段' : '数据窗口' }}</span><span class="q-v">{{ anchorDate ? `${store.dashboard.segment_start || anchorDate} ~ ${store.dashboard.segment_end || '—'}` : (store.dashboard.window_hours >= 10000 ? '全部' : store.dashboard.window_hours + 'h') }}</span></div>
+        <div class="q-item"><span class="q-k">{{ anchorDate ? '播放段' : '数据窗口' }}</span><span class="q-v">{{ anchorDate ? `${formatSamplingTime(store.dashboard.segment_start || anchorDate, store.dashboard.data_context?.timezone)} ~ ${formatSamplingTime(store.dashboard.segment_end, store.dashboard.data_context?.timezone)}` : (store.dashboard.window_hours >= 10000 ? '全部' : store.dashboard.window_hours + 'h') }}</span></div>
         <div class="q-item"><span class="q-k">进水点数</span><span class="q-v">{{ store.dashboard.influent_points }}</span></div>
         <div class="q-item"><span class="q-k">出水点数</span><span class="q-v">{{ store.dashboard.effluent_points }}</span></div>
         <div class="q-item"><span class="q-k">最后刷新</span><span class="q-v">{{ lastRefresh }}</span></div>
@@ -78,21 +84,38 @@
     </div>
   </div>
 
-  <div v-else class="board loading">
-    {{ store.dashboardLoading ? '加载看板数据…' : '该厂暂无数据' }}
-  </div>
+  </PageState>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import echarts from '@/lib/echarts'
+import PageState from '@/components/common/PageState.vue'
 import { usePlantsStore } from '@/stores/plants'
 import { useActionStore } from '@/stores/action'
+import type { Annotation } from '@/stores/action'
+import { matchAnnotations, samplingTimeKey, sameAnnotationWindow, type AnnotationContext } from '@/assistant/annotations'
 import { usePolling } from '@/composables/usePolling'
+import { dashboardRecords, latestValues, advanceDate, formatSamplingTime, plantStatusLabel, annotationCursor } from '@/composables/dashboardData'
+import { formatDataContext as contextLabel } from '@/utils/displayFormat'
 
 const props = defineProps<{ plantId: string }>()
 const store = usePlantsStore()
 const actionStore = useActionStore()
+const annotationSummary = ref('')
+let disposed = false
+const missingSide = computed(() => {
+  const d = store.dashboard
+  if (!d || (!d.influent_points && !d.effluent_points)) return ''
+  return !d.influent_points ? '缺少进水数据，当前仅显示出水采样。' : !d.effluent_points ? '缺少出水数据，当前仅显示进水采样。' : ''
+})
+const boardState = computed(() => {
+  if (store.dashboardLoading) return store.dashboard ? 'refreshing' : 'initial-loading'
+  if (store.dashboardError) return 'error'
+  if (!store.dashboard || (!store.dashboard.influent_points && !store.dashboard.effluent_points)) return 'empty'
+  return missingSide.value ? 'partial' : store.dashboard.data_context?.freshness === 'stale' ? 'stale' : 'ready'
+})
+async function retry() { await store.fetchDashboard(props.plantId, hours.value, anchorDate.value || undefined) }
 
 const WINDOWS = [
   { t: '24h', v: 24 }, { t: '72h', v: 72 }, { t: '168h', v: 168 }, { t: '全部', v: 10000 },
@@ -106,15 +129,22 @@ const lastJump = ref('')   // 标注跳转提示(异常点在视野外时自动�
 // 选日期后 fetchDashboard 带 anchor=该日,取[该日00:00起7天]一段;
 // 回放播完该段 → 自动加载下一段(锚点+7天)继续播,永续直到"回到实时"。
 const anchorDate = ref('')          // '' = 实时模式(锚定最新点)
+/** Awaitable bridge for the global assistant; updates the actual board window. */
+async function applyAssistantRange(range: '1h' | '6h' | '24h' | '7d' | '30d') {
+  stopReplay()
+  hours.value = ({ '1h': 1, '6h': 6, '24h': 24, '7d': 168, '30d': 720 })[range]
+  anchorDate.value = ''
+  const data = await store.fetchDashboard(props.plantId, hours.value)
+  return !!data && !disposed
+}
+defineExpose({ applyAssistantRange, applyAssistantAnnotations })
 const DATA_MIN = '2026-01-01'
 const DATA_MAX = '2026-12-31'
 const SEG_DAYS = 7
 
 /** 下一段锚点 = 当前段锚点 + 7 天;超出数据末尾返回 ''(停播回实时) */
 function nextSegmentAnchor(): string {
-  const a = new Date(anchorDate.value + 'T00:00:00')
-  a.setDate(a.getDate() + SEG_DAYS)
-  const ymd = a.toISOString().slice(0, 10)
+  const ymd = advanceDate(anchorDate.value, SEG_DAYS)
   // 数据末尾判断:segment_end 接近 latest_time 就没有下一段了
   const seg = store.dashboard?.segment_end || ''
   const latest = store.dashboard?.latest_time || ''
@@ -124,15 +154,19 @@ function nextSegmentAnchor(): string {
 
 async function onAnchorPick() {
   if (!anchorDate.value) { backToLive(); return }
-  await store.fetchDashboard(props.plantId, hours.value, anchorDate.value)
+  stopReplay()
+  const data = await store.fetchDashboard(props.plantId, hours.value, anchorDate.value)
+  if (disposed || !data) return
   startReplay()
 }
 function setWindow(v: number) {
+  stopReplay()
   hours.value = v
   anchorDate.value = ''   // 选时间窗 = 回实时模式
   void store.fetchDashboard(props.plantId, hours.value)
 }
 function backToLive() {
+  stopReplay()
   anchorDate.value = ''
   void store.fetchDashboard(props.plantId, hours.value).then(() => {
     // 实时模式不自动回放,显示最新窗口全量
@@ -143,9 +177,25 @@ function backToLive() {
 // ══ 全指标图表网格 ════════════════════════════════════════════════
 const chartRefs = new Map<string, HTMLDivElement>()
 const charts = new Map<string, ReturnType<typeof echarts.init>>()
+let resizeObserver: ResizeObserver | undefined
 
 function setChartRef(field: string, el: unknown) {
-  if (el) chartRefs.set(field, el as HTMLDivElement)
+  const previous = chartRefs.get(field)
+  if (previous === el) return
+  if (previous) {
+    resizeObserver?.unobserve(previous)
+    charts.get(field)?.dispose()
+    charts.delete(field)
+    chartRefs.delete(field)
+  }
+  if (el) { chartRefs.set(field, el as HTMLDivElement); resizeObserver?.observe(el as HTMLDivElement) }
+}
+
+function clearCharts() {
+  chartRefs.forEach(el => resizeObserver?.unobserve(el))
+  charts.forEach(chart => chart.dispose())
+  charts.clear()
+  chartRefs.clear()
 }
 
 function ensureCharts() {
@@ -166,26 +216,12 @@ const speedIdx = ref(0)
 const WINDOW_PTS = 24   // 固定窗口=24个点(约一天),左右恒定,数据流过
 let replayTimer: ReturnType<typeof setInterval> | null = null
 
-const totalPts = computed(() => {
-  let n = 0
-  for (const f of FIELDS.value) {
-    const ind = store.dashboard?.indicators?.[f]
-    if (!ind) continue
-    n = Math.max(n, ind.series.effluent.length, ind.series.influent.length)
-  }
-  return n
-})
+const alignedRows = computed(() => dashboardRecords(store.dashboard?.indicators ?? {}))
+const totalPts = computed(() => alignedRows.value.length)
 
 const simTime = computed(() => {
   if (!replaying.value) return ''
-  for (const f of FIELDS.value) {
-    const ind = store.dashboard?.indicators?.[f]
-    if (!ind) continue
-    const s = ind.series.effluent.length ? ind.series.effluent : ind.series.influent
-    const i = Math.min(cursor.value, s.length) - 1
-    if (i >= 0) return s[i].time
-  }
-  return ''
+  return formatSamplingTime(alignedRows.value[Math.min(cursor.value, totalPts.value) - 1]?.timestamp, store.dashboard?.data_context?.timezone)
 })
 
 function clearReplayTimer() {
@@ -193,6 +229,7 @@ function clearReplayTimer() {
 }
 
 function startReplay(fromCurrent = false) {
+  if (disposed || !store.dashboard) return
   clearReplayTimer()
   replaying.value = true
   if (!fromCurrent) cursor.value = 0
@@ -202,10 +239,11 @@ function startReplay(fromCurrent = false) {
       // 锚点模式播完本段:自动加载下一段继续播(永续)
       const next = nextSegmentAnchor()
       if (next) {
+        clearReplayTimer()
         anchorDate.value = next
         cursor.value = 0
-        await store.fetchDashboard(props.plantId, hours.value, next)
-        // startReplay 不重置 cursor,继续跑(此时 cursor 已是 0)
+        const data = await store.fetchDashboard(props.plantId, hours.value, next)
+        if (!disposed && data && anchorDate.value === next) startReplay()
       } else {
         backToLive()  // 到数据末尾了,回实时
       }
@@ -232,9 +270,7 @@ function cardVal(field: string, side: 'influent' | 'effluent'): number | null {
   const ind = store.dashboard?.indicators?.[field]
   if (!ind) return null
   if (!replaying.value) return ind[side]
-  const s = ind.series[side]
-  const i = Math.min(cursor.value, s.length) - 1
-  return i >= 0 ? (s[i]?.value ?? null) : null
+  return latestValues(alignedRows.value.slice(0, cursor.value), field)[side]
 }
 function panelStatus(field: string): 'normal' | 'warning' | 'nodata' {
   const ind = store.dashboard?.indicators?.[field]
@@ -281,7 +317,7 @@ const { start: startPoll, stop: stopPoll } = usePolling(
   async () => {
     if (anchorDate.value) return  // 播放历史段时不轮询
     await store.fetchDashboard(props.plantId, hours.value)
-    lastRefresh.value = new Date().toLocaleTimeString()
+    if (!disposed && !store.dashboardError) lastRefresh.value = new Date().toLocaleTimeString()
   },
   POLL_MS,
 )
@@ -301,15 +337,13 @@ function annCount(field: string): number {
   if (!hasAnnotations(field)) return 0
   return actionStore.annotations.length
 }
-function markPointsFor(field: string, effl: { time: string; value: number }[], infl: { time: string; value: number }[]) {
+function markPointsFor(field: string, effl: { time: string; value: number | null }[], infl: { time: string; value: number | null }[], side: 'influent' | 'effluent' = 'effluent') {
   if (!actionStore.annotations.length) return undefined
   if (actionStore.annotationIndicator && actionStore.annotationIndicator !== field) return undefined
-  const xs = (effl.length ? effl : infl).map((p) => p.time.slice(5))
-  const idxByTime = new Map(xs.map((t, i) => [t, i]))
-  const pts = actionStore.annotations
-    .map((a) => ({ idx: idxByTime.get(a.timestamp.slice(5)), a }))
-    .filter(({ idx }) => idx !== undefined)
-    .map(({ idx, a }) => ({ coord: [idx, a.value], value: a.type, itemStyle: { color: '#ef4444' } }))
+  const binding = actionStore.annotationContext
+  if ((binding?.side || actionStore.annotationSide) !== side) return undefined
+  if (binding && !sameAnnotationWindow(binding, currentAnnotationWindow())) return undefined
+  const pts = matchAnnotations(actionStore.annotations, side === 'influent' ? infl : effl, store.dashboard?.data_context?.timezone).points
   if (!pts.length) return undefined
   return {
     symbol: 'circle', symbolSize: 7,
@@ -327,14 +361,10 @@ function renderAll() {
     const ch = charts.get(field)
     const ind = inds[field]
     if (!ch || !ind) continue
-    let infl = ind.series.influent
-    let effl = ind.series.effluent
-    if (replaying.value) {
-      // 固定滑窗:已播的 WINDOW_PTS 个点;超出窗口左端的流走(不堆叠)
-      infl = infl.slice(Math.max(0, cursor.value - WINDOW_PTS), cursor.value)
-      effl = effl.slice(Math.max(0, cursor.value - WINDOW_PTS), cursor.value)
-    }
-    const xs = (effl.length ? effl : infl).map((p) => p.time.slice(5))
+    const rows = replaying.value ? alignedRows.value.slice(Math.max(0, cursor.value - WINDOW_PTS), cursor.value) : alignedRows.value
+    const infl = rows.map(r => ({ time: r.timestamp.replace('T', ' '), value: r.influent[field] ?? null }))
+    const effl = rows.map(r => ({ time: r.timestamp.replace('T', ' '), value: r.effluent[field] ?? null }))
+    const xs = rows.map(r => (samplingTimeKey(r.timestamp, store.dashboard?.data_context?.timezone)?.slice(0, 19) || r.timestamp.replace('T', ' ')).slice(5))
     // 限值参考线
     const lim = ind.limit as number | [number, number] | null | undefined
     const markLine: any = { silent: true, symbol: 'none', data: [] as any[], lineStyle: { color: '#f59e0b', type: 'dashed', opacity: .7 }, label: { fontSize: 9, formatter: '{b}: {c}' } }
@@ -343,9 +373,8 @@ function renderAll() {
       if (lim[0] != null) markLine.data.push({ yAxis: lim[0], name: '下限' })
       if (lim[1] != null) markLine.data.push({ yAxis: lim[1], name: '上限' })
     }
-    const mp = markPointsFor(field, effl, infl)
-    const showIn = sideFilter.value !== 'effluent' && infl.length > 0   // 无进水数据的厂不画进水线
-    const showOut = sideFilter.value !== 'influent' && effl.length > 0
+    const showIn = sideFilter.value !== 'effluent' && hasSide(field, 'influent')
+    const showOut = sideFilter.value !== 'influent' && hasSide(field, 'effluent')
     const overLimit = panelStatus(field) === 'warning'
     const outColor = overLimit ? '#ef4444' : '#10b981'
     const areas = thresholdAreas(field)
@@ -353,7 +382,7 @@ function renderAll() {
     if (showIn) series.push(
       { name: '进水', type: 'line', smooth: true, symbol: 'none',
         data: infl.map((p) => p.value), lineStyle: { width: 1.6 }, itemStyle: { color: '#6366f1' },
-        areaStyle: { color: 'rgba(99,102,241,.05)' } })
+        areaStyle: { color: 'rgba(99,102,241,.05)' }, markPoint: markPointsFor(field, effl, infl, 'influent') })
     if (showOut) series.push(
       { name: '出水', type: 'line', smooth: true, symbol: 'none',
         data: effl.map((p) => p.value), lineStyle: { width: 1.8 },
@@ -361,7 +390,7 @@ function renderAll() {
         areaStyle: { color: overLimit ? 'rgba(239,68,68,.07)' : 'rgba(16,185,129,.05)' },
         markLine: markLine.data.length ? markLine : undefined,
         markArea: areas ? { silent: true, data: areas } : undefined,
-        markPoint: mp })
+        markPoint: markPointsFor(field, effl, infl, 'effluent') })
     ch.setOption({
       animation: true, animationDurationUpdate: 260, animationEasingUpdate: 'linear',
       tooltip: { trigger: 'axis', textStyle: { fontSize: 11 } },
@@ -376,6 +405,11 @@ function renderAll() {
 }
 
 watch(() => store.dashboard, (d) => {
+  if (!d) clearCharts()
+  if (actionStore.annotationContext && !sameAnnotationWindow(actionStore.annotationContext, currentAnnotationWindow())) {
+    actionStore.clearAnnotations()
+    annotationSummary.value = '厂站、来源或采样窗口已变化，旧检测标注已清除。'
+  }
   // 上报观看窗口上下文:AI 检测动作按"正在看的时段"取数
   if (d) actionStore.setViewContext({
     plant: props.plantId,
@@ -384,6 +418,7 @@ watch(() => store.dashboard, (d) => {
     segmentEnd: d.segment_end,
   })
   nextTick(() => {
+    if (disposed) return
     ensureCharts()   // 数据到达后 DOM 才在,init 在这兜底(修过 v-if 时序坑)
     renderAll()
   })
@@ -402,16 +437,55 @@ function ensureAnnotationVisible() {
   if (!anns.length || !replaying.value) return
   const ind = store.dashboard?.indicators?.[actionStore.annotationIndicator || '']
   if (!ind) return
-  const s = ind.series.effluent.length ? ind.series.effluent : ind.series.influent
   const firstTs = anns.map((a) => a.timestamp).sort()[0]
-  // 找首个异常点在序列里的下标
-  const idx = s.findIndex((p) => p.time === firstTs)
-  if (idx < 0) return                      // 不在本段数据里,无从跳转
-  const windowStart = cursor.value - WINDOW_PTS
-  if (idx >= windowStart && idx < cursor.value) return  // 已在窗内
-  // 跳转:游标 = 异常点下标 + 半窗,让红点落在窗口中部
-  cursor.value = Math.min(idx + Math.floor(WINDOW_PTS / 2), totalPts.value)
+  const next = annotationCursor(alignedRows.value, firstTs, cursor.value, WINDOW_PTS)
+  if (next === cursor.value) return
+  cursor.value = next
   lastJump.value = firstTs
+}
+function currentAnnotationWindow() {
+  return { plant: props.plantId, source: store.dashboard?.data_context?.bucket || '', start: store.dashboard?.segment_start, end: store.dashboard?.segment_end }
+}
+function focusAnnotation() {
+  const field = actionStore.annotationIndicator
+  const chart = field ? chartRefs.get(field) : undefined
+  chart?.closest('.panel')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+}
+/** Apply only verified points, then inspect the actual rendered chart output. */
+async function applyAssistantAnnotations(annotations: Annotation[], binding: AnnotationContext) {
+  if (disposed || !sameAnnotationWindow(binding, currentAnnotationWindow())) return { success: false, code: 'stale_context', message: '检测期间厂站、来源或采样窗口已变化，未应用旧标注' }
+  const field = actionStore.normalizeIndicator(binding.indicator)
+  const indicator = store.dashboard?.indicators[field]
+  if (!indicator || !hasSide(field, binding.side)) return { success: false, code: 'missing_side', message: '目标指标或侧别没有可显示的采样数据' }
+  const matched = matchAnnotations(annotations, indicator.series[binding.side], binding.timezone)
+  if (matched.unmatched) return { success: false, code: 'unmatched_annotations', message: `检测返回 ${annotations.length} 个点，其中 ${matched.unmatched} 个与当前采样时间或数值不匹配，未标注` }
+  const wasReplaying = replaying.value
+  stopReplay()
+  if (actionStore.indicators && !visibleFields.value.includes(field)) actionStore.indicators = [...actionStore.indicators, field]
+  if (actionStore.side && actionStore.side !== binding.side) actionStore.side = binding.side
+  await nextTick()
+  if (disposed || !sameAnnotationWindow(binding, currentAnnotationWindow())) return { success: false, code: 'stale_context', message: '准备绘图时采样窗口已变化，未应用旧标注' }
+  ensureCharts()
+  const chart = charts.get(field)
+  if (!chart) return { success: false, code: 'chart_not_ready', message: '目标图表尚未就绪，检测结果未应用，请重新准备' }
+  actionStore.annotations = annotations
+  actionStore.annotationIndicator = field
+  actionStore.annotationContext = { ...binding, indicator: field }
+  actionStore.annotationSide = binding.side
+  actionStore.annotationSeq++
+  await nextTick()
+  renderAll()
+  const series = chart.getOption().series as { name?: string; markPoint?: { data?: unknown[] } }[] | undefined
+  const sideName = binding.side === 'influent' ? '进水' : '出水'
+  const visible = series?.find(s => s.name === sideName)?.markPoint?.data?.length || 0
+  const details = { algorithm: binding.algorithm, indicator: field, side: binding.side, plant: binding.plant, source: binding.source, start: binding.start, end: binding.end, anomaly_count: annotations.length, visible_count: visible }
+  if (visible !== annotations.length) {
+    actionStore.clearAnnotations(); renderAll()
+    return { success: false, code: 'unmatched_annotations', message: '检测结果未完整显示在目标曲线上，请重新准备', details }
+  }
+  annotationSummary.value = `${binding.plant} ${sideName} ${field} · ${binding.start} ~ ${binding.end} · ${binding.algorithm}：${annotations.length ? `检出并显示 ${visible} 个统计异常点` : '本次未检出统计异常点'}。不代表违规判断。${wasReplaying ? '已暂停历史回放以展示结果。' : ''}`
+  focusAnnotation()
+  return { success: true, code: annotations.length ? 'completed' : 'empty', message: annotationSummary.value, details }
 }
 const visibleFields = computed(() => {
   const all = FIELDS.value
@@ -424,8 +498,9 @@ const visibleFields = computed(() => {
 const sideFilter = computed(() => actionStore.side)
 
 // 切时间窗 / 切厂：拉新数据后从头回放
-watch(hours, async () => { await store.fetchDashboard(props.plantId, hours.value); startReplay() })
 watch(() => props.plantId, async () => {
+  actionStore.clearAnnotations()
+  annotationSummary.value = ''
   hours.value = 24
   anchorDate.value = ''   // 切厂回实时模式
   stopReplay()
@@ -437,24 +512,34 @@ function resize() { charts.forEach((c) => c.resize()) }
 
 onMounted(async () => {
   window.addEventListener('resize', resize)
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(resize)
+    chartRefs.forEach(el => resizeObserver?.observe(el))
+  }
   await store.fetchDashboard(props.plantId, hours.value)
+  if (disposed) return
   startPoll()
   startReplay()
 })
 onBeforeUnmount(() => {
+  disposed = true
+  store.invalidateDashboard()
   clearReplayTimer()
   stopPoll()
   window.removeEventListener('resize', resize)
-  charts.forEach((c) => c.dispose())
-  charts.clear(); chartRefs.clear()
+  clearCharts()
+  resizeObserver?.disconnect()
 })
 </script>
 
 <style scoped>
 .board { display: flex; flex-direction: column; gap: 14px }
+.annotation-summary { margin: 0; padding: 10px 12px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #334155; font-size: 12px; line-height: 1.7 }
+.annotation-summary button { border: 1px solid #93c5fd; background: white; color: #2563eb; border-radius: 6px; padding: 3px 8px; cursor: pointer }
 .board.loading { padding: 60px; text-align: center; color: var(--text-muted) }
 
-.head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px }
+.head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+  position: sticky; top: 0; z-index: 2; background: var(--bg, #f8fafc); padding: 8px 0 }
 .head h2 { margin: 0; font-size: 18px }
 .sub { font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap }
 .sub b { color: var(--primary, #4f46e5) }
@@ -463,7 +548,7 @@ onBeforeUnmount(() => {
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1 }
 .live-dot.on { background: #10b981; animation: pulse 2s infinite }
 @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,.4) } 50% { box-shadow: 0 0 0 5px rgba(16,185,129,0) } }
-.wins { display: flex; gap: 6px; align-items: center }
+.wins { display: flex; gap: 6px; align-items: center; flex-wrap: wrap }
 .date-pick { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--brd, #e2e8f0);
   border-radius: 7px; padding: 3px 8px; background: #fff }
 .dp-lbl { font-size: 11px; color: var(--text-muted, #94a3b8) }

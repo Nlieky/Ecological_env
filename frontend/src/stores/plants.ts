@@ -53,6 +53,13 @@ export const usePlantsStore = defineStore('plants', () => {
 
   const dashboard = ref<PlantDashboard | null>(null)
   const dashboardLoading = ref(false)
+  const dashboardError = ref<string | null>(null)
+  let dashboardGeneration = 0
+  let dashboardQuery = ''
+  function invalidateDashboard() {
+    dashboardGeneration++
+    dashboardLoading.value = false
+  }
 
   async function fetchTree(force = false) {
     if (tree.value && !force) return tree.value
@@ -67,17 +74,27 @@ export const usePlantsStore = defineStore('plants', () => {
     } finally { treeLoading.value = false }
   }
 
-  async function fetchDashboard(plantId: string, hours = 24, anchor?: string) {
+  async function fetchDashboard(plantId: string, hours = 24, anchor?: string, endDate?: string) {
+    const generation = ++dashboardGeneration
     dashboardLoading.value = true
+    dashboardError.value = null
+    const query = JSON.stringify([plantId, hours, anchor || '', endDate || ''])
+    if (dashboardQuery !== query) dashboard.value = null
+    dashboardQuery = query
     try {
-      const r = await plantsService.dashboard(plantId, hours, anchor)
+      const r = await plantsService.dashboard(plantId, hours, anchor, endDate)
+      if (generation !== dashboardGeneration) return null
       dashboard.value = r.data
       return r.data
-    } catch { dashboard.value = null; return null }
-    finally { dashboardLoading.value = false }
+    } catch (e: unknown) {
+      if (generation !== dashboardGeneration) return null
+      dashboardError.value = e instanceof Error ? e.message : '看板数据加载失败'
+      return null
+    }
+    finally { if (generation === dashboardGeneration) dashboardLoading.value = false }
   }
 
-  return { tree, treeLoading, treeError, dashboard, dashboardLoading,
+  return { tree, treeLoading, treeError, dashboard, dashboardLoading, dashboardError, invalidateDashboard,
     openCities, openDists, activePlant, toggleCity, toggleDist,
     selectPlant, expandTo, fetchTree, fetchDashboard }
 })

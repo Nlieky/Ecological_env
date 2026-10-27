@@ -25,7 +25,7 @@
 | LSTM自编码器 | 学习时序模式，重构误差高的为异常 | 长序列、有模式 | epochs=50 |
 | VAE | 变分自编码器 | 复杂分布 | latent_dim=8 |
 
-## 二、算子选择策略（专利要求）
+## 二、算子选择策略
 
 ```
 输入：特征向量
@@ -41,7 +41,7 @@
 └─────────────────────────────────────────────────┘
 ```
 
-## 三、专利参数要求
+## 三、参数要求
 
 | 参数 | 要求值 | 说明 |
 |------|--------|------|
@@ -74,7 +74,7 @@ from sklearn.ensemble import IsolationForest
 
 X = series.values.reshape(-1, 1)
 iso_forest = IsolationForest(
-    contamination=0.1,  # 专利要求值
+    contamination=0.1,  # 要求值
     n_estimators=100,
     random_state=42
 )
@@ -95,7 +95,7 @@ Q1 = series.quantile(0.25)
 Q3 = series.quantile(0.75)
 IQR = Q3 - Q1
 
-lower_bound = Q1 - 1.5 * IQR  # 专利系数
+lower_bound = Q1 - 1.5 * IQR  # IQR 系数
 upper_bound = Q3 + 1.5 * IQR
 
 anomaly_mask = (series < lower_bound) | (series > upper_bound)
