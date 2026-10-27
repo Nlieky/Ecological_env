@@ -294,6 +294,18 @@ npm run dev
 - 智能体服务健康检查：`http://localhost:8642/health`
 - InfluxDB 健康检查：`http://localhost:8086/health`
 
+### Docker 部署（可选）
+
+```bash
+# 前置：已完成上文的 .env 配置（LLM 三项必填）。
+# 如需在容器里导入监管报表，先把 xls 放到 shared/data/real-time/（会在构建时进入镜像）；
+# 不放也能起服务，只是 InfluxDB 里没有业务数据（influxdb-init 容器会报"没有 .xls 文件"后退出，属预期）。
+docker compose up -d --build
+```
+
+访问：前端 `http://localhost:8080`（nginx 托管 + `/api` 反代），后端 `http://localhost:8000/docs`。
+InfluxDB 首启自动建 org/bucket（`monitoring-real`）并导入报表；容器内通过服务名互访（LLM 地址仍按 `.env` 填，需容器网络可达）。
+
 ### API 端点
 
 | 端点 | 方法 | 说明 |
